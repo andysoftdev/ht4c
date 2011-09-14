@@ -1,16 +1,16 @@
-HOW TO BUILD HT4C
+HOW TO BUILD ht4c
 =================
 
-Building ht4c for Windows requires Microsoft Visual Studio 2010 Professional or better.
+Building ht4c from source requires at least Microsoft Visual Studio 2010 Professional.
 
-###Browse or get the source###
 
-* Browse or download the source at [github](http://github.com/andysoftdev/ht4c).
-  Download the latest sources by pressing the Downloads button and choosing
-  Download.tar.gz or Download.zip.
+###Browse through or download the ht4c source###
+
+* Browse through or download the ht4c source from [github](http://github.com/andysoftdev/ht4c).
+  To download the latest sources press the 'Downloads' button and choose one of the following files, either the
+  Download.tar.gz or the Download.zip.
   
-* Or get the source from the repository, create a projects folder (the path must not
-  contain any spaces) and use:
+* Alternatively, get the source from the repository, create a projects folder (the path must not contain any spaces) and use:
 
 		mkdir hypertable
 		cd hypertable
@@ -24,13 +24,12 @@ Building ht4c for Windows requires Microsoft Visual Studio 2010 Professional or 
 
 ###Build ht4c###
 
-* Open the ht4c solution (...\\ht4c\\ht4c.sln) with Microsoft Visual Studio 2010 and build the solution configuration(s) or
-  run Visual Studio Command Prompt and run:
+* Open the ht4c solution (ht4c\ht4c.sln) with Microsoft Visual Studio 2010 and build its configurations. Alternatively, open the Visual Studio command prompt and type:
 
-		cd ...\ht4c
+		cd ht4c
 		msbuild ht4c.buildproj
-  or for a complete rebuild
+  or, for a complete rebuild, type
 
-		cd ...\ht4c
+		cd ht4c
 		msbuild ht4c.buildproj /t:Clean;Make
 
