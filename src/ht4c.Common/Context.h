@@ -1,0 +1,65 @@
+/** -*- C++ -*-
+ * Copyright (C) 2011 Andy Thalmann
+ *
+ * This file is part of ht4c.
+ *
+ * ht4c is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or any later version.
+ *
+ * Hypertable is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ */
+
+#pragma once
+
+#ifdef __cplusplus_cli
+#pragma managed( push, off )
+#endif
+
+#include "ContextKind.h"
+
+namespace ht4c { namespace Common {
+		class Client;
+		class Properties;
+
+	/// <summary>
+	/// Abstract class represents a Hypertable context, handles connection to a Hypertable instance.
+	/// </summary>
+	class Context : public IContextKind {
+
+		public:
+
+			/// <summary>
+			/// Destroys the Context instance.
+			/// </summary>
+			virtual ~Context( ) { }
+
+			/// <summary>
+			/// Creates a new Hypertable client.
+			/// </summary>
+			/// <returns>New Client instance</returns>
+			/// <remarks>To free the created instance, use the delete operator.</remarks>
+			virtual Common::Client* createClient( ) = 0;
+
+			/// <summary>
+			/// Returns all configuration parameters.
+			/// </summary>
+			/// <param name="prop">Receives the configuration parameters</param>
+			/// <seealso cref="ht4c::Common::Properties"/>
+			virtual void getProperties( Properties& prop ) const = 0;
+	};
+
+} }
+
+#ifdef __cplusplus_cli
+#pragma managed( pop )
+#endif

@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Make" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+
+	<!-- Master files to make -->
+	<PropertyGroup>
+		<Version>0.9.5.0</Version>
+	</PropertyGroup>
+
+	<!-- Check for MSBuildCommunityTasks -->
+	<PropertyGroup>
+		<MSBuildCommunityTasksTargets>$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets</MSBuildCommunityTasksTargets>
+		<HasMSBuildCommunityTasks>false</HasMSBuildCommunityTasks>
+		<HasMSBuildCommunityTasks Condition="Exists('$(MSBuildCommunityTasksTargets)')">true</HasMSBuildCommunityTasks>
+	</PropertyGroup>
+
+	<!-- Get machine's architecture -->
+	<PropertyGroup>
+		<MachineProcessorArchitecture>$(registry:HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment@PROCESSOR_ARCHITECTURE)</MachineProcessorArchitecture>
+		<Is32Bit>False</Is32Bit>
+		<Is32Bit
+			Condition="'$(MachineProcessorArchitecture)' == 'x86'">true</Is32Bit>
+		<Is64Bit>False</Is64Bit>
+		<Is64Bit
+			Condition="'$(MachineProcessorArchitecture)' == 'AMD64'">true</Is64Bit>
+	</PropertyGroup>
+
+	<!-- Configuration group -->
+	<ItemGroup>
+		<MakeConfiguration Include="." >
+			<Configuration>Debug</Configuration>
+			<Platform>Win32</Platform>
+		</MakeConfiguration>
+		<MakeConfiguration Include="." >
+			<Configuration>Release</Configuration>
+			<Platform>Win32</Platform>
+		</MakeConfiguration>
+		<MakeConfiguration Include="." Condition="$(Is64Bit) == true" >
+			<Configuration>Debug</Configuration>
+			<Platform>x64</Platform>
+		</MakeConfiguration>
+		<MakeConfiguration Include="." Condition="$(Is64Bit) == true" >
+			<Configuration>Release</Configuration>
+			<Platform>x64</Platform>
+		</MakeConfiguration>
+	</ItemGroup>
+
+	<!-- Import MSBuildCommunityTasksTargets if available -->
+	<Import Project="$(MSBuildCommunityTasksTargets)"
+			Condition="$(HasMSBuildCommunityTasks) == true"/>
+
+	<!-- Build and make master -->
+	<Target Name="Make"
+			DependsOnTargets="CleanMaster;Build;MakeMaster">
+	</Target>
+
+	<!-- Build -->
+	<Target Name="Build">
+		<MSBuild
+			Projects="ht4c.sln"
+			Targets="Build"
+			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform)"
+			ContinueOnError="false" />
+	</Target>
+
+	<!-- Make master -->
+	<Target Name="MakeMaster"
+			Condition="$(HasMSBuildCommunityTasks) == true" >
+	</Target>
+
+	<!-- Cleans build and deletes the master files -->
+	<Target Name="Clean"
+			DependsOnTargets="CleanMaster">
+		<MSBuild
+			Projects="ht4c.sln"
+			Targets="Clean"
+			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform)"
+			ContinueOnError="false" />
+	</Target>
+
+	<!-- Deletes the master files -->
+	<Target Name="CleanMaster">
+	</Target>
+
+</Project>
