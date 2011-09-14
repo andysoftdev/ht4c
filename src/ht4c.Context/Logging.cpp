@@ -42,7 +42,7 @@ namespace {
 				: fs( 0 )
 				, ls( )
 			{
-				setp( buf, buf + size - 1 );
+				setp( buf, buf + size_t(size - 1) );
 			}
 
 			void setSink( std::fstream* _fs ) {
