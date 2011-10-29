@@ -153,6 +153,11 @@ namespace ht4c { namespace Thrift {
 			tss.__isset.cell_limit = true;
 		}
 
+		if( hss.cell_limit_per_family ) {
+			tss.cell_limit_per_family = hss.cell_limit_per_family;
+			tss.__isset.cell_limit_per_family = true;
+		}
+
 		if( hss.max_versions ) {
 			tss.revs = hss.max_versions;
 			tss.__isset.revs = true;

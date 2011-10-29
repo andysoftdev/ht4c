@@ -75,10 +75,16 @@ namespace ht4c { namespace Common {
 			void maxVersions( int maxVersion );
 
 			/// <summary>
-			/// Sets the maximum number of cells to return per column family, per row.
+			/// Sets the maximum number of cells to return.
 			/// </summary>
-			/// <param name="maxCells">Maximum number of cells to return per column family, per row</param>
+			/// <param name="maxCells">Maximum number of cells to return</param>
 			void maxCells( int maxCells );
+
+			/// <summary>
+			///  Sets the maximum number of cells to return per column family and row.
+			/// </summary>
+			/// <param name="maxCells">Maximum number of cells to return per column family and row</param>
+			void maxCellsColumnFamily( int maxCells );
 
 			/// <summary>
 			/// If set scans return only keys, no cell values.

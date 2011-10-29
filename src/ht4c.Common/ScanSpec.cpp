@@ -57,6 +57,10 @@ namespace ht4c { namespace Common {
 		scanSpecBuilder.set_cell_limit( maxCells );
 	}
 
+	void ScanSpec::maxCellsColumnFamily( int maxCells ) {
+		scanSpecBuilder.set_cell_limit_per_family( maxCells );
+	}
+
 	void ScanSpec::keysOnly( bool keysOnly ) {
 		scanSpecBuilder.set_keys_only( keysOnly );
 	}
