@@ -43,7 +43,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			{
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->close_mutator(tableMutator, true) );
+				HT4C_THRIFT_RETRY( client->close_mutator(tableMutator) );
 			}
 			client = 0;
 		}
