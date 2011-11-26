@@ -163,6 +163,16 @@ namespace ht4c { namespace Thrift {
 			tss.__isset.revs = true;
 		}
 
+		if( hss.row_offset ) {
+			tss.row_offset = hss.row_offset;
+			tss.__isset.row_offset = true;
+		}
+
+		if( hss.cell_offset ) {
+			tss.cell_offset = hss.cell_offset;
+			tss.__isset.cell_offset = true;
+		}
+
 		if( hss.time_interval.first ) {
 			tss.start_time = hss.time_interval.first;
 			tss.__isset.start_time = true;
@@ -197,15 +207,19 @@ namespace ht4c { namespace Thrift {
 			tss.__isset.row_intervals = true;
 
 			Hypertable::ThriftGen::RowInterval tri;
-			tri.__isset.start_row = true;
 			tri.__isset.start_inclusive = true;
-			tri.__isset.end_row = true;
 			tri.__isset.end_inclusive = true;
 
 			foreach( const Hypertable::RowInterval& ri, hss.row_intervals ) {
-				tri.start_row = ri.start;
+				tri.__isset.start_row = ri.start != 0;
+				if( ri.start ) {
+					tri.start_row = ri.start;
+				}
 				tri.start_inclusive = ri.start_inclusive;
-				tri.end_row = ri.end;
+				tri.__isset.end_row = ri.end != 0;
+				if( ri.end ) {
+					tri.end_row = ri.end;
+				}
 				tri.end_inclusive = ri.end_inclusive;
 
 				tss.row_intervals.push_back( tri );
@@ -217,18 +231,22 @@ namespace ht4c { namespace Thrift {
 			tss.__isset.cell_intervals = true;
 
 			Hypertable::ThriftGen::CellInterval tci;
-			tci.__isset.start_row = true;
 			tci.__isset.start_column = true;
 			tci.__isset.start_inclusive = true;
-			tci.__isset.end_row = true;
 			tci.__isset.end_column = true;
 			tci.__isset.end_inclusive = true;
 
 			foreach( const Hypertable::CellInterval& ci, hss.cell_intervals ) {
-				tci.start_row = ci.start_row;
+				tci.__isset.start_row = ci.start_row != 0;
+				if( ci.start_row ) {
+					tci.start_row = ci.start_row;
+				}
 				tci.start_column = ci.start_column;
 				tci.start_inclusive = ci.start_inclusive;
-				tci.end_row = ci.end_row;
+				tci.__isset.end_row = ci.end_row != 0;
+				if( ci.end_row ) {
+					tci.end_row = ci.end_row;
+				}
 				tci.end_column = ci.end_column;
 				tci.end_inclusive = ci.end_inclusive;
 

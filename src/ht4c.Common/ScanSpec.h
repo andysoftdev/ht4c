@@ -81,10 +81,24 @@ namespace ht4c { namespace Common {
 			void maxCells( int maxCells );
 
 			/// <summary>
-			///  Sets the maximum number of cells to return per column family and row.
+			/// Sets the maximum number of cells to return per column family and row.
 			/// </summary>
 			/// <param name="maxCells">Maximum number of cells to return per column family and row</param>
 			void maxCellsColumnFamily( int maxCells );
+
+			/// <summary>
+			/// Sets the number of rows to be skipped at the beginning of the query.
+			/// </summary>
+			/// <param name="rows">Number of rows to be skipped</param>
+			/// <remarks>Not valid in combination of cell offset</remarks>
+			void rowOffset( int rows );
+
+			/// <summary>
+			/// Sets the number of cells to be skipped at the beginning of the query.
+			/// </summary>
+			/// <param name="cells">Number of cells to be skipped</param>
+			/// <remarks>Not valid in combination of row offset</remarks>
+			void cellOffset( int cells );
 
 			/// <summary>
 			/// If set scans return only keys, no cell values.

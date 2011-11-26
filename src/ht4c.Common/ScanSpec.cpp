@@ -61,6 +61,14 @@ namespace ht4c { namespace Common {
 		scanSpecBuilder.set_cell_limit_per_family( maxCells );
 	}
 
+	void ScanSpec::rowOffset( int rows ) {
+		scanSpecBuilder.set_row_offset( rows );
+	}
+
+	void ScanSpec::cellOffset( int cells ) {
+		scanSpecBuilder.set_cell_offset( cells );
+	}
+
 	void ScanSpec::keysOnly( bool keysOnly ) {
 		scanSpecBuilder.set_keys_only( keysOnly );
 	}
@@ -121,17 +129,11 @@ namespace ht4c { namespace Common {
 	}
 
 	void ScanSpec::addRowInterval( const char* startRow, bool includeStartRow, const char* endRow, bool includeEndRow ) {
-		if(  startRow && *startRow
-			&& endRow && *endRow ) {
-
-			scanSpecBuilder.add_row_interval( startRow, includeStartRow, endRow, includeEndRow );
-		}
+		scanSpecBuilder.add_row_interval( startRow, includeStartRow, endRow, includeEndRow );
 	}
 
 	void ScanSpec::addCellInterval( const char* startRow, const char* startColumn, bool includeStartRow, const char* endRow, const char* endColumn, bool includeEndRow ) {
-		if(  startRow && *startRow
-			&& startColumn && *startColumn
-			&& endRow && *endRow
+		if(  startColumn && *startColumn
 			&& endColumn && *endColumn ) {
 
 			scanSpecBuilder.add_cell_interval( startRow, startColumn, includeStartRow, endRow, endColumn, includeEndRow );
