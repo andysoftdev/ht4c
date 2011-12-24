@@ -59,7 +59,7 @@ namespace ht4c { namespace Thrift {
 	Common::TableMutator* ThriftTable::createMutator( uint32_t /*timeoutMsec*/, uint32_t flags, uint32_t flushIntervalMsec ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			return ThriftTableMutator::create( client, client->open_mutator(ns, name, flags, flushIntervalMsec) );
+			return ThriftTableMutator::create( client, client->mutator_open(ns, name, flags, flushIntervalMsec) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -70,7 +70,7 @@ namespace ht4c { namespace Thrift {
 			Hypertable::ThriftGen::Future future = typeid(asyncResult) != typeid(ThriftBlockingAsyncResult)
 																					 ? static_cast<ThriftAsyncResult&>(asyncResult).get(client)
 																					 : static_cast<ThriftBlockingAsyncResult&>(asyncResult).get(client);
-			return ThriftAsyncTableMutator::create( client, client->open_mutator_async(ns, name, future, flags) );
+			return ThriftAsyncTableMutator::create( client, client->async_mutator_open(ns, name, future, flags) );
 		}
 		HT4C_RETHROW
 	}
@@ -80,7 +80,7 @@ namespace ht4c { namespace Thrift {
 			Hypertable::ThriftGen::ScanSpec _scanSpec;
 			convertScanSpec( scanSpec, _scanSpec );
 			ThriftClientLock sync( client.get() );
-			return ThriftTableScanner::create( client, client->open_scanner(ns, name, _scanSpec) );
+			return ThriftTableScanner::create( client, client->scanner_open(ns, name, _scanSpec) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -94,7 +94,7 @@ namespace ht4c { namespace Thrift {
 																					 ? static_cast<ThriftAsyncResult&>(asyncResult).get(client)
 																					 : static_cast<ThriftBlockingAsyncResult&>(asyncResult).get(client);
 
-			return ThriftAsyncTableScanner::create( client, client->open_scanner_async(ns, name, future, _scanSpec) );
+			return ThriftAsyncTableScanner::create( client, client->async_scanner_open(ns, name, future, _scanSpec) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -108,7 +108,7 @@ namespace ht4c { namespace Thrift {
 																					 ? static_cast<ThriftAsyncResult&>(asyncResult).get(client)
 																					 : static_cast<ThriftBlockingAsyncResult&>(asyncResult).get(client);
 
-			return ThriftAsyncTableScanner::id( client->open_scanner_async(ns, name, future, _scanSpec) );
+			return ThriftAsyncTableScanner::id( client->async_scanner_open(ns, name, future, _scanSpec) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -118,10 +118,10 @@ namespace ht4c { namespace Thrift {
 			std::string schema;
 			ThriftClientLock sync( client.get() );
 			if( withIds ) {
-				client->get_schema_str_with_ids( schema, ns, name );
+				client->table_get_schema_str_with_ids( schema, ns, name );
 			}
 			else {
-				client->get_schema_str( schema, ns, name );
+				client->table_get_schema_str( schema, ns, name );
 			}
 			return schema;
 		}
@@ -159,8 +159,8 @@ namespace ht4c { namespace Thrift {
 		}
 
 		if( hss.max_versions ) {
-			tss.revs = hss.max_versions;
-			tss.__isset.revs = true;
+			tss.versions = hss.max_versions;
+			tss.__isset.versions = true;
 		}
 
 		if( hss.row_offset ) {

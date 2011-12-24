@@ -41,7 +41,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			{
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->close_scanner(tableScanner) );
+				HT4C_THRIFT_RETRY( client->scanner_close(tableScanner) );
 			}
 			if( reader ) delete reader;
 			client = 0;
@@ -55,7 +55,7 @@ namespace ht4c { namespace Thrift {
 				if( !reader ) {
 					{
 						ThriftClientLock sync( client.get() );
-						client->next_cells_serialized( cells, tableScanner );
+						client->scanner_get_cells_serialized( cells, tableScanner );
 					}
 					reader = new Hypertable::SerializedCellsReader( reinterpret_cast<void*>(const_cast<char*>(cells.c_str())), (uint32_t)cells.length() );
 				}

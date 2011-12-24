@@ -52,7 +52,7 @@ namespace ht4c { namespace Thrift {
 			if( !future ) {
 				client = _client->get_pooled();
 				ThriftClientLock sync( client.get() );
-				future = client->open_future( capacity );
+				future = client->future_open( capacity );
 			}
 			return future;
 		}
@@ -63,10 +63,10 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			if( future ) {
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->close_future(future) );
+				HT4C_THRIFT_RETRY( client->future_close(future) );
 				future = 0;
 				for each( int64_t asyncScannerId in asyncTableScanners ) {
-					HT4C_THRIFT_RETRY( client->close_scanner_async(asyncScannerId) );
+					HT4C_THRIFT_RETRY( client->async_scanner_close(asyncScannerId) );
 				}
 			}
 			client = 0;
@@ -103,7 +103,7 @@ namespace ht4c { namespace Thrift {
 			if( future ) {
 				{
 					ThriftClientLock sync( client.get() );
-					client->cancel_future( future );
+					client->future_cancel( future );
 				}
 				Hypertable::ScopedRecLock lock( mutex );
 				cancelled = true;
@@ -117,7 +117,7 @@ namespace ht4c { namespace Thrift {
 			if( asyncScannerId ) {
 				{
 					ThriftClientLock sync( client.get() );
-					HT4C_THRIFT_RETRY( client->cancel_scanner_async(asyncScannerId) );
+					HT4C_THRIFT_RETRY( client->async_scanner_cancel(asyncScannerId) );
 				}
 				Hypertable::ScopedRecLock lock( mutex );
 				asyncTableScanners.erase( asyncScannerId );
@@ -130,7 +130,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			if( asyncMutatorId ) {
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->cancel_mutator_async(asyncMutatorId) );
+				HT4C_THRIFT_RETRY( client->async_mutator_cancel(asyncMutatorId) );
 			}
 		}
 		HT4C_RETHROW
@@ -185,7 +185,7 @@ namespace ht4c { namespace Thrift {
 							Sleep( 20 );
 							continue;
 						}
-						client->get_future_result_serialized( result, future ); // FIXME timeoutMsec, timedOut if once available
+						client->future_get_result_serialized( result, future, 0 ); // FIXME timeoutMsec, timedOut if once available
 
 						// ignore cancelled scanners
 						if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
@@ -218,7 +218,7 @@ namespace ht4c { namespace Thrift {
 							Sleep( 20 );
 							continue;
 						}
-						client->get_future_result_serialized( result, future ); // FIXME timeoutMsec, timedOut if once available
+						client->future_get_result_serialized( result, future, 0 ); // FIXME timeoutMsec, timedOut if once available
 
 						// ignore cancelled scanners
 						if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {

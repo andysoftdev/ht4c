@@ -46,7 +46,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			{
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->close_mutator_async(tableMutator) );
+				HT4C_THRIFT_RETRY( client->async_mutator_close(tableMutator) );
 			}
 			client = 0;
 		}
@@ -64,7 +64,7 @@ namespace ht4c { namespace Thrift {
 			writer.add( row, CF(columnFamily), columnQualifier, TIMESTAMP(timestamp, flag), value, valueLength, flag );
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->set_cells_serialized_async( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->async_mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -83,7 +83,7 @@ namespace ht4c { namespace Thrift {
 			}
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->set_cells_serialized_async( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->async_mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -95,7 +95,7 @@ namespace ht4c { namespace Thrift {
 			writer.add( row, CF(columnFamily), columnQualifier, TIMESTAMP(timestamp, flag), 0, 0, flag );
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->set_cells_serialized_async( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->async_mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -103,7 +103,7 @@ namespace ht4c { namespace Thrift {
 	void ThriftAsyncTableMutator::flush() {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->flush_mutator_async( tableMutator );
+			client->async_mutator_flush( tableMutator );
 		}
 		HT4C_THRIFT_RETHROW
 	}

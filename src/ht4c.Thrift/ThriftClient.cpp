@@ -55,14 +55,14 @@ namespace ht4c { namespace Thrift {
 					char* ptr = ns_tmp;
 					while( (ptr = strchr(ptr, '/')) != 0 ) {
 						*ptr = 0;
-						if( created > 0 || !client->exists_namespace(ns_tmp) ) {
-							client->create_namespace( ns_tmp );
+						if( created > 0 || !client->namespace_exists(ns_tmp) ) {
+							client->namespace_create( ns_tmp );
 							++created;
 						}
 						*ptr++ = '/';
 					}
-					if( created > 0 || !client->exists_namespace(ns_tmp) ) {
-						client->create_namespace( ns_tmp );
+					if( created > 0 || !client->namespace_exists(ns_tmp) ) {
+						client->namespace_create( ns_tmp );
 					}
 					free( ns_tmp );
 				}
@@ -72,7 +72,7 @@ namespace ht4c { namespace Thrift {
 				}
 			}
 			else {
-				client->create_namespace( ns );
+				client->namespace_create( ns );
 			}
 		}
 		HT4C_THRIFT_RETHROW
@@ -82,7 +82,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			std::string _name( getNamespace(name, nsBase) );
 			ThriftClientLock sync( client.get() );
-			Hypertable::ThriftGen::Namespace ns( client->open_namespace(_name) );
+			Hypertable::ThriftGen::Namespace ns( client->namespace_open(_name) );
 			return ns ? ThriftNamespace::create( client, ns, _name ) : 0;
 		}
 		HT4C_THRIFT_RETHROW
@@ -93,33 +93,33 @@ namespace ht4c { namespace Thrift {
 			std::string _name = getNamespace( name, nsBase );
 			ThriftClientLock sync( client.get() );
 			if( dropTables || deep ) {
-				if( ifExists && !client->exists_namespace(_name) ) {
+				if( ifExists && !client->namespace_exists(_name) ) {
 					return;
 				}
-				Hypertable::ThriftGen::Namespace ns = client->open_namespace( _name );
+				Hypertable::ThriftGen::Namespace ns = client->namespace_open( _name );
 				try {
 					if( deep ) {
 						std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
-						client->get_listing( listing, ns );
+						client->namespace_get_listing( listing, ns );
 						drop( ns, _name, listing, ifExists, dropTables );
 					}
 					else {
 						std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
-						client->get_listing( listing, ns );
+						client->namespace_get_listing( listing, ns );
 						for( std::vector<Hypertable::ThriftGen::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
 							if( !(*it).is_namespace ) {
-								client->drop_table( ns, (*it).name, true );
+								client->table_drop( ns, (*it).name, true );
 							}
 						}
 					}
-					client->close_namespace( ns );
+					client->namespace_close( ns );
 				}
 				catch( ... ) {
-					client->close_namespace( ns );
+					client->namespace_close( ns );
 					throw;
 				}
 			}
-			return client->drop_namespace( _name, ifExists );
+			return client->namespace_drop( _name, ifExists );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -127,7 +127,7 @@ namespace ht4c { namespace Thrift {
 	bool ThriftClient::existsNamespace( const char* name, Common::Namespace* nsBase ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			return client->exists_namespace( getNamespace(name, nsBase) );
+			return client->namespace_exists( getNamespace(name, nsBase) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -156,22 +156,22 @@ namespace ht4c { namespace Thrift {
 		for( std::vector<Hypertable::ThriftGen::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
 			if( (*it).is_namespace ) {
 				std::string nsSubName = nsName + "/" + (*it).name;
-				Hypertable::ThriftGen::Namespace nsSub = client->open_namespace( nsSubName );
+				Hypertable::ThriftGen::Namespace nsSub = client->namespace_open( nsSubName );
 				try {
 					std::vector<Hypertable::ThriftGen::NamespaceListing> sub_entries;
-					client->get_listing( sub_entries, nsSub ); //FIXME remove if the sub entries are available in thrift
+					client->namespace_get_listing( sub_entries, nsSub ); //FIXME remove if the sub entries are available in thrift
 					drop( nsSub, nsSubName, sub_entries, ifExists, dropTables ); //FIXME remove, use next line
 					//drop( nsSub, nsSubName, (*it).sub_entries, ifExists, dropTables );
-					client->close_namespace( nsSub );
+					client->namespace_close( nsSub );
 				}
 				catch( ... ) {
-					client->close_namespace( nsSub );
+					client->namespace_close( nsSub );
 					throw;
 				}
-				client->drop_namespace( nsSubName, ifExists );
+				client->namespace_drop( nsSubName, ifExists );
 			}
 			else if( dropTables ) {
-				client->drop_table( ns, (*it).name, true );
+				client->table_drop( ns, (*it).name, true );
 			}
 		}
 	}

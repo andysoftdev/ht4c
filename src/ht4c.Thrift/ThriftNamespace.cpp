@@ -44,7 +44,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			{
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->close_namespace(ns) );
+				HT4C_THRIFT_RETRY( client->namespace_close(ns) );
 			}
 			client = 0;
 		}
@@ -58,7 +58,7 @@ namespace ht4c { namespace Thrift {
 	void ThriftNamespace::createTable( const char* name, const char* schema ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->create_table( ns, name, schema );
+			client->table_create( ns, name, schema );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -67,8 +67,8 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			std::string schemaLike;
 			ThriftClientLock sync( client.get() );
-			client->get_schema_str_with_ids( schemaLike, ns, like );
-			client->create_table( ns, name, schemaLike );
+			client->table_get_schema_str_with_ids( schemaLike, ns, like );
+			client->table_create( ns, name, schemaLike );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -76,7 +76,7 @@ namespace ht4c { namespace Thrift {
 	void ThriftNamespace::alterTable( const char* name, const char* schema ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->alter_table( ns, name, schema );
+			client->table_alter( ns, name, schema );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -84,7 +84,7 @@ namespace ht4c { namespace Thrift {
 	void ThriftNamespace::renameTable( const char* nameOld, const char* nameNew ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->rename_table( ns, nameOld, nameNew );
+			client->table_rename( ns, nameOld, nameNew );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -92,7 +92,7 @@ namespace ht4c { namespace Thrift {
 	Common::Table* ThriftNamespace::openTable( const char* name, bool /*force*/ ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			if( !client->exists_table(ns, name) ) {
+			if( !client->table_exists(ns, name) ) {
 				using namespace Hypertable;
 				HT_THROW(Error::TABLE_NOT_FOUND, name);
 			}
@@ -104,7 +104,7 @@ namespace ht4c { namespace Thrift {
 	void ThriftNamespace::dropTable( const char* name, bool ifExists ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			return client->drop_table( ns, name, ifExists );
+			return client->table_drop( ns, name, ifExists );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -112,7 +112,7 @@ namespace ht4c { namespace Thrift {
 	bool ThriftNamespace::existsTable( const char* name ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			return client->exists_table( ns, name );
+			return client->table_exists( ns, name );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -122,10 +122,10 @@ namespace ht4c { namespace Thrift {
 			std::string schema;
 			ThriftClientLock sync( client.get() );
 			if( withIds ) {
-				client->get_schema_str_with_ids( schema, ns, name );
+				client->table_get_schema_str_with_ids( schema, ns, name );
 			}
 			else {
-				client->get_schema_str( schema, ns, name );
+				client->table_get_schema_str( schema, ns, name );
 			}
 			return schema;
 		}
@@ -139,7 +139,7 @@ namespace ht4c { namespace Thrift {
 			std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
 			{
 				ThriftClientLock sync( client.get() );
-				client->get_listing( listing, ns );
+				client->namespace_get_listing( listing, ns );
 			}
 			getListing( deep, getName(), listing, nsListing ); //FIXME remove deep+name parameter if the sub entries are available in thrift
 		}
@@ -153,7 +153,7 @@ namespace ht4c { namespace Thrift {
 				Hypertable::ThriftGen::HqlResult result;
 				client->hql_exec( result, ns, hql, false, true );
 				if( result.__isset.scanner ) {
-					client->close_scanner( result.scanner );
+					client->scanner_close( result.scanner );
 				}
 			}
 		}
@@ -196,16 +196,16 @@ namespace ht4c { namespace Thrift {
 				//FIXME remove complete block if the sub entries are available in thrift
 				if( deep ) {
 					std::string nsSubName = nsName + "/" + (*it).name;
-					Hypertable::ThriftGen::Namespace nsSub = client->open_namespace( nsSubName );
+					Hypertable::ThriftGen::Namespace nsSub = client->namespace_open( nsSubName );
 					ThriftClientLock sync( client.get() );
 					try {
 						std::vector<Hypertable::ThriftGen::NamespaceListing> sub_entries;
-						client->get_listing( sub_entries, nsSub );
-						client->close_namespace( nsSub );
+						client->namespace_get_listing( sub_entries, nsSub );
+						client->namespace_close( nsSub );
 						getListing( deep, nsSubName, sub_entries, nsListing.addNamespace(ht4c::Common::NamespaceListing((*it).name)));
 					}
 					catch( ... ) {
-						HT4C_THRIFT_RETRY( client->close_namespace(nsSub) );
+						HT4C_THRIFT_RETRY( client->namespace_close(nsSub) );
 						throw;
 					}
 				}

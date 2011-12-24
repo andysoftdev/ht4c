@@ -43,7 +43,7 @@ namespace ht4c { namespace Thrift {
 	ThriftAsyncTableScanner::~ThriftAsyncTableScanner( ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			HT4C_THRIFT_RETRY( client->close_scanner_async(tableScanner) );
+			HT4C_THRIFT_RETRY( client->async_scanner_close(tableScanner) );
 		}
 		HT4C_THRIFT_RETHROW
 	}
