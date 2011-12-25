@@ -118,6 +118,10 @@ namespace ht4c { namespace Thrift {
 
 			#ifndef __cplusplus_cli
 
+			enum {
+				queryFutureResultTimeoutMs = 100
+			};
+
 			void readAndPublishResult( );
 
 			static DWORD WINAPI threadProc( void* param );

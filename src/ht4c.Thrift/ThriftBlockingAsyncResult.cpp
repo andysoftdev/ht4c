@@ -173,64 +173,41 @@ namespace ht4c { namespace Thrift {
 	}
 
 	bool ThriftBlockingAsyncResult::getCells( Common::AsyncResultSink* asyncResultSink ) {
-		HT4C_TRY {
-			if( future && asyncResultSink && !isCancelled() ) {
-				Hypertable::ThriftGen::ResultSerialized result;
-				while (true) {
-					{
-						ThriftClientLock sync( client.get() );
-						if(  client->future_is_empty(future)
-							&& client->future_has_outstanding(future) ) { // FIXME, remove if timeoutMsec, timedOut is available
-
-							Sleep( 20 );
-							continue;
-						}
-						client->future_get_result_serialized( result, future, 0 ); // FIXME timeoutMsec, timedOut if once available
-
-						// ignore cancelled scanners
-						if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
-							Hypertable::ScopedRecLock lock( mutex );
-							if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
-								continue;
-							}
-						}
-					}
-					return ThriftAsyncResult::publishResult( result, this, asyncResultSink, true ) && !result.is_empty;
-				}
-			}
-			return false;
+		bool result;
+		bool timedOut = true;
+		while( timedOut ) {
+			result = getCells( asyncResultSink, queryFutureResultTimeoutMs, timedOut);
 		}
-		HT4C_THRIFT_RETHROW
+		return result;
 	}
 
 	bool ThriftBlockingAsyncResult::getCells( Common::AsyncResultSink* asyncResultSink, uint32_t timeoutMsec, bool& timedOut ) {
 		HT4C_TRY {
 			timedOut = false;
 			if( future && asyncResultSink && !isCancelled() ) {
-				Hypertable::HRTimer timer;
 				Hypertable::ThriftGen::ResultSerialized result;
-				while( timer.peek_ms() <= timeoutMsec ) {
-					{
+				while (true) {
+					try {
 						ThriftClientLock sync( client.get() );
-						if(  client->future_is_empty(future)
-							&& client->future_has_outstanding(future) ) { // FIXME, remove if timeoutMsec, timedOut is available
-
-							Sleep( 20 );
-							continue;
+						client->future_get_result_serialized( result, future, timeoutMsec );
+					}
+					catch( Hypertable::ThriftGen::ClientException& e ) {
+						if( e.code == Hypertable::Error::REQUEST_TIMEOUT ) {
+							timedOut = true;
+							return false;
 						}
-						client->future_get_result_serialized( result, future, 0 ); // FIXME timeoutMsec, timedOut if once available
+						throw;
+					}
 
-						// ignore cancelled scanners
-						if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
-							Hypertable::ScopedRecLock lock( mutex );
-							if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
-								continue;
-							}
+					// ignore cancelled scanners
+					if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
+						Hypertable::ScopedRecLock lock( mutex );
+						if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
+							continue;
 						}
 					}
 					return ThriftAsyncResult::publishResult( result, this, asyncResultSink, true ) && !result.is_empty;
 				}
-				timedOut = true;
 			}
 			return false;
 		}

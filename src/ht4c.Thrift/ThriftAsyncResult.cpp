@@ -253,15 +253,19 @@ namespace ht4c { namespace Thrift {
 					}
 				}
 				Hypertable::ThriftGen::ResultSerialized result;
-				try {
-					ThriftClientLock sync( client.get() );
-					if(  client->future_is_empty(future)
-						&& client->future_has_outstanding(future) ) { // FIXME, remove if timeoutMsec, timedOut is available
-
-						Sleep( 20 );
-						continue;
+				HT4C_TRY {
+					try {
+						ThriftClientLock sync( client.get() );
+						client->future_get_result_serialized( result, future, queryFutureResultTimeoutMs );
 					}
-					client->future_get_result_serialized( result, future, 0 ); // FIXME timeoutMsec, timedOut if once available
+					catch( Hypertable::ThriftGen::ClientException& e ) {
+						if(  e.code == Hypertable::Error::REQUEST_TIMEOUT
+							|| e.code == Hypertable::Error::NOT_IMPLEMENTED ) { // FIXME, ThriftBroker does not implement get_future_result_serialized for async mutators
+
+							continue;
+						}
+						throw;
+					}
 
 					// ignore cancelled scanners
 					if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
@@ -280,10 +284,8 @@ namespace ht4c { namespace Thrift {
 				}
 			}
 			catch( Common::HypertableException& e ) {
-				if( e.code() != Hypertable::Error::NOT_IMPLEMENTED ) { // FIXME, ThriftBroker does not implement get_future_result_serialized for async mutators
-					cancel();
-					asyncResultSink->failure( e );
-				}
+				cancel();
+				asyncResultSink->failure( e );
 			}
 			catch( ... ) {
 				cancel();

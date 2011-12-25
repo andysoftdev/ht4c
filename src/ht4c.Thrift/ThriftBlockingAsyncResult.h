@@ -91,6 +91,10 @@ namespace ht4c { namespace Thrift {
 
 			#ifndef __cplusplus_cli
 
+			enum {
+				queryFutureResultTimeoutMs = 500
+			};
+
 			Hypertable::Thrift::ClientPtr client;
 			Hypertable::ThriftGen::Future future;
 			size_t capacity;
