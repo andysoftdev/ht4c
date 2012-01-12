@@ -30,7 +30,7 @@
 namespace ht4c {
 
 	/// <summary>
-	/// Abstract class represents a callback for logging events.
+	/// Abstract class represents a callback for log events.
 	/// </summary>
 	class LoggingSink {
 
@@ -42,14 +42,21 @@ namespace ht4c {
 			virtual ~LoggingSink( ) { }
 
 			/// <summary>
-			/// Gets called if a logging event occurs.
+			/// Gets called if a log event occurs.
 			/// </summary>
-			/// <param name="log">Logging message</param>
-			virtual void logEvent( const std::string& log ) = 0;
+			/// <param name="priority">Log event priority</param>
+			/// <param name="message">Log event message</param>
+			virtual void logEvent( int priority, const std::string& message ) = 0;
+
+			/// <summary>
+			/// Gets called if a log event occurs.
+			/// </summary>
+			/// <param name="message">Log event message</param>
+			virtual void logMessage( const std::string& message ) = 0;
 	};
 
 	/// <summary>
-	/// Logging utility, redirects logging events to a file and/or logging callbacks.
+	/// Logging utility, redirects log events to a file and/or log callbacks.
 	/// </summary>
 	/// <remarks>Links between native and C++/CLI.</remarks>
 	class Logging {
@@ -72,13 +79,13 @@ namespace ht4c {
 			/// Adds a log event callback.
 			/// </summary>
 			/// <param name="loggingSink">Log event callback to add</param>
-			static void addLogsink( LoggingSink* loggingSink );
+			static void addLoggingSink( LoggingSink* loggingSink );
 
 			/// <summary>
 			/// Removes a log event callback.
 			/// </summary>
 			/// <param name="loggingSink">Log event callback to remove</param>
-			static void removeLogsink( LoggingSink* loggingSink );
+			static void removeLoggingSink( LoggingSink* loggingSink );
 
 			#ifndef __cplusplus_cli
 

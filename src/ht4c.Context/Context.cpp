@@ -70,7 +70,7 @@ namespace ht4c {
 	Hypertable::RecMutex Context::mutex;
 	Context::sessions_t Context::sessions;
 
-	Context* Context::create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& _prop ) {
+	Context* Context::create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& _prop, const char* loggingLevel ) {
 		HT4C_TRY {
 			Hypertable::PropertiesPtr prop = getProperties( 0, 0 );
 			std::vector<std::string> names;
@@ -98,15 +98,15 @@ namespace ht4c {
 					prop->set( "thrift-broker", format("%s:%d", host, port ? port : (uint16_t)38080), false );
 				}
 			}
-			return new Context( ctxKind, prop );
+			return new Context( ctxKind, prop, loggingLevel );
 		}
 		HT4C_RETHROW
 	}
 
-	Context* Context::create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName ) {
+	Context* Context::create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName, const char* loggingLevel ) {
 		HT4C_TRY {
 			Hypertable::PropertiesPtr prop = getProperties( commandLine, includesModuleFileName );
-			return new Context( ctxKind, prop );
+			return new Context( ctxKind, prop, loggingLevel );
 		}
 		HT4C_RETHROW
 	}
@@ -213,7 +213,7 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
-	Context::Context( Common::ContextKind _ctxKind, Hypertable::PropertiesPtr _prop )
+	Context::Context( Common::ContextKind _ctxKind, Hypertable::PropertiesPtr _prop, const char* loggingLevel )
 	: ctxKind( _ctxKind )
 	, prop( _prop )
 	{
@@ -224,8 +224,7 @@ namespace ht4c {
 			prop->set( "Hypertable.Silent", true );
 		}
 		if( prop->defaulted("Hypertable.Logging.Level") ) {
-			prop->set( "Hypertable.Logging.Level", Hypertable::String("notice") );
-			Hypertable::Logger::set_level(Hypertable::Logger::Priority::NOTICE);
+			prop->set( "Hypertable.Logging.Level", Hypertable::String(loggingLevel && *loggingLevel ? loggingLevel : "notice") );
 		}
 		if( prop->defaulted("Hyperspace.Lease.Interval") ) {
 			prop->set( "Hyperspace.Lease.Interval", 300000 );

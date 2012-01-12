@@ -50,11 +50,12 @@ namespace ht4c {
 			/// <param name="host">Hypertable instance host name</param>
 			/// <param name="port">Hypertable instance port number</param>
 			/// <param name="prop">Configuration properties</param>
+			/// <param name="loggingLevel">Preferred logging level, might be null or empty</param>
 			/// <returns>New Context instance</returns>
 			/// <remarks>To free the created instance, use the destroy method.</remarks>
 			/// <seealso cref="ht4c::Common::ContextKind"/>
 			/// <seealso cref="ht4c::Common::Properties"/>
-			static Context* create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& prop );
+			static Context* create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& prop, const char* loggingLevel );
 
 			/// <summary>
 			/// Creates a new Context instance.
@@ -62,10 +63,11 @@ namespace ht4c {
 			/// <param name="ctxKind">Context kind</param>
 			/// <param name="commandLine">Command line arguments</param>
 			/// <param name="includesModuleFileName">If true the commandLine parameter contains the module filename</param>
+			/// <param name="loggingLevel">Preferred logging level, might be null or empty</param>
 			/// <returns>New Context instance</returns>
 			/// <remarks>To free the created instance, use the destroy method.</remarks>
 			/// <seealso cref="ht4c::Common::ContextKind"/>
-			static Context* create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName );
+			static Context* create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName, const char* loggingLevel );
 
 			/// <summary>
 			/// Destroys the Context instance.
@@ -140,7 +142,7 @@ namespace ht4c {
 			typedef std::pair<Hypertable::ConnectionManagerPtr, uint32_t> connection_t;
 			typedef std::map<Hyperspace::SessionPtr, connection_t> sessions_t;
 
-			Context( Common::ContextKind ctxKind, Hypertable::PropertiesPtr prop );
+			Context( Common::ContextKind ctxKind, Hypertable::PropertiesPtr prop, const char* loggingLevel );
 
 			static Hyperspace::SessionPtr findSession( Hypertable::PropertiesPtr prop, Hypertable::ConnectionManagerPtr& connMgr );
 			static void registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr );

@@ -30,12 +30,16 @@
 #pragma warning( push, 3 )
 
 #include "Common/Logger.h"
+#include <log4cpp/LayoutAppender.hh>
 
 #pragma warning( pop )
 
 namespace {
 
-	class logbuf : public std::streambuf {
+	typedef std::set<ht4c::LoggingSink*> sinks_t;
+
+	class logbuf : public std::streambuf
+	{
 		public:
 
 			logbuf( )
@@ -45,7 +49,7 @@ namespace {
 				setp( buf, buf + size_t(size - 1) );
 			}
 
-			void setSink( std::fstream* _fs ) {
+			void setLogfile( std::fstream* _fs ) {
 				fs = _fs;
 			}
 
@@ -61,6 +65,12 @@ namespace {
 				ls.clear( );
 			}
 
+			void append( const ::log4cpp::LoggingEvent& event ) {
+				for each( ht4c::LoggingSink* _ls in ls ) {
+					_ls->logEvent( event.priority, event.message );
+				}
+			}
+
 		protected:
 
 			void publish( bool flush ) {
@@ -73,9 +83,9 @@ namespace {
 					}
 				}
 				if( ls.size() ) {
-					std::string log( pbase(), n );
+					std::string message( pbase(), n );
 					for each( ht4c::LoggingSink* _ls in ls ) {
-						_ls->logEvent( log );
+						_ls->logMessage( message );
 					}
 				}
 			}
@@ -102,8 +112,6 @@ namespace {
 				publish( true );
 				return 0;
 			}
-
-			typedef std::set<ht4c::LoggingSink*> sinks_t;
 
 			char buf[size];
 			std::fstream* fs;
@@ -140,19 +148,23 @@ namespace {
 					fs = new std::fstream( filename, std::ios_base::app, _SH_DENYNO );
 					fn = filename;
 				}
-				lb.setSink( fs );
+				lb.setLogfile( fs );
 			}
 
-			void addLogsink( ht4c::LoggingSink* loggingSink ) {
+			void addLoggingSink( ht4c::LoggingSink* loggingSink ) {
 				lb.addSink( loggingSink );
 			}
 
-			void removeLogsink( ht4c::LoggingSink* loggingSink ) {
+			void removeLoggingSink( ht4c::LoggingSink* loggingSink ) {
 				lb.removeSink( loggingSink );
 			}
 
 			void removeAllLogsinks( ) {
 				lb.removeAllSinks( );
+			}
+
+			void append( const ::log4cpp::LoggingEvent& event ) {
+				lb.append( event );
 			}
 
 		private:
@@ -163,6 +175,37 @@ namespace {
 			std::string fn;
 			std::fstream* fs;
 			logbuf lb;
+	};
+
+	class logappender : public ::log4cpp::LayoutAppender
+	{
+		public:
+
+			logappender( logstream* _ls )
+				: LayoutAppender( "ht4c::LoggingSink" )
+				, ls( _ls )
+			{
+			}
+
+			virtual ~logappender( ) {
+				ls = 0;
+			}
+
+			virtual void close() {
+				ls = 0;
+			}
+
+		protected:
+
+			virtual void _append( const ::log4cpp::LoggingEvent& event ) {
+				if( ls ) {
+					ls->append( event );
+				}
+			}
+
+		private:
+
+			logstream* ls;
 	};
 
 	static logstream ls;
@@ -181,22 +224,27 @@ namespace ht4c {
 		ls.setLogfile( filename );
 	}
 
-	void Logging::addLogsink( LoggingSink* loggingSink ) {
-		ls.addLogsink( loggingSink );
+	void Logging::addLoggingSink( LoggingSink* loggingSink ) {
+		ls.addLoggingSink( loggingSink );
 	}
 
-	void Logging::removeLogsink( LoggingSink* loggingSink ) {
-		ls.removeLogsink( loggingSink );
+	void Logging::removeLoggingSink( LoggingSink* loggingSink ) {
+		ls.removeLoggingSink( loggingSink );
 	}
 
 	void Logging::init( ) {
 		if( !initialized ) {
-			Logger::initialize(System::exe_name
+			Logger::initialize( System::exe_name
 												, Logger::logger
 												? Logger::logger->getPriority()
 												: Logger::Priority::FATAL
 												, true
 												, ls);
+
+			if( Logger::logger ) {
+				Logger::logger->addAppender( new logappender(&ls) );
+			}
+
 			initialized = true;
 		}
 	}
