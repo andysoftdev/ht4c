@@ -44,36 +44,20 @@
 		} \
 	}
 
+#include "ht4c.Common/Utils.h"
+
 inline const char* CF( const char* columnFamily ) {
-	return columnFamily && *columnFamily ? columnFamily : 0;
+	return ht4c::Common::CF( columnFamily );
 }
 
 inline uint8_t FLAG( const char* columnFamily, const char* columnQualifier, uint8_t flag ) {
-	if( flag != Hypertable::FLAG_INSERT ) {
-		if( flag >= Hypertable::FLAG_DELETE_COLUMN_FAMILY ) {
-			if( !CF(columnFamily) ) {
-				return Hypertable::FLAG_DELETE_ROW;
-			}
-			else if( flag >= Hypertable::FLAG_DELETE_CELL && !columnQualifier ) {
-				return Hypertable::FLAG_DELETE_COLUMN_FAMILY;
-			}
-		}
-	}
-	return flag;
+	return ht4c::Common::FLAG( columnFamily, columnQualifier, flag );
 }
 
 inline uint8_t FLAG_DELETE( const char* columnFamily, const char* columnQualifier ) {
-		return !CF(columnFamily)
-					? Hypertable::FLAG_DELETE_ROW
-					: columnQualifier
-					? Hypertable::FLAG_DELETE_CELL
-					: Hypertable::FLAG_DELETE_COLUMN_FAMILY;
+	return ht4c::Common::FLAG_DELETE( columnFamily, columnQualifier );
 }
 
 inline uint64_t TIMESTAMP( uint64_t timestamp, uint8_t flag ) {
-		return  timestamp == 0
-					? Hypertable::AUTO_ASSIGN
-					: flag == Hypertable::FLAG_INSERT
-					? timestamp
-					: timestamp + 1;
+	return ht4c::Common::TIMESTAMP( timestamp, flag );
 }
