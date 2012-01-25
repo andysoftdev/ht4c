@@ -70,7 +70,7 @@ namespace ht4c { namespace Hyper {
 				return Common::CK_Hyper;
 			}
 
-			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate );
+			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists );
 			virtual Common::Namespace* openNamespace( const char* name, Common::Namespace* nsBase );
 			virtual void dropNamespace( const char* name, Common::Namespace* nsBase, bool ifExists, bool dropTables, bool deep );
 			virtual bool existsNamespace( const char* name, Common::Namespace* nsBase );

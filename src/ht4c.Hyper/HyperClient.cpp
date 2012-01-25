@@ -54,9 +54,9 @@ namespace ht4c { namespace Hyper {
 		HT4C_RETHROW
 	}
 
-	void HyperClient::createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate ) {
+	void HyperClient::createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists ) {
 		HT4C_TRY {
-			client->create_namespace( name, getNamespace(nsBase), createIntermediate );
+			client->create_namespace( name, getNamespace(nsBase), createIntermediate, createIfNotExists );
 		}
 		HT4C_RETHROW
 	}
@@ -77,14 +77,12 @@ namespace ht4c { namespace Hyper {
 					return;
 				}
 				Hypertable::NamespacePtr ns = client->open_namespace( name, _nsBase );
+				std::vector<Hypertable::NamespaceListing> listing;
+				ns->get_listing( deep, listing );
 				if( deep ) {
-					std::vector<Hypertable::NamespaceListing> listing;
-					ns->get_listing( true, listing );
 					drop( ns, listing, ifExists, dropTables );
 				}
 				else {
-					std::vector<Hypertable::NamespaceListing> listing;
-					ns->get_listing( false, listing );
 					for( std::vector<Hypertable::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
 						if( !(*it).is_namespace ) {
 							ns->drop_table( (*it).name.c_str(), true );

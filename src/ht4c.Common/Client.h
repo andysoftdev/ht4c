@@ -51,11 +51,12 @@ namespace ht4c { namespace Common {
 			/// <param name="name">Namespace name</param>
 			/// <param name="nsBase">Base namespace, might be NULL</param>
 			/// <param name="createIntermediate">If true, all intermediate namespaces will be created if not exist</param>
+			/// <param name="createIfNotExists">If true, namespaces will be created if not exist</param>
 			/// <remarks>
 			/// Use '/' separator character to separate namespace names. Optionally specify nsBase
 			/// to create the new namespace relative to an existing namespace.
 			/// </remarks>
-			virtual void createNamespace( const char* name, Namespace* nsBase, bool createIntermediate ) = 0;
+			virtual void createNamespace( const char* name, Namespace* nsBase, bool createIntermediate, bool createIfNotExists ) = 0;
 
 			/// <summary>
 			/// Opens an existig namespace.

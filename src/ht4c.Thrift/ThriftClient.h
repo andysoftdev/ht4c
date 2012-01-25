@@ -29,7 +29,6 @@
 
 namespace ht4c { namespace Thrift {
 
-	class Context;
 	class Namespace;
 
 	typedef Hypertable::Thrift::ThriftClient::Lock ThriftClientLock;
@@ -61,7 +60,7 @@ namespace ht4c { namespace Thrift {
 				return Common::CK_Thrift;
 			}
 
-			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate );
+			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists );
 			virtual Common::Namespace* openNamespace( const char* name, Common::Namespace* nsBase );
 			virtual void dropNamespace( const char* name, Common::Namespace* nsBase, bool ifExists, bool dropTables, bool deep );
 			virtual bool existsNamespace( const char* name, Common::Namespace* nsBase );
@@ -80,7 +79,6 @@ namespace ht4c { namespace Thrift {
 			ThriftClient& operator = ( const ThriftClient& ) { return *this; }
 
 			Hypertable::Thrift::ClientPtr client;
-			Context* ctx;
 	};
 
 } }

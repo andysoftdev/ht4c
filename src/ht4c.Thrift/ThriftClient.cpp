@@ -44,10 +44,13 @@ namespace ht4c { namespace Thrift {
 		HT4C_THRIFT_RETHROW
 	}
 
-	void ThriftClient::createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate ) {
+	void ThriftClient::createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists ) {
 		HT4C_TRY {
 			std::string ns( getNamespace(name, nsBase) );
 			ThriftClientLock sync( client.get() );
+			if( createIfNotExists && client->namespace_exists(ns) ) {
+				return;
+			}
 			if( createIntermediate ) {
 				char* ns_tmp = strdup( ns.c_str() );
 				try {
@@ -98,14 +101,12 @@ namespace ht4c { namespace Thrift {
 				}
 				Hypertable::ThriftGen::Namespace ns = client->namespace_open( _name );
 				try {
+					std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
+					client->namespace_get_listing( listing, ns );
 					if( deep ) {
-						std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
-						client->namespace_get_listing( listing, ns );
 						drop( ns, _name, listing, ifExists, dropTables );
 					}
 					else {
-						std::vector<Hypertable::ThriftGen::NamespaceListing> listing;
-						client->namespace_get_listing( listing, ns );
 						for( std::vector<Hypertable::ThriftGen::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
 							if( !(*it).is_namespace ) {
 								client->table_drop( ns, (*it).name, true );
