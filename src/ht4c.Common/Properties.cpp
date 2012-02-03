@@ -93,51 +93,55 @@ namespace ht4c { namespace Common {
 		return it != map.end() ? (*it).second : boost::any();
 	}
 
-	bool Properties::insert( const std::string& name, bool value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, bool value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, uint16_t value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, uint16_t value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, int32_t value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, int32_t value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const std::vector<int32_t>& value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, const std::vector<int32_t>& value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, int64_t value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, int64_t value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const std::vector<int64_t>& value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, const std::vector<int64_t>& value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, double value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, double value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const std::vector<double>& value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, const std::vector<double>& value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const std::string& value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, const std::string& value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const std::vector<std::string>& value ) {
-		return insert( name, boost::any(value) );
+	bool Properties::addOrUpdate( const std::string& name, const std::vector<std::string>& value ) {
+		return addOrUpdate( name, boost::any(value) );
 	}
 
-	bool Properties::insert( const std::string& name, const boost::any& value ) {
-		return map.insert( map_t::value_type(name, value) ).second;
+	bool Properties::addOrUpdate( const std::string& name, const boost::any& value ) {
+		std::pair<map_t::iterator, bool> r = map.insert( map_t::value_type(name, value) );
+		if( !r.second ) {
+			(*r.first).second = value;
+		}
+		return r.second;
 	}
 
-		boost::any Properties::convert( const std::type_info& src, const std::type_info& dst, const boost::any& value ) {
+	boost::any Properties::convert( const std::type_info& src, const std::type_info& dst, const boost::any& value ) {
 		#define CONVERT_ANY( s, d, v )													\
 			if( src == typeid(s) && dst == typeid(d) ) {					\
 				d _value = static_cast<d>( boost::any_cast<s>(v) );	\
@@ -153,7 +157,9 @@ namespace ht4c { namespace Common {
 		CONVERT_ANY( int16_t, int32_t, value );
 		CONVERT_ANY( int64_t, int32_t, value );
 
-		throw std::bad_cast();
+		std::stringstream ss;
+		ss << "Unsupported property type\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')';
+		throw std::bad_cast( ss.str().c_str() );
 
 		#undef CONVERT_ANY
 	}

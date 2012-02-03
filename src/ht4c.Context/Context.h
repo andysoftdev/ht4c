@@ -46,28 +46,11 @@ namespace ht4c {
 			/// <summary>
 			/// Creates a new Context instance.
 			/// </summary>
-			/// <param name="ctxKind">Context kind</param>
-			/// <param name="host">Hypertable instance host name</param>
-			/// <param name="port">Hypertable instance port number</param>
-			/// <param name="prop">Configuration properties</param>
-			/// <param name="loggingLevel">Preferred logging level, might be null or empty</param>
+			/// <param name="properties">Configuration properties</param>
 			/// <returns>New Context instance</returns>
 			/// <remarks>To free the created instance, use the destroy method.</remarks>
-			/// <seealso cref="ht4c::Common::ContextKind"/>
 			/// <seealso cref="ht4c::Common::Properties"/>
-			static Context* create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& prop, const char* loggingLevel );
-
-			/// <summary>
-			/// Creates a new Context instance.
-			/// </summary>
-			/// <param name="ctxKind">Context kind</param>
-			/// <param name="commandLine">Command line arguments</param>
-			/// <param name="includesModuleFileName">If true the commandLine parameter contains the module filename</param>
-			/// <param name="loggingLevel">Preferred logging level, might be null or empty</param>
-			/// <returns>New Context instance</returns>
-			/// <remarks>To free the created instance, use the destroy method.</remarks>
-			/// <seealso cref="ht4c::Common::ContextKind"/>
-			static Context* create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName, const char* loggingLevel );
+			static Context* create( const Common::Properties& properties );
 
 			/// <summary>
 			/// Destroys the Context instance.
@@ -81,6 +64,15 @@ namespace ht4c {
 			static void shutdown( );
 
 			/// <summary>
+			/// Merges the connection string with all default properties and those from a configuration file.
+			/// </summary>
+			/// <param name="connectionString">Connection string, might be null or empty</param>
+			/// <param name="loggingLevel">Preferred logging level, might be null or empty</param>
+			/// <param name="properties">Configuration properties</param>
+			/// <seealso cref="ht4c::Common::Properties"/>
+			static void mergeProperties( const char* connectionString, const char* loggingLevel, Common::Properties& properties );
+
+			/// <summary>
 			/// Destroys the Context instance.
 			/// </summary>
 			virtual ~Context( );
@@ -88,19 +80,12 @@ namespace ht4c {
 			#pragma region Common::Context methods
 
 			virtual Common::Client* createClient( );
-			virtual Common::ContextKind getContextKind( ) const;
-			virtual void getProperties( Common::Properties& prop ) const;
+			virtual void getProperties( Common::Properties& properties ) const;
+			virtual bool hasFeature( Common::ContextFeature contextFeature ) const;
 
 			#pragma endregion
 
 			#ifndef __cplusplus_cli
-
-			/// <summary>
-			/// Returns the underlying Hypertable properties.
-			/// </summary>
-			/// <returns>Underlying Hypertable properties</returns>
-			/// <remarks>Pure native method.</remarks>
-			Hypertable::PropertiesPtr getProperties( ) const;
 
 			/// <summary>
 			/// Returns the Hypertable connection manager.
@@ -142,22 +127,23 @@ namespace ht4c {
 			typedef std::pair<Hypertable::ConnectionManagerPtr, uint32_t> connection_t;
 			typedef std::map<Hyperspace::SessionPtr, connection_t> sessions_t;
 
-			Context( Common::ContextKind ctxKind, Hypertable::PropertiesPtr prop, const char* loggingLevel );
+			Context( Common::ContextKind contextKind, Hypertable::PropertiesPtr properties );
 
-			static Hyperspace::SessionPtr findSession( Hypertable::PropertiesPtr prop, Hypertable::ConnectionManagerPtr& connMgr );
+			static Hyperspace::SessionPtr findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr );
 			static void registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr );
 			static void unregisterSession( Hyperspace::SessionPtr session );
 
-			static Hypertable::PropertiesPtr getProperties( int argc, char *argv[] );
-			static Hypertable::PropertiesPtr getProperties( const char* commandLine, bool includesModuleFileName );
-			static char** commandLineToArgv( const char* commandLine, int& argc, bool includesModuleFileName );
-			static bool getPropValue( Hypertable::PropertiesPtr prop, const std::string& name, boost::any& value );
+			static Hypertable::PropertiesPtr initializeProperties( int argc, char *argv[], const Common::Properties& properties, const char* loggingLevel );
+			static Hypertable::PropertiesPtr convertProperties( const Common::Properties& properties );
+			static char** commandLineToArgv( const char* commandLine, int& argc );
+			static bool getPropValue( Hypertable::PropertiesPtr properties, const std::string& name, boost::any& value );
+			static Common::ContextKind getContextKind( Hypertable::PropertiesPtr properties );
 
-			Hypertable::PropertiesPtr prop;
+			Common::ContextKind contextKind;
+			Hypertable::PropertiesPtr properties;
 			Hypertable::ConnectionManagerPtr connMgr;
 			Hyperspace::SessionPtr session;
 			Hypertable::Thrift::ClientPtr thriftClient;
-			Common::ContextKind ctxKind;
 
 			static Hypertable::RecMutex mutex;
 			static sessions_t sessions;

@@ -32,9 +32,9 @@
 
 namespace ht4c { namespace Hyper {
 
-	Common::Client* HyperClient::create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr prop ) {
+	Common::Client* HyperClient::create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties ) {
 		HT4C_TRY {
-			return new HyperClient( connMngr, session, prop );
+			return new HyperClient( connMngr, session, properties );
 		}
 		HT4C_RETHROW
 	}
@@ -102,11 +102,11 @@ namespace ht4c { namespace Hyper {
 		HT4C_RETHROW
 	}
 	
-	HyperClient::HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr prop )
+	HyperClient::HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties )
 	: client( )
 	{
 		HT4C_TRY {
-			client = new Hypertable::Client( Hypertable::String(), connMngr, session, prop );
+			client = new Hypertable::Client( Hypertable::String(), connMngr, session, properties );
 		}
 		HT4C_RETHROW
 	}

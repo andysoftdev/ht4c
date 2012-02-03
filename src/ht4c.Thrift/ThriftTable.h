@@ -67,7 +67,6 @@ namespace ht4c { namespace Thrift {
 			virtual Common::ContextKind getContextKind( ) const {
 				return Common::CK_Thrift;
 			}
-
 			virtual std::string getName( ) const;
 			virtual Common::TableMutator* createMutator( uint32_t timeoutMsec = 0, uint32_t flags = 0, uint32_t flushIntervalMsec = 0 );
 			virtual Common::AsyncTableMutator* createAsyncMutator( Common::AsyncResult& asyncResult, uint32_t timeoutMsec = 0, uint32_t flags = 0 );

@@ -35,8 +35,7 @@ namespace ht4c { namespace Common {
 	/// <summary>
 	/// Abstract class represents Hypertable client.
 	/// </summary>
-	/// <seealso cref="ht4c::Common::IContextKind"/>
-	class Client : public IContextKind {
+	class Client {
 
 		public:
 

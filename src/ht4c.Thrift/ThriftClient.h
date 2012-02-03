@@ -56,10 +56,6 @@ namespace ht4c { namespace Thrift {
 
 			#pragma region Common::Client methods
 
-			virtual Common::ContextKind getContextKind( ) const {
-				return Common::CK_Thrift;
-			}
-
 			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists );
 			virtual Common::Namespace* openNamespace( const char* name, Common::Namespace* nsBase );
 			virtual void dropNamespace( const char* name, Common::Namespace* nsBase, bool ifExists, bool dropTables, bool deep );

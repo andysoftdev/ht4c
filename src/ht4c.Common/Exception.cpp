@@ -67,4 +67,15 @@ namespace ht4c { namespace Common {
 		return out;
 	}
 
+	HypertableArgumentNullException::HypertableArgumentNullException( const std::string& arg, int l, const char *fn, const char *fl )
+	: HypertableException( Hypertable::Error::EXTERNAL, arg, l, fn, fl )
+	{
+	}
+
+	HypertableArgumentException::HypertableArgumentException( const std::string& msg, const std::string& arg, int l, const char *fn, const char *fl )
+	: HypertableException( Hypertable::Error::EXTERNAL, msg, l, fn, fl )
+	, eArg( arg )
+	{
+	}
+
 } }

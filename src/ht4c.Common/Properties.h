@@ -89,21 +89,21 @@ namespace ht4c { namespace Common {
 			bool get( const std::string& name, std::vector<std::string>& value ) const;
 
 			/// <summary>
-			/// Sets the property value for a particular property name.
+			/// Adds or updates the property value for a particular property name.
 			/// </summary>
 			/// <param name="name">Property name</param>
 			/// <param name="value">Property value</param>
-			/// <returns>true if the value has been set</returns>
-			bool insert( const std::string& name, bool value );
-			bool insert( const std::string& name, uint16_t value );
-			bool insert( const std::string& name, int32_t value );
-			bool insert( const std::string& name, const std::vector<int32_t>& value );
-			bool insert( const std::string& name, int64_t value );
-			bool insert( const std::string& name, const std::vector<int64_t>& value );
-			bool insert( const std::string& name, double value );
-			bool insert( const std::string& name, const std::vector<double>& value );
-			bool insert( const std::string& name, const std::string& value );
-			bool insert( const std::string& name, const std::vector<std::string>& value );
+			/// <returns>true if the value has been added, false idf the value has been updated</returns>
+			bool addOrUpdate( const std::string& name, bool value );
+			bool addOrUpdate( const std::string& name, uint16_t value );
+			bool addOrUpdate( const std::string& name, int32_t value );
+			bool addOrUpdate( const std::string& name, const std::vector<int32_t>& value );
+			bool addOrUpdate( const std::string& name, int64_t value );
+			bool addOrUpdate( const std::string& name, const std::vector<int64_t>& value );
+			bool addOrUpdate( const std::string& name, double value );
+			bool addOrUpdate( const std::string& name, const std::vector<double>& value );
+			bool addOrUpdate( const std::string& name, const std::string& value );
+			bool addOrUpdate( const std::string& name, const std::vector<std::string>& value );
 
 			#ifndef __cplusplus_cli
 
@@ -124,6 +124,16 @@ namespace ht4c { namespace Common {
 				return false;
 			}
 
+			template < int32_t > inline
+			bool get( const std::string& name, int32_t& value ) const {
+				map_t::const_iterator it = map.find( name );
+				if( it != map.end() ) {
+					value = typeid((*it).second.value) == int32_t::typeid ? boost::any_cast<int32_t>((*it).second) : boost::any_cast<long>((*it).second);
+					return true;
+				}
+				return false;
+			}
+
 			/// <summary>
 			/// Gets the property value for a particular property name.
 			/// </summary>
@@ -139,7 +149,7 @@ namespace ht4c { namespace Common {
 			/// <param name="value">Property value</param>
 			/// <returns>true if the value has been set</returns>
 			/// <remarks>Pure native method.</remarks>
-			bool insert( const std::string& name, const boost::any& value );
+			bool addOrUpdate( const std::string& name, const boost::any& value );
 
 			/// <summary>
 			/// Converts a value from source type to destination type.

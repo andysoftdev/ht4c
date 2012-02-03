@@ -28,30 +28,47 @@
 namespace ht4c { namespace Common {
 
 	/// <summary>
-	/// Specifies possible context values. The context kind defines the
-	/// provider API to use for any operation within the context.
+	/// Represents various configuration and connection string options.
 	/// </summary>
-	enum ContextKind {
+	class Config {
 
-		/// <summary>
-		/// Unknown context kind.
-		/// </summary>
-	  CK_Unknown = 0
+		public:
 
-		/// <summary>
-		/// Hypertable native protocol context kind.
-		/// </summary>
-	, CK_Hyper
+			/// <summary>
+			/// Provider name.
+			/// </summary>
+			static const char* ProviderName;
 
-		/// <summary>
-		/// Hypertable thrift API context kind.
-		/// </summary>
-	, CK_Thrift
+			/// <summary>
+			/// Provider name alias.
+			/// </summary>
+			static const char* ProviderNameAlias;
 
-		/// <summary>
-		/// Terminator.
-		/// </summary>
-	, CK_Last 
+			/// <summary>
+			/// Provider name value - Hyper.
+			/// </summary>
+			static const char* ProviderHyper;
+
+			/// <summary>
+			/// Provider name value - Thrift.
+			/// </summary>
+			static const char* ProviderThrift;;
+
+			/// <summary>
+			/// Uri, hostname:port.
+			/// </summary>
+			static const char* Uri;
+
+			/// <summary>
+			/// Uri alias.
+			/// </summary>
+			static const char* UriAlias;
+
+			/// <summary>
+			/// Composable part catalog (only used for MEF composition).
+			/// </summary>
+			static const char* ComposablePartCatalogs;
+
 	};
 
 } }

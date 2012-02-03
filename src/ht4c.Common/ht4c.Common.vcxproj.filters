@@ -85,6 +85,12 @@
     <ClInclude Include="AsyncCallbackResult.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ContextFeature.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -106,6 +112,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Properties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

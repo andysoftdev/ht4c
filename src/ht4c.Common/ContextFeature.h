@@ -1,9 +1,9 @@
 /** -*- C++ -*-
  * Copyright (C) 2011 Andy Thalmann
  *
- * This file is part of ht4c.
+ * This file is part of ht4n.
  *
- * ht4c is free software; you can redistribute it and/or
+ * ht4n is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or any later version.
@@ -28,30 +28,34 @@
 namespace ht4c { namespace Common {
 
 	/// <summary>
-	/// Specifies possible context values. The context kind defines the
-	/// provider API to use for any operation within the context.
+	/// Declares extended context features, apart from the regular features.
 	/// </summary>
-	enum ContextKind {
+	enum ContextFeature {
 
 		/// <summary>
-		/// Unknown context kind.
+		/// Unknown provider feature.
 		/// </summary>
-	  CK_Unknown = 0
+		CF_Unknown
 
 		/// <summary>
-		/// Hypertable native protocol context kind.
+		/// Hypertable query language (HQL).
 		/// </summary>
-	, CK_Hyper
+	, CF_HQL
 
 		/// <summary>
-		/// Hypertable thrift API context kind.
+		/// Asynchronous table mutator.
 		/// </summary>
-	, CK_Thrift
+	, CF_AsyncTableMutator
 
 		/// <summary>
-		/// Terminator.
+		/// Periodic flush mutator.
 		/// </summary>
-	, CK_Last 
+	, CF_PeriodicFlushTableMutator
+
+		/// <summary>
+		/// Asynchronous table scanner.
+		/// </summary>
+	, CF_AsyncTableScanner
 	};
 
 } }

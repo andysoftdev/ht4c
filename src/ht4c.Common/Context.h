@@ -26,15 +26,16 @@
 #endif
 
 #include "ContextKind.h"
+#include "ContextFeature.h"
 
 namespace ht4c { namespace Common {
-		class Client;
-		class Properties;
+	class Client;
+	class Properties;
 
 	/// <summary>
 	/// Abstract class represents a Hypertable context, handles connection to a Hypertable instance.
 	/// </summary>
-	class Context : public IContextKind {
+	class Context {
 
 		public:
 
@@ -53,9 +54,17 @@ namespace ht4c { namespace Common {
 			/// <summary>
 			/// Returns all configuration parameters.
 			/// </summary>
-			/// <param name="prop">Receives the configuration parameters</param>
+			/// <param name="properties">Receives the configuration parameters</param>
 			/// <seealso cref="ht4c::Common::Properties"/>
-			virtual void getProperties( Properties& prop ) const = 0;
+			virtual void getProperties( Properties& properties ) const = 0;
+
+			/// <summary>
+			/// Returns true if the actual provider supports the feature specified, otherwise false.
+			/// </summary>
+			/// <param name="contextFeature">ContextFeature feature</param>
+			/// <returns>true if the actual provider supports the feature specified, otherwise false.</returns>
+			/// <seealso cref="ht4c::Common::ContextFeature"/>
+			virtual bool hasFeature( ContextFeature contextFeature ) const = 0;
 	};
 
 } }

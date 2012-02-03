@@ -181,6 +181,7 @@
     <ClInclude Include="CellFlag.h" />
     <ClInclude Include="Cells.h" />
     <ClInclude Include="Client.h" />
+    <ClInclude Include="Config.h" />
     <ClInclude Include="Context.h" />
     <ClInclude Include="ContextKind.h" />
     <ClInclude Include="Exception.h" />
@@ -188,6 +189,7 @@
     <ClInclude Include="Namespace.h" />
     <ClInclude Include="NamespaceListing.h" />
     <ClInclude Include="Properties.h" />
+    <ClInclude Include="ContextFeature.h" />
     <ClInclude Include="ScanSpec.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Table.h" />
@@ -201,6 +203,7 @@
   <ItemGroup>
     <ClCompile Include="Cell.cpp" />
     <ClCompile Include="Cells.cpp" />
+    <ClCompile Include="Config.cpp" />
     <ClCompile Include="Exception.cpp" />
     <ClCompile Include="KeyBuilder.cpp" />
     <ClCompile Include="Properties.cpp" />

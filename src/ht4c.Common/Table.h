@@ -42,8 +42,7 @@ namespace ht4c { namespace Common {
 	/// <summary>
 	/// Abstract class represents a Hypertable table.
 	/// </summary>
-	/// <seealso cref="ht4c::Common::IContextKind"/>
-	class Table : public IContextKind {
+	class Table {
 
 		public:
 
@@ -51,6 +50,11 @@ namespace ht4c { namespace Common {
 			/// Destroys the Table instance.
 			/// </summary>
 			virtual ~Table( ) { }
+
+			/// <summary>
+			/// Returns the context kind.
+			/// </summary>
+			virtual Common::ContextKind getContextKind( ) const = 0;
 
 			/// <summary>
 			/// Returns the table name.

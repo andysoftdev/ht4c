@@ -54,10 +54,10 @@ namespace ht4c { namespace Hyper {
 			/// </summary>
 			/// <param name="connMngr">Connection manager</param>
 			/// <param name="session">Hyperspace session</param>
-			/// <param name="prop">Configuraton properties</param>
+			/// <param name="properties">Configuraton properties</param>
 			/// <returns>New HyperClient instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::Client* create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr prop );
+			static Common::Client* create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties );
 
 			/// <summary>
 			/// Destroys the HyperClient instance.
@@ -65,10 +65,6 @@ namespace ht4c { namespace Hyper {
 			virtual ~HyperClient( );
 
 			#pragma region Common::Client methods
-
-			virtual Common::ContextKind getContextKind( ) const {
-				return Common::CK_Hyper;
-			}
 
 			virtual void createNamespace( const char* name, Common::Namespace* nsBase, bool createIntermediate, bool createIfNotExists );
 			virtual Common::Namespace* openNamespace( const char* name, Common::Namespace* nsBase );
@@ -79,7 +75,7 @@ namespace ht4c { namespace Hyper {
 
 		private:
 
-			HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr prop );
+			HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties );
 
 			Hypertable::Namespace* getNamespace( Common::Namespace* ns );
 			void drop( Hypertable::NamespacePtr ns, const std::vector<Hypertable::NamespaceListing>& listing, bool ifExists, bool dropTables );

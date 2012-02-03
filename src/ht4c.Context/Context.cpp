@@ -28,6 +28,7 @@
 #include "Context.h"
 #include "Logging.h"
 
+#include "ht4c.Common/Config.h"
 #include "ht4c.Common/Properties.h"
 #include "ht4c.Common/Exception.h"
 #include "ht4c.Hyper/HyperClient.h"
@@ -49,76 +50,209 @@ namespace ht4c {
 	using namespace Hypertable;
 	using namespace Hypertable::Config;
 
-	typedef Meta::list<
-		DfsClientPolicy
-	, HyperspaceClientPolicy
-	, MasterClientPolicy
-	, RangeServerClientPolicy
-	, ThriftClientPolicy
-	, DefaultCommPolicy
-	> PolicyList;
+	namespace {
 
-	typedef Join<PolicyList>::type JoinedPolicyList;
+		const char* localhost													= "net.tcp://localhost";
+		const char* hyperspace												= "hyperspace";
+		const char* hyperspaceHost										= "hs-host";
+		const char* hyperspacePort										= "hs-port";
+		const char* thriftBroker											= "thrift-broker";
+		const char* thriftBrokerHost									= "thrift-host";
+		const char* thriftBrokerPort									= "thrift-port";
+		const char* thriftBrokerTimeout								= "thrift-timeout";
+		const char* loggingLevel											= "logging-level";
+		const char* verbose														= "verbose";
+		const char* silent														= "silent";
+		const char* leaseInterval											= "Hyperspace.Lease.Interval";
+		const char* gracePeriod												= "Hyperspace.GracePeriod";
 
-	struct Policies : JoinedPolicyList {
-		static void on_init_error(Exception &e) {
-			HT_ERROR_OUT << e << HT_END;
-			throw e;
+		const uint16_t defaultHyperspacePort					= 38040;
+		const uint16_t defaultThriftBrokerPort				= 38080;
+
+		const int32_t defaultThriftBrokerTimeoutMsec	= 30000;
+		const int32_t defaultLeaseIntervalMsec				= 300000;
+		const int32_t defaultGracePeriodMsec					= 300000;
+
+		template<typename SequenceT, typename Range1T, typename Range2T>
+		inline void replace_all_recursive( SequenceT& input, const Range1T& search, const Range2T& format ) {
+			SequenceT previous;
+			do {
+				previous = input;
+				boost::replace_all( input, search, format );
+			}
+			while( previous != input );
 		}
-	};
+
+		inline bool expand_environment_strings( std::string& str ) {
+			char expanded[2048];
+			if( ExpandEnvironmentStringsA(str.c_str(), expanded, sizeof(expanded)) ) {
+				if( str != expanded ) {
+					str = expanded;
+					return true;
+				}
+			}
+			return false;
+		}
+
+		typedef Meta::list<
+			DfsClientPolicy
+		, HyperspaceClientPolicy
+		, MasterClientPolicy
+		, RangeServerClientPolicy
+		, ThriftClientPolicy
+		, DefaultCommPolicy
+		> PolicyList;
+
+		typedef Join<PolicyList>::type JoinedPolicyList;
+
+		struct Policies : JoinedPolicyList {
+
+			static PropertiesPtr initialProperties;
+			static std::string prefferedLoggingLevel;
+
+			static void init_options( ) {
+				Config::allow_unregistered_options( true );
+
+				cmdline_desc().add_options()
+					(Common::Config::ProviderNameAlias, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
+					(Common::Config::UriAlias, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n");
+
+				alias( Common::Config::ProviderNameAlias, Common::Config::ProviderName );
+				alias( Common::Config::UriAlias, Common::Config::Uri );
+
+				file_desc().add_options()
+					(Common::Config::ProviderName, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
+					(Common::Config::Uri, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n");
+
+				JoinedPolicyList::init_options();
+			}
+
+			static void init( ) {
+				PropertiesPtr properties = Config::properties;
+
+				if( initialProperties ) {
+					std::vector<String> names;
+					initialProperties->get_names( names );
+					for each( const String& name in names ) {
+						properties->set( name, (*initialProperties)[name] );
+					}
+					initialProperties = 0;
+				}
+
+				properties->sync_aliases();
+
+				if( !prefferedLoggingLevel.empty() ) {
+					if( properties->defaulted(loggingLevel) ) {
+						properties->set( loggingLevel, prefferedLoggingLevel );
+					}
+					prefferedLoggingLevel.clear();
+				}
+
+				if( properties->defaulted(verbose) && properties->defaulted(silent) ) {
+					properties->set( silent, true );
+				}
+
+				if( properties->defaulted(leaseInterval) ) {
+					properties->set( leaseInterval, defaultLeaseIntervalMsec );
+				}
+				if( properties->defaulted(gracePeriod) ) {
+					properties->set( gracePeriod, defaultGracePeriodMsec );
+				}
+
+				int32_t timeoutMsec = defaultThriftBrokerTimeoutMsec;
+				if( properties->has(thriftBrokerTimeout) ) {
+					timeoutMsec = properties->get_i32( thriftBrokerTimeout );
+				}
+				else {
+					properties->set( thriftBrokerTimeout, timeoutMsec );
+				}
+
+				properties->sync_aliases();
+
+				std::string providerName = properties->get_str( Common::Config::ProviderName );
+				if( providerName == Common::Config::ProviderHyper ) {
+					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(hyperspace) ) {
+						properties->set( hyperspace, get_uri(hyperspacePort, defaultHyperspacePort) );
+					}
+				}
+				else if( providerName == Common::Config::ProviderThrift ) {
+					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(thriftBroker) ) {
+						properties->set( thriftBroker, get_uri(thriftBrokerPort, defaultThriftBrokerPort) );
+					}
+				}
+
+				properties->sync_aliases();
+
+				JoinedPolicyList::init();
+			}
+
+			static void on_init_error( Exception &e ) {
+				Config::cleanup();
+				HT_ERROR_OUT << e << HT_END;
+				throw e;
+			}
+
+			static std::string get_uri( ) {
+				PropertiesPtr properties = Config::properties;
+				std::string uri = properties->get_str( Common::Config::Uri );
+				boost::trim( uri );
+				if( expand_environment_strings(uri) ) {
+					boost::trim( uri );
+					properties->set( Common::Config::UriAlias, uri );
+				}
+				return uri;
+			}
+
+			static std::string get_uri( const char* portProperty, uint16_t defaultPort ) {
+				std::string uri = get_uri();
+				if( uri.empty() ) {
+					uri = localhost;
+				}
+				replace_all_recursive( uri, "//", "/" );
+				if( uri.find("net.tcp:/") != 0 ) {
+					HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, net.tcp://hostname[:port] required" );
+				}
+				uri = uri.substr( 9 );
+				if( uri.empty() ) {
+					HT_THROW( Error::CONFIG_BAD_VALUE, "Empty hostname, net.tcp://hostname[:port] required" );
+				}
+				if( uri.find(':') == std::string::npos ) {
+					uint16_t port = defaultPort;
+					if( properties->has(portProperty) ) {
+						port = properties->get_i16( portProperty );
+					}
+					uri = format( "%s:%d", uri.c_str(), port );
+				}
+				return uri;
+			}
+
+		};
+
+		PropertiesPtr Policies::initialProperties;
+		std::string Policies::prefferedLoggingLevel;
+
+	}
 
 	Hypertable::RecMutex Context::mutex;
 	Context::sessions_t Context::sessions;
 
-	Context* Context::create( Common::ContextKind ctxKind, const char* host, uint16_t port, const Common::Properties& _prop, const char* loggingLevel ) {
+	Context* Context::create( const Common::Properties& _properties ) {
 		HT4C_TRY {
-			Hypertable::PropertiesPtr prop = getProperties( 0, 0 );
-			std::vector<std::string> names;
-			_prop.names( names );
-			for each( const std::string& name in names ) {
-				boost::any any;
-				if( getPropValue(prop, name, any) && any.type() != _prop.type(name) ) {
-					try {
-						prop->set( name, Common::Properties::convert(_prop.type(name), any.type(), _prop.get(name)), false );
-					}
-					catch( std::bad_cast& ) {
-						throw std::bad_cast( format("Invalid property value for '%s'", name.c_str()).c_str() );
-					}
-				}
-				else {
-					prop->set( name, _prop.get(name), false );
-				}
-			}
-
-			if( host && *host ) {
-				if( ctxKind == Common::CK_Hyper ) {
-					prop->set( "hyperspace", format("%s:%d", host, port ? port : (uint16_t)38040), false );
-				}
-				else if( ctxKind == Common::CK_Thrift ) {
-					prop->set( "thrift-broker", format("%s:%d", host, port ? port : (uint16_t)38080), false );
-				}
-			}
-			return new Context( ctxKind, prop, loggingLevel );
-		}
-		HT4C_RETHROW
-	}
-
-	Context* Context::create( Common::ContextKind ctxKind, const char* commandLine, bool includesModuleFileName, const char* loggingLevel ) {
-		HT4C_TRY {
-			Hypertable::PropertiesPtr prop = getProperties( commandLine, includesModuleFileName );
-			return new Context( ctxKind, prop, loggingLevel );
+			Hypertable::PropertiesPtr properties = convertProperties( _properties );
+			Common::ContextKind contextKind = getContextKind( properties );
+			return contextKind != Common::CK_Unknown ? new Context( contextKind, properties ) : 0;
 		}
 		HT4C_RETHROW
 	}
 
 	void Context::shutdown( ) {
 		HT4C_TRY {
-			size_t remaining_sessions;
+			size_t remainingSessions;
 			{
 				ScopedRecLock lock( mutex );
-				remaining_sessions = sessions.size();
+				remainingSessions = sessions.size();
 			}
-			if( !remaining_sessions ) {
+			if( !remainingSessions ) {
 				Comm::destroy();
 				Config::cleanup();
 			}
@@ -127,27 +261,60 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
+	void Context::mergeProperties( const char* connectionString, const char* loggingLevel, Common::Properties& _properties ) {
+		HT4C_TRY {
+			int argc;
+			char** argv = Context::commandLineToArgv( connectionString, argc );
+			Hypertable::PropertiesPtr properties = initializeProperties( argc, argv, _properties, loggingLevel );
+			if( argv ) {
+				free( argv );
+			}
+			std::vector<String> names;
+			properties->get_names( names );
+			for each( const String& name in names ) {
+				_properties.addOrUpdate( name, (*properties)[name] );
+			}
+		}
+		HT4C_RETHROW
+	}
+
 	Common::Client* Context::createClient( ) {
-		switch( getContextKind() ) {
-			case Common::CK_Hyper:
-				return ht4c::Hyper::HyperClient::create( getConnectionManager(), getHyperspaceSession(), getProperties() );
-			case Common::CK_Thrift:
-				return ht4c::Thrift::ThriftClient::create( getThriftClient() );
+		HT4C_TRY {
+			ScopedRecLock lock( mutex );
+			switch( contextKind ) {
+				case Common::CK_Hyper:
+					return ht4c::Hyper::HyperClient::create( getConnectionManager(), getHyperspaceSession(), properties );
+				case Common::CK_Thrift:
+					return ht4c::Thrift::ThriftClient::create( getThriftClient() );
+			}
+			return 0;
 		}
-		return 0;
+		HT4C_RETHROW
 	}
 
-	Common::ContextKind Context::getContextKind( ) const {
-		return ctxKind;
+	void Context::getProperties( Common::Properties& _properties ) const {
+		HT4C_TRY {
+			_properties.clear();
+			std::vector<String> names;
+			properties->get_names( names );
+			for each( const String& name in names ) {
+				_properties.addOrUpdate( name, (*properties)[name] );
+			}
+		}
+		HT4C_RETHROW
 	}
 
-	void Context::getProperties( Common::Properties& _prop ) const {
-		_prop.clear();
-		std::vector<String> names;
-		getProperties()->get_names( names );
-		for each( const String& name in names ) {
-			_prop.insert( name, (*getProperties())[name] );
+	bool Context::hasFeature( Common::ContextFeature contextFeature ) const {
+		switch( contextFeature ) {
+		case Common::CF_HQL:
+		case Common::CF_AsyncTableMutator:
+		case Common::CF_PeriodicFlushTableMutator:
+		case Common::CF_AsyncTableScanner:
+			return contextKind == Common::CK_Hyper || contextKind == Common::CK_Thrift;
+		default:
+			break;
 		}
+		return false;
 	}
 
 	Context::~Context( ) {
@@ -156,11 +323,7 @@ namespace ht4c {
 			unregisterSession( session );
 		}
 		session = 0;
-		prop = 0;
-	}
-
-	PropertiesPtr Context::getProperties() const {
-		return prop;
+		properties = 0;
 	}
 
 	ConnectionManagerPtr Context::getConnectionManager( ) {
@@ -176,9 +339,9 @@ namespace ht4c {
 	Hyperspace::SessionPtr Context::getHyperspaceSession( ) {
 		HT4C_TRY {
 			if( !session ) {
-				session = findSession( prop, connMgr );
+				session = findSession( properties, connMgr );
 				if( !session ) {
-					session = new Hyperspace::Session( getComm(), prop );
+					session = new Hyperspace::Session( getComm(), properties );
 				}
 				registerSession( session, getConnectionManager() );
 			}
@@ -197,15 +360,9 @@ namespace ht4c {
 	Hypertable::Thrift::ClientPtr Context::getThriftClient( ) {
 		HT4C_TRY {
 			if( !thriftClient ) {
-				std::string host = prop->get_str("thrift-host");
-				uint16_t port = prop->get_i16("thrift-port");
-				int32_t timeoutMsec = 30000;
-				if (prop->has("thrift-timeout")) {
-					timeoutMsec = prop->get_i32("thrift-timeout");
-				}
-				else {
-					 prop->set("thrift-timeout", timeoutMsec);
-				}
+				std::string host = properties->get_str( thriftBrokerHost );
+				uint16_t port = properties->get_i16( thriftBrokerPort );
+				int32_t timeoutMsec = properties->get_i32( thriftBrokerTimeout );
 				thriftClient = ht4c::Thrift::ThriftFactory::create( host, port, timeoutMsec );
 			}
 			return thriftClient;
@@ -213,42 +370,19 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
-	Context::Context( Common::ContextKind _ctxKind, Hypertable::PropertiesPtr _prop, const char* loggingLevel )
-	: ctxKind( _ctxKind )
-	, prop( _prop )
+	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
+	: contextKind( _contextKind )
+	, properties( _properties )
 	{
-		ScopedRecLock lock( rec_mutex );
-		PropertiesPtr propExisting = Config::properties;
-		Config::properties = prop;
-		if( prop->defaulted("Hypertable.Verbose") && prop->defaulted("Hypertable.Silent") ) {
-			prop->set( "Hypertable.Silent", true );
-		}
-		if( prop->defaulted("Hypertable.Logging.Level") ) {
-			prop->set( "Hypertable.Logging.Level", Hypertable::String(loggingLevel && *loggingLevel ? loggingLevel : "notice") );
-		}
-		if( prop->defaulted("Hyperspace.Lease.Interval") ) {
-			prop->set( "Hyperspace.Lease.Interval", 300000 );
-		}
-		if( prop->defaulted("Hyperspace.GracePeriod") ) {
-			prop->set( "Hyperspace.GracePeriod", 300000 );
-		}
-
-		prop->sync_aliases();
-		Logging::init();
-		JoinedPolicyList::init();
-		prop->sync_aliases();
-		if( propExisting ) {
-			Config::properties = propExisting;
-		}
 	}
 
-	Hyperspace::SessionPtr Context::findSession( Hypertable::PropertiesPtr prop, Hypertable::ConnectionManagerPtr& connMgr ) {
+	Hyperspace::SessionPtr Context::findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr ) {
 		connMgr = 0;
 		ScopedRecLock lock( mutex );
 		if( ReactorRunner::handler_map && sessions.size() ) {
-			Hypertable::Strings hosts = prop->get_strs("hs-host");
+			Hypertable::Strings hosts = properties->get_strs( hyperspaceHost );
 			if( hosts.size() && hosts.front().size() ) {
-				Hypertable::InetAddr addr( hosts.front(), prop->get_i16("hs-port") );
+				Hypertable::InetAddr addr( hosts.front(), properties->get_i16(hyperspacePort) );
 				for each( sessions_t::value_type item in sessions ) {
 					if( item.first->get_master_addr() == addr ) {
 						connMgr = item.second.first;
@@ -283,35 +417,67 @@ namespace ht4c {
 		}
 	}
 
-	Hypertable::PropertiesPtr Context::getProperties(const char* commandLine, bool includesModuleFileName ) {
-		int argc;
-		char** argv = Context::commandLineToArgv( commandLine, argc, includesModuleFileName );
-		Hypertable::PropertiesPtr prop = getProperties( argc, argv );
-		if( argv ) free( argv );
-		return prop;
-	}
-
-	Hypertable::PropertiesPtr Context::getProperties( int argc, char *argv[] ) {
-		ScopedRecLock lock( rec_mutex );
-		PropertiesPtr propExisting = Config::properties;
+	Hypertable::PropertiesPtr Context::initializeProperties( int argc, char *argv[], const Common::Properties& initialProperties, const char* loggingLevel ) {
+		ScopedRecLock lock( Config::rec_mutex );
+		PropertiesPtr existingProperties = Config::properties;
 		Config::cleanup();
-		init_with_policy<Policies>(argc, argv, 0);
-		Hypertable::PropertiesPtr prop = Config::properties;
-		if( propExisting ) {
-			Config::properties = propExisting;
+		Policies::initialProperties = Context::convertProperties( initialProperties );
+		Policies::prefferedLoggingLevel = loggingLevel && *loggingLevel ? loggingLevel : "notice";
+		init_with_policy<Policies>( argc, argv, 0 );
+		Hypertable::PropertiesPtr properties = Config::properties;
+
+		properties->get_i32("Hypertable.Connection.Retry.Interval");
+
+		if( existingProperties ) {
+			Config::properties = existingProperties;
 		}
-		return prop;
+		return properties;
 	}
 
-	char** Context::commandLineToArgv( const char* commandLine, int& argc, bool includesModuleFileName ) {
-		char filename[MAX_PATH];
-		uint32_t lenfn = 0;
-		
-		if( !includesModuleFileName ) {
-			lenfn = ::GetModuleFileNameA( 0, filename, sizeof(filename) );
+	Hypertable::PropertiesPtr Context::convertProperties( const Common::Properties& _properties ) {
+		Hypertable::PropertiesPtr properties = new Hypertable::Properties();
+		std::vector<std::string> names;
+		_properties.names( names );
+		for each( const std::string& name in names ) {
+			boost::any any;
+			if( getPropValue(properties, name, any) && any.type() != _properties.type(name) ) {
+				try {
+					properties->set( name, Common::Properties::convert(_properties.type(name), any.type(), _properties.get(name)) );
+				}
+				catch( std::bad_cast& ) {
+					std::stringstream ss;
+					ss << "Invalid property value for '" << name << "'\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')';
+					throw std::bad_cast( ss.str().c_str() );
+				}
+			}
+			else {
+				properties->set( name, _properties.get(name) );
+			}
+		}
+		return properties;
+	}
+
+	char** Context::commandLineToArgv( const char* commandLine, int& argc ) {
+		std::string _commandLine;
+		if( commandLine && *commandLine ) {
+			_commandLine = commandLine;
+			boost::trim( _commandLine );
+			replace_all_recursive( _commandLine, " ;", ";" );
+			replace_all_recursive( _commandLine, "; ", ";" );
+			replace_all_recursive( _commandLine, ";;", ";" );
+			boost::trim_if( _commandLine, boost::is_any_of(";") );
+			boost::replace_all( _commandLine, ";", " --" );
+			boost::trim( _commandLine );
+			if( !_commandLine.empty() && _commandLine.front() != '-' ) {
+				_commandLine = "--" + _commandLine;
+			}
+			commandLine = _commandLine.c_str();
 		}
 
-		uint32_t len = strlen( commandLine ) + lenfn + 1;
+		char filename[MAX_PATH];
+		uint32_t lenfn = ::GetModuleFileNameA( 0, filename, sizeof(filename) );
+
+		uint32_t len = (commandLine ? strlen( commandLine ) : 0) + lenfn + 1;
 		uint32_t i = ((len+2)/2)*sizeof(PVOID) + sizeof(PVOID);
 
 		char** argv = (char**)malloc( i + (len+2)*sizeof(char) );
@@ -319,74 +485,87 @@ namespace ht4c {
 
 		argc = 0;
 		argv[argc] = _argv;
-		bool inQM = false;
-		bool inText = false;
-		bool inSpace = true;
-		i = 0;
 
-		uint32_t j = 0;
-		if( !includesModuleFileName ) {
-			strcpy_s( _argv, (len+2)*sizeof(char), filename );
-			j += lenfn + 1;
-			argv[++argc] = _argv+j;
-		}
-		
-		char a;
-		while( (a = commandLine[i]) != '\0' ) {
-			if( inQM ) {
-				if( a == '\"' ) {
-					inQM = false;
-				}
+		strcpy_s( _argv, (len+2)*sizeof(char), filename );
+		int j = lenfn + 1;
+		argv[++argc] = _argv+j;
+
+		if( commandLine ) {
+			bool inQM = false;
+			bool inText = false;
+			bool inSpace = true;
+			i = 0;
+
+			char a;
+			while( (a = commandLine[i]) != '\0' ) {
+				if( inQM ) {
+					if( a == '\"' ) {
+						inQM = false;
+					}
+					else {
+						_argv[j++] = a;
+					}
+				} 
 				else {
-					_argv[j++] = a;
+					switch( a ) {
+					case '\"':
+						inQM = inText = true;
+						if( inSpace ) {
+							argv[argc++] = _argv+j;
+						}
+						inSpace = false;
+						break;
+					case ' ':
+					case '\t':
+					case '\n':
+					case '\r':
+						if( inText ) {
+							_argv[j++] = '\0';
+						}
+						inText = false;
+						inSpace = true;
+						break;
+					default:
+						inText = true;
+						if( inSpace ) {
+							argv[argc++] = _argv+j;
+						}
+						_argv[j++] = a;
+						inSpace = false;
+						break;
+					}
 				}
-			} 
-			else {
-				switch( a ) {
-				case '\"':
-					inQM = inText = true;
-					if( inSpace ) {
-						argv[argc++] = _argv+j;
-					}
-					inSpace = false;
-					break;
-				case ' ':
-				case '\t':
-				case '\n':
-				case '\r':
-					if( inText ) {
-						_argv[j++] = '\0';
-					}
-					inText = false;
-					inSpace = true;
-					break;
-				default:
-					inText = true;
-					if( inSpace ) {
-						argv[argc++] = _argv+j;
-					}
-					_argv[j++] = a;
-					inSpace = false;
-					break;
-				}
+				++i;
 			}
-			++i;
 		}
+
 		_argv[j] = '\0';
 		argv[argc] = 0;
 
 		return argv;
 	}
 
-	bool Context::getPropValue( PropertiesPtr prop, const std::string& name, boost::any& value ) {
+	bool Context::getPropValue( PropertiesPtr properties, const std::string& name, boost::any& value ) {
 		HT4C_TRY {
-			if( prop && prop->has(name) ) {
-				value = (*prop)[name];
+			if( properties && properties->has(name) ) {
+				value = (*properties)[name];
 				return true;
 			}
 			return false;
 		}
 		HT4C_RETHROW
+	}
+
+	Common::ContextKind Context::getContextKind( Hypertable::PropertiesPtr properties ) {
+		Common::ContextKind contextKind = Common::CK_Unknown;
+		std::string providerName = properties->get_str( Common::Config::ProviderName );
+		if( providerName == Common::Config::ProviderHyper ) {
+			contextKind = Common::CK_Hyper;
+		}
+		else if( providerName == Common::Config::ProviderThrift ) {
+			contextKind = Common::CK_Thrift;
+		}
+		return contextKind;
 	}
 
 }

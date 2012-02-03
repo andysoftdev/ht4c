@@ -19,43 +19,23 @@
  * 02110-1301, USA.
  */
 
-#pragma once
-
 #ifdef __cplusplus_cli
-#pragma managed( push, off )
+#error compile native
 #endif
 
-namespace ht4c { namespace Common {
+#include "stdafx.h"
+#include "Config.h"
 
-	/// <summary>
-	/// Specifies possible context values. The context kind defines the
-	/// provider API to use for any operation within the context.
-	/// </summary>
-	enum ContextKind {
+namespace ht4c { namespace Common { 
 
-		/// <summary>
-		/// Unknown context kind.
-		/// </summary>
-	  CK_Unknown = 0
+	const char* Config::ProviderName												= "Hypertable.Client.Provider";
+	const char* Config::ProviderNameAlias										= "Provider";
+	const char* Config::ProviderHyper												= "Hyper";
+	const char* Config::ProviderThrift											= "Thrift";
 
-		/// <summary>
-		/// Hypertable native protocol context kind.
-		/// </summary>
-	, CK_Hyper
+	const char* Config::Uri																	= "Hypertable.Client.Uri";
+	const char* Config::UriAlias														= "Uri";
 
-		/// <summary>
-		/// Hypertable thrift API context kind.
-		/// </summary>
-	, CK_Thrift
-
-		/// <summary>
-		/// Terminator.
-		/// </summary>
-	, CK_Last 
-	};
+	const char* Config::ComposablePartCatalogs							= "Hypertable.Composition.ComposablePartCatalogs";
 
 } }
-
-#ifdef __cplusplus_cli
-#pragma managed ( pop )
-#endif

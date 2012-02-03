@@ -53,10 +53,22 @@
 	}
 
 /// <summary>
-/// Throws a Hypertable 'not implemented' exception.
+/// Throws a Hypertable 'NotImplemented exception.
 /// </summary>
 #define HT4C_THROW_NOTIMPLEMENTED() \
-	throw Hypertable::Exception( Hypertable::Error::NOT_IMPLEMENTED, __LINE__, __FUNCTION__, __FILE__ );
+	throw ht4c::Common::HypertableException( Hypertable::Error::NOT_IMPLEMENTED, __FUNCTION__ " not implemented", __LINE__, __FUNCTION__, __FILE__ );
+
+/// <summary>
+/// Throws an ArgumentNull exception.
+/// </summary>
+#define HT4C_THROW_ARGUMENTNULL( arg ) \
+	throw ht4c::Common::HypertableArgumentNullException( arg, __LINE__, __FUNCTION__, __FILE__ );
+
+/// <summary>
+/// Throws an Argument exception.
+/// </summary>
+#define HT4C_THROW_ARGUMENT( mesg, arg ) \
+	throw ht4c::Common::HypertableArgumentException( msg, arg, __LINE__, __FUNCTION__, __FILE__ );
 
 #endif
 
@@ -203,6 +215,55 @@ namespace ht4c { namespace Common {
 			std::string eFile;
 
 			HypertableException* eInner;
+	};
+
+	/// <summary>
+	/// Represents a ht4c argument null exception.
+	/// </summary>
+	/// <remarks>Links between native and C++/CLI.</remarks>
+	class HypertableArgumentNullException : public HypertableException {
+
+		public:
+
+			/// <summary>
+			/// Initializes a new instance of the HypertableArgumentNullException.
+			/// </summary>
+			/// <param name="arg">Argument name</param>
+			/// <param name="l">Error line</param>
+			/// <param name="fn">Error function/method</param>
+			/// <param name="fl">Source file</param>
+			HypertableArgumentNullException( const std::string& arg, int l = 0, const char *fn = 0, const char *fl = 0 );
+	};
+
+	/// <summary>
+	/// Represents a ht4c argument exception.
+	/// </summary>
+	/// <remarks>Links between native and C++/CLI.</remarks>
+	class HypertableArgumentException : public HypertableException {
+
+		public:
+
+			/// <summary>
+			/// Initializes a new instance of the HypertableArgumentNullException.
+			/// </summary>
+			/// <param name="msg">Error message</param>
+			/// <param name="arg">Argument name</param>
+			/// <param name="l">Error line</param>
+			/// <param name="fn">Error function/method</param>
+			/// <param name="fl">Source file</param>
+			HypertableArgumentException( const std::string& msg, const std::string& arg, int l = 0, const char *fn = 0, const char *fl = 0 );
+
+			/// <summary>
+			/// Returns the argument name.
+			/// </summary>
+			/// <returns>Argument name</returns>
+			const std::string& argument() const { 
+				return eArg;
+			}
+
+		private:
+
+			std::string eArg;
 	};
 
 } }
