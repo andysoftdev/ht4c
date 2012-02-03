@@ -124,6 +124,30 @@ namespace ht4c {
 					(Common::Config::ProviderName, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
 					(Common::Config::Uri, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n");
 
+#ifdef SUPPORT_HAMSTERDB
+
+				cmdline_desc().add_options()
+					(Common::Config::HamsterFilenameAlias, str(), "Hamster db filename\n")
+					(Common::Config::HamsterEnableRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
+					(Common::Config::HamsterEnableAutoRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
+					(Common::Config::HamsterMaxTablesAlias, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
+					(Common::Config::HamsterCacheSizeMBAlias, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n");
+
+				alias( Common::Config::HamsterFilenameAlias, Common::Config::HamsterFilename );
+				alias( Common::Config::HamsterEnableRecoveryAlias, Common::Config::HamsterEnableRecovery );
+				alias( Common::Config::HamsterEnableAutoRecoveryAlias, Common::Config::HamsterEnableAutoRecovery );
+				alias( Common::Config::HamsterMaxTablesAlias, Common::Config::HamsterMaxTables );
+				alias( Common::Config::HamsterCacheSizeMBAlias, Common::Config::HamsterCacheSizeMB );
+
+				file_desc().add_options()
+					(Common::Config::HamsterFilename, str(), "Hamster db filename\n")
+					(Common::Config::HamsterEnableRecovery, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
+					(Common::Config::HamsterEnableAutoRecovery, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
+					(Common::Config::HamsterMaxTables, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
+					(Common::Config::HamsterCacheSizeMB, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n");
+
+#endif
+
 				JoinedPolicyList::init_options();
 			}
 
@@ -181,6 +205,26 @@ namespace ht4c {
 					}
 				}
 
+#ifdef SUPPORT_HAMSTERDB
+
+				else if( providerName == Common::Config::ProviderHamster ) {
+					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(Common::Config::HamsterFilenameAlias) ) {
+						std::string filename = get_uri();
+						replace_all_recursive( filename, "//", "/" );
+						if( filename.find("file:/") != 0 ) {
+							HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file://[drive][/path/]filename required" );
+						}
+						filename = filename.substr( 6 );
+						if( filename.empty() ) {
+							HT_THROW( Error::CONFIG_BAD_VALUE, "Empty filename, file://[drive][/path/]filename required" );
+						}
+						replace_all_recursive( filename, "/", "\\" );
+						properties->set( Common::Config::HamsterFilenameAlias, filename );
+					}
+				}
+
+#endif
+
 				properties->sync_aliases();
 
 				JoinedPolicyList::init();
@@ -236,6 +280,12 @@ namespace ht4c {
 	Hypertable::RecMutex Context::mutex;
 	Context::sessions_t Context::sessions;
 
+#ifdef SUPPORT_HAMSTERDB
+
+	Context::hamster_envs_t Context::hamsterEnvs;
+
+#endif
+
 	Context* Context::create( const Common::Properties& _properties ) {
 		HT4C_TRY {
 			Hypertable::PropertiesPtr properties = convertProperties( _properties );
@@ -250,6 +300,13 @@ namespace ht4c {
 			size_t remainingSessions;
 			{
 				ScopedRecLock lock( mutex );
+
+#ifdef SUPPORT_HAMSTERDB
+
+				hamsterEnvs.clear();
+
+#endif
+
 				remainingSessions = sessions.size();
 			}
 			if( !remainingSessions ) {
@@ -286,6 +343,14 @@ namespace ht4c {
 					return ht4c::Hyper::HyperClient::create( getConnectionManager(), getHyperspaceSession(), properties );
 				case Common::CK_Thrift:
 					return ht4c::Thrift::ThriftClient::create( getThriftClient() );
+
+#ifdef SUPPORT_HAMSTERDB
+
+				case Common::CK_Hamster:
+					return getHamsterEnv()->createClient( );
+
+#endif
+
 			}
 			return 0;
 		}
@@ -318,6 +383,24 @@ namespace ht4c {
 	}
 
 	Context::~Context( ) {
+
+#ifdef SUPPORT_HAMSTERDB
+
+		if( hamsterEnv ) {
+			ScopedRecLock lock( mutex );
+			for( hamster_envs_t::iterator it = hamsterEnvs.begin(); it != hamsterEnvs.end(); ++it ) {
+				if( (*it).second.first == hamsterEnv ) {
+					if( --(*it).second.second == 0 ) {
+						hamsterEnvs.erase( it );
+					}
+					break;
+				}
+			}
+			hamsterEnv = 0;
+		}
+
+#endif
+
 		thriftClient = 0;
 		if( session ) {
 			unregisterSession( session );
@@ -368,6 +451,30 @@ namespace ht4c {
 			return thriftClient;
 		}
 		HT4C_RETHROW
+	}
+
+	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
+		if( !hamsterEnv ) {
+			ScopedRecLock lock( mutex );
+			std::string filename = properties->get_str( Common::Config::HamsterFilenameAlias );
+			hamster_envs_t::iterator it = hamsterEnvs.find( filename );
+			if( it == hamsterEnvs.end() ) {
+				Hamster::HamsterEnvConfig config;
+				config.enableRecovery = properties->get_bool( Common::Config::HamsterEnableRecoveryAlias );
+				config.enableAutoRecovery = properties->get_bool( Common::Config::HamsterEnableAutoRecoveryAlias );
+				config.maxTables = properties->get_i32( Common::Config::HamsterMaxTablesAlias );
+				config.cacheSizeMB = properties->get_i32( Common::Config::HamsterCacheSizeMBAlias );
+
+				hamsterEnv = Hamster::HamsterFactory::create( filename, config );
+				hamsterEnvs.insert( hamster_envs_t::value_type(filename, std::make_pair(hamsterEnv, 1)) );
+			}
+			else {
+				++(*it).second.second;
+				hamsterEnv = (*it).second.first;
+			}
+		}
+
+		return hamsterEnv;
 	}
 
 	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
@@ -565,6 +672,15 @@ namespace ht4c {
 		else if( providerName == Common::Config::ProviderThrift ) {
 			contextKind = Common::CK_Thrift;
 		}
+
+#ifdef SUPPORT_HAMSTERDB
+
+		else if( providerName == Common::Config::ProviderHamster ) {
+			contextKind = Common::CK_Hamster;
+		}
+
+#endif
+
 		return contextKind;
 	}
 

@@ -38,4 +38,20 @@ namespace ht4c { namespace Common {
 
 	const char* Config::ComposablePartCatalogs							= "Hypertable.Composition.ComposablePartCatalogs";
 
+#ifdef SUPPORT_HAMSTERDB
+
+	const char* Config::ProviderHamster											= "Hamster";
+	const char* Config::HamsterFilename											= "Hypertable.Client.Hamster.Filename";
+	const char* Config::HamsterFilenameAlias								= "Hamster.Filename";
+	const char* Config::HamsterEnableRecovery								= "Hypertable.Client.Hamster.EnableRecovery";
+	const char* Config::HamsterEnableRecoveryAlias					= "Hamster.EnableRecovery";
+	const char* Config::HamsterEnableAutoRecovery						= "Hypertable.Client.Hamster.EnableAutoRecovery";
+	const char* Config::HamsterEnableAutoRecoveryAlias			= "Hamster.EnableAutoRecovery";
+	const char* Config::HamsterMaxTables										= "Hypertable.Client.Hamster.MaxTables";
+	const char* Config::HamsterMaxTablesAlias								= "Hamster.MaxTables";
+	const char* Config::HamsterCacheSizeMB									= "Hypertable.Client.Hamster.CacheSizeMB";
+	const char* Config::HamsterCacheSizeMBAlias							= "Hamster.CacheSizeMB";
+
+#endif
+
 } }

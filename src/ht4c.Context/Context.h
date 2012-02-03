@@ -115,6 +115,17 @@ namespace ht4c {
 			/// <remarks>Pure native method.</remarks>
 			Hypertable::Thrift::ClientPtr getThriftClient( );
 
+#ifdef SUPPORT_HAMSTERDB
+
+			/// <summary>
+			/// Returns the hamster db environment.
+			/// </summary>
+			/// <returns>Hamster db environment</returns>
+			/// <remarks>Pure native method.</remarks>
+			Hamster::HamsterEnvPtr getHamsterEnv( );
+
+#endif
+
 			#endif
 
 		private:
@@ -144,6 +155,23 @@ namespace ht4c {
 			Hypertable::ConnectionManagerPtr connMgr;
 			Hyperspace::SessionPtr session;
 			Hypertable::Thrift::ClientPtr thriftClient;
+
+#ifdef SUPPORT_HAMSTERDB
+
+			struct stricmp_t {
+				bool operator () ( const std::string& a, const std::string& b ) const {
+					return stricmp( a.c_str(), b.c_str() ) < 0;
+				}
+			};
+
+			typedef std::pair<Hamster::HamsterEnvPtr, uint32_t> hamster_env_t;
+			typedef std::map<std::string, hamster_env_t> hamster_envs_t;
+
+			Hamster::HamsterEnvPtr hamsterEnv;
+
+			static hamster_envs_t hamsterEnvs;
+
+#endif
 
 			static Hypertable::RecMutex mutex;
 			static sessions_t sessions;

@@ -34,3 +34,9 @@
 #include "ThriftBroker/Client.h"
 
 #pragma warning( pop )
+
+#ifdef SUPPORT_HAMSTERDB
+
+#include "ht4c.Hamster/HamsterFactory.h"
+
+#endif

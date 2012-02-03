@@ -48,6 +48,15 @@ namespace ht4c { namespace Common {
 		/// </summary>
 	, CK_Thrift
 
+#ifdef SUPPORT_HAMSTERDB
+
+		/// <summary>
+		/// Hypertable hamster API context kind.
+		/// </summary>
+	, CK_Hamster
+
+#endif
+
 		/// <summary>
 		/// Terminator.
 		/// </summary>
