@@ -116,14 +116,24 @@ namespace ht4c { namespace Common {
 			static const char* HamsterMaxTablesAlias;
 
 			/// <summary>
-			/// Hamster db cache size.
+			/// Hamster db cache size [MB].
 			/// </summary>
 			static const char* HamsterCacheSizeMB;
 
 			/// <summary>
-			/// Hamster db cache size alias.
+			/// Hamster db cache size [MB] alias.
 			/// </summary>
 			static const char* HamsterCacheSizeMBAlias;
+
+			/// <summary>
+			/// Hamster db page size [KB], multiple of 64KB.
+			/// </summary>
+			static const char* HamsterPageSizeKB;
+
+			/// <summary>
+			/// Hamster db cache size alias.
+			/// </summary>
+			static const char* HamsterPageSizeKBAlias;
 
 #endif
 

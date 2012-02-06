@@ -51,6 +51,8 @@ namespace ht4c { namespace Common {
 	const char* Config::HamsterMaxTablesAlias								= "Hamster.MaxTables";
 	const char* Config::HamsterCacheSizeMB									= "Hypertable.Client.Hamster.CacheSizeMB";
 	const char* Config::HamsterCacheSizeMBAlias							= "Hamster.CacheSizeMB";
+	const char* Config::HamsterPageSizeKB										= "Hypertable.Client.Hamster.PageSizeKB";
+	const char* Config::HamsterPageSizeKBAlias							= "Hamster.PageSizeKB";
 
 #endif
 

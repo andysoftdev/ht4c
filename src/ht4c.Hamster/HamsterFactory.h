@@ -39,12 +39,14 @@ namespace ht4c { namespace Hamster {
 		bool enableAutoRecovery;
 		int maxTables;
 		int cacheSizeMB;
+		int pageSizeKB;
 
 		HamsterEnvConfig( )
 			: enableRecovery( false )
 			, enableAutoRecovery( false )
 			, maxTables( 1024 )
 			, cacheSizeMB( 64 )
+			, pageSizeKB( 64 )
 		{
 		}
 	};

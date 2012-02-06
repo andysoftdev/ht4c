@@ -123,6 +123,12 @@ namespace ht4c { namespace Hamster {
 		::InitializeCriticalSection( &cs );
 		try {
 			ham_set_errhandler( errhandler );
+
+			const ham_parameter_t env_pars[] = {
+					{ HAM_PARAM_CACHESIZE, std::max(1, config.cacheSizeMB) * 1024 * 1024 }
+				, { 0, 0 }
+			};
+
 			env->open( filename.c_str(), envFlags );
 		}
 		catch( ham::error& e ) {
@@ -131,8 +137,9 @@ namespace ht4c { namespace Hamster {
 			}
 
 			const ham_parameter_t env_pars[] = {
-					{ HAM_PARAM_MAX_ENV_DATABASES, std::min(config.maxTables, 0xfff0) }
+					{ HAM_PARAM_MAX_ENV_DATABASES, std::min(config.maxTables, HAM_DEFAULT_DATABASE_NAME - 1) }
 				, { HAM_PARAM_CACHESIZE, std::max(1, config.cacheSizeMB) * 1024 * 1024 }
+				, { HAM_PARAM_PAGESIZE, (std::min(64, config.pageSizeKB) / 64) * 64 * 1024 }
 				, { 0, 0 }
 			};
 

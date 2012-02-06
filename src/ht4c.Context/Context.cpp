@@ -131,20 +131,23 @@ namespace ht4c {
 					(Common::Config::HamsterEnableRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
 					(Common::Config::HamsterEnableAutoRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
 					(Common::Config::HamsterMaxTablesAlias, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
-					(Common::Config::HamsterCacheSizeMBAlias, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n");
+					(Common::Config::HamsterCacheSizeMBAlias, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n")
+					(Common::Config::HamsterPageSizeKBAlias, i32()->default_value(64), "Hamster db page size [KB] (default:64)\n");
 
 				alias( Common::Config::HamsterFilenameAlias, Common::Config::HamsterFilename );
 				alias( Common::Config::HamsterEnableRecoveryAlias, Common::Config::HamsterEnableRecovery );
 				alias( Common::Config::HamsterEnableAutoRecoveryAlias, Common::Config::HamsterEnableAutoRecovery );
 				alias( Common::Config::HamsterMaxTablesAlias, Common::Config::HamsterMaxTables );
 				alias( Common::Config::HamsterCacheSizeMBAlias, Common::Config::HamsterCacheSizeMB );
+				alias( Common::Config::HamsterPageSizeKBAlias, Common::Config::HamsterPageSizeKB );
 
 				file_desc().add_options()
 					(Common::Config::HamsterFilename, str(), "Hamster db filename\n")
 					(Common::Config::HamsterEnableRecovery, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
 					(Common::Config::HamsterEnableAutoRecovery, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
 					(Common::Config::HamsterMaxTables, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
-					(Common::Config::HamsterCacheSizeMB, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n");
+					(Common::Config::HamsterCacheSizeMB, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n")
+					(Common::Config::HamsterPageSizeKB, i32()->default_value(64), "Hamster db page size [KB] (default:64)\n");
 
 #endif
 
@@ -424,6 +427,7 @@ namespace ht4c {
 			if( !session ) {
 				session = findSession( properties, connMgr );
 				if( !session ) {
+					HT_INFO_OUT << "Creating hyperspace session " << properties->get_str(hyperspace) << HT_END;
 					session = new Hyperspace::Session( getComm(), properties );
 				}
 				registerSession( session, getConnectionManager() );
@@ -446,6 +450,7 @@ namespace ht4c {
 				std::string host = properties->get_str( thriftBrokerHost );
 				uint16_t port = properties->get_i16( thriftBrokerPort );
 				int32_t timeoutMsec = properties->get_i32( thriftBrokerTimeout );
+				HT_INFO_OUT << "Creating thrift client " << host << ":" << port << HT_END;
 				thriftClient = ht4c::Thrift::ThriftFactory::create( host, port, timeoutMsec );
 			}
 			return thriftClient;
@@ -464,7 +469,9 @@ namespace ht4c {
 				config.enableAutoRecovery = properties->get_bool( Common::Config::HamsterEnableAutoRecoveryAlias );
 				config.maxTables = properties->get_i32( Common::Config::HamsterMaxTablesAlias );
 				config.cacheSizeMB = properties->get_i32( Common::Config::HamsterCacheSizeMBAlias );
+				config.pageSizeKB = properties->get_i32( Common::Config::HamsterPageSizeKBAlias );
 
+				HT_INFO_OUT << "Creating hamster environment " << filename << HT_END;
 				hamsterEnv = Hamster::HamsterFactory::create( filename, config );
 				hamsterEnvs.insert( hamster_envs_t::value_type(filename, std::make_pair(hamsterEnv, 1)) );
 			}
@@ -531,13 +538,12 @@ namespace ht4c {
 		Policies::initialProperties = Context::convertProperties( initialProperties );
 		Policies::prefferedLoggingLevel = loggingLevel && *loggingLevel ? loggingLevel : "notice";
 		init_with_policy<Policies>( argc, argv, 0 );
+		Logging::init();
 		Hypertable::PropertiesPtr properties = Config::properties;
-
-		properties->get_i32("Hypertable.Connection.Retry.Interval");
-
 		if( existingProperties ) {
 			Config::properties = existingProperties;
 		}
+		HT_INFO_OUT << "Configuration properties initialized" << HT_END;
 		return properties;
 	}
 
