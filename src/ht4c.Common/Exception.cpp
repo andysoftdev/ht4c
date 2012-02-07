@@ -47,14 +47,20 @@ namespace ht4c { namespace Common {
 	}
 
 	std::ostream& HypertableException::renderMessage( std::ostream &out, const Hypertable::Exception &e ) {
-		out << e.message() << " - " <<  Hypertable::Error::get_text(e.code());
-		if( e.line() ) {
+		std::stringstream ss;
+		ss << e.message();
+		std::string msg = ss.str();
+		if( !msg.empty() ) {
+			out << msg << " - ";
+		}
+		out <<  Hypertable::Error::get_text(e.code());
+		if( e.func() && e.file() && e.line() ) {
 			out << "\n\tat " << e.func() << " (" << e.file() << ':' << e.line() << ')';
 		}
 
 		int prev_code = e.code();
 
-		for (Hypertable::Exception *prev = e.prev; prev; prev = prev->prev) {
+		for( Hypertable::Exception *prev = e.prev; prev; prev = prev->prev ) {
 			out << "\n\tat " << (prev->func() ? prev->func() : "-") << " ("
 				<< (prev->file() ? prev->file() : "-") <<':'<< prev->line() << "): "
 				<< prev->message();

@@ -36,6 +36,9 @@
 /// </summary>
 /// <remarks>Translates Hypertable and std exceptions into ht4c exceptions.</remarks>
 #define HT4C_RETHROW \
+	catch( ht4c::Common::HypertableException& ) { \
+		throw; \
+	} \
 	catch( Hypertable::Exception& e ) { \
 		std::stringstream ss; \
 		ht4c::Common::HypertableException::renderMessage( ss, e ); \
