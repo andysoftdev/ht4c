@@ -36,6 +36,9 @@ namespace ht4c { namespace Common {
 	const char* Config::Uri																	= "Hypertable.Client.Uri";
 	const char* Config::UriAlias														= "Uri";
 
+	const char* Config::ConnectionTimeout										= "Hypertable.Client.ConnectionTimeout";
+	const char* Config::ConnectionTimeoutAlias							= "ConnectionTimeout";
+
 	const char* Config::ComposablePartCatalogs							= "Hypertable.Composition.ComposablePartCatalogs";
 
 #ifdef SUPPORT_HAMSTERDB

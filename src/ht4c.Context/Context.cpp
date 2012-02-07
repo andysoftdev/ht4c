@@ -70,7 +70,7 @@ namespace ht4c {
 		const uint16_t defaultHyperspacePort					= 38040;
 		const uint16_t defaultThriftBrokerPort				= 38080;
 
-		const int32_t defaultThriftBrokerTimeoutMsec	= 30000;
+		const int32_t defaultConnectionTimeoutMsec		= 30000;
 		const int32_t defaultLeaseIntervalMsec				= 300000;
 		const int32_t defaultGracePeriodMsec					= 300000;
 
@@ -116,14 +116,17 @@ namespace ht4c {
 
 				cmdline_desc().add_options()
 					(Common::Config::ProviderNameAlias, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
-					(Common::Config::UriAlias, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n");
+					(Common::Config::UriAlias, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n")
+					(Common::Config::ConnectionTimeoutAlias, i32()->default_value(defaultConnectionTimeoutMsec), "Connection timeout [ms] (default: 30000)\n");
 
 				alias( Common::Config::ProviderNameAlias, Common::Config::ProviderName );
 				alias( Common::Config::UriAlias, Common::Config::Uri );
+				alias( Common::Config::ConnectionTimeoutAlias, Common::Config::ConnectionTimeout );
 
 				file_desc().add_options()
 					(Common::Config::ProviderName, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
-					(Common::Config::Uri, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n");
+					(Common::Config::Uri, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n")
+					(Common::Config::ConnectionTimeout, i32()->default_value(defaultConnectionTimeoutMsec), "Connection timeout [ms] (default: 30000)\n");
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -187,11 +190,11 @@ namespace ht4c {
 					properties->set( gracePeriod, defaultGracePeriodMsec );
 				}
 
-				int32_t timeoutMsec = defaultThriftBrokerTimeoutMsec;
-				if( properties->has(thriftBrokerTimeout) ) {
-					timeoutMsec = properties->get_i32( thriftBrokerTimeout );
-				}
-				else {
+				if( !properties->has(thriftBrokerTimeout) ) {
+					int32_t timeoutMsec = defaultConnectionTimeoutMsec;
+					if( properties->has(Common::Config::ConnectionTimeoutAlias) ) {
+						timeoutMsec = properties->get_i32( Common::Config::ConnectionTimeoutAlias );
+					}
 					properties->set( thriftBrokerTimeout, timeoutMsec );
 				}
 

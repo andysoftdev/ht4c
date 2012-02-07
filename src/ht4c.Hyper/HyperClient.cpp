@@ -27,6 +27,7 @@
 #include "HyperClient.h"
 #include "HyperNamespace.h"
 
+#include "ht4c.Common/Config.h"
 #include "ht4c.Common/Exception.h"
 
 
@@ -106,7 +107,11 @@ namespace ht4c { namespace Hyper {
 	: client( )
 	{
 		HT4C_TRY {
-			client = new Hypertable::Client( Hypertable::String(), connMngr, session, properties );
+			int32_t connectionTimeoutMsec = 30000;
+			if( properties && properties->has(Common::Config::ConnectionTimeoutAlias) ) {
+				connectionTimeoutMsec = properties->get_i32( Common::Config::ConnectionTimeoutAlias );
+			}
+			client = new Hypertable::Client( Hypertable::String(), connMngr, session, properties, connectionTimeoutMsec );
 		}
 		HT4C_RETHROW
 	}

@@ -73,6 +73,16 @@ namespace ht4c { namespace Common {
 			/// </summary>
 			static const char* UriAlias;
 
+			/// <summary>
+			/// Connection timeout [ms]
+			/// </summary>
+			static const char* ConnectionTimeout;
+
+			/// <summary>
+			/// Connection timeout [ms] alias.
+			/// </summary>
+			static const char* ConnectionTimeoutAlias;
+
 #ifdef SUPPORT_HAMSTERDB
 
 			/// <summary>
