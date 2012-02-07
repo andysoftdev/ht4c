@@ -53,6 +53,7 @@ namespace ht4c {
 	namespace {
 
 		const char* localhost													= "net.tcp://localhost";
+		const char* requestTimeout										= "Hypertable.Request.Timeout";
 		const char* hyperspace												= "hyperspace";
 		const char* hyperspaceHost										= "hs-host";
 		const char* hyperspacePort										= "hs-port";
@@ -450,9 +451,10 @@ namespace ht4c {
 			if( !thriftClient ) {
 				std::string host = properties->get_str( thriftBrokerHost );
 				uint16_t port = properties->get_i16( thriftBrokerPort );
-				int32_t timeoutMsec = properties->get_i32( thriftBrokerTimeout );
+				int32_t connectionTimeoutMsec = properties->get_i32( thriftBrokerTimeout );
+				int32_t timeoutMsec = properties->get_i32( requestTimeout );
 				HT_INFO_OUT << "Creating thrift client " << host << ":" << port << HT_END;
-				thriftClient = ht4c::Thrift::ThriftFactory::create( host, port, timeoutMsec );
+				thriftClient = ht4c::Thrift::ThriftFactory::create( host, port, connectionTimeoutMsec, timeoutMsec );
 			}
 			return thriftClient;
 		}

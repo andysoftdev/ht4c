@@ -31,9 +31,9 @@
 
 namespace ht4c { namespace Thrift {
 
-	Hypertable::Thrift::ThriftClient* ThriftFactory::create( const std::string &host, int port, int timeout_ms ) {
+	Hypertable::Thrift::ThriftClient* ThriftFactory::create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms ) {
 		HT4C_TRY {
-			return new Hypertable::Thrift::ThriftClient( host, port, timeout_ms );
+			return new Hypertable::Thrift::ThriftClient( host, port, connectionTimeout_ms, timeout_ms );
 		}
 		HT4C_THRIFT_RETHROW
 	}

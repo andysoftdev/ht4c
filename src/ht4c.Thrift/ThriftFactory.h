@@ -43,10 +43,11 @@ namespace ht4c { namespace Thrift {
 			/// </summary>
 			/// <param name="host">Thrift broker host</param>
 			/// <param name="port">Thrift broker port</param>
-			/// <param name="timeout_ms">Connection time out [ms]</param>
+			/// <param name="connectionTimeout_ms">Connection time out [ms]</param>
+			/// <param name="timeout_ms">Send/receive time out [ms]</param>
 			/// <returns>New ThriftClient instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Hypertable::Thrift::ThriftClient* create( const std::string &host, int port, int timeout_ms );
+			static Hypertable::Thrift::ThriftClient* create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms );
 	};
 
 } }
