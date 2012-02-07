@@ -214,10 +214,11 @@ namespace ht4c {
 					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(Common::Config::HamsterFilenameAlias) ) {
 						std::string filename = get_uri();
 						replace_all_recursive( filename, "//", "/" );
-						if( filename.find("file:/") != 0 ) {
+						if( filename.find("file:") != 0 ) {
 							HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file://[drive][/path/]filename required" );
 						}
-						filename = filename.substr( 6 );
+						filename = filename.substr( 5 );
+						boost::trim_left_if( filename, boost::is_any_of("/") );
 						if( filename.empty() ) {
 							HT_THROW( Error::CONFIG_BAD_VALUE, "Empty filename, file://[drive][/path/]filename required" );
 						}
