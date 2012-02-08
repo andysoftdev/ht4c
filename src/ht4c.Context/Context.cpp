@@ -464,6 +464,8 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
+#ifdef SUPPORT_HAMSTERDB
+
 	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
 		if( !hamsterEnv ) {
 			ScopedRecLock lock( mutex );
@@ -489,6 +491,8 @@ namespace ht4c {
 
 		return hamsterEnv;
 	}
+
+#endif
 
 	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
 	: contextKind( _contextKind )
