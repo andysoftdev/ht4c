@@ -918,7 +918,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 					ri->start = "";
 				}
 				if( !ri->end || !*ri->end ) {
-					ri->end = Hypertable::Key::END_ROW_MARKER;;
+					ri->end = Hypertable::Key::END_ROW_MARKER;
 				}
 			}
 			reader = new ReaderRowIntervals( &cursor, _table->getSchema(), scanSpec.get() );
