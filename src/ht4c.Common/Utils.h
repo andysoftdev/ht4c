@@ -74,7 +74,7 @@ namespace ht4c { namespace Common {
 	inline uint64_t TIMESTAMP( uint64_t timestamp, uint8_t flag ) {
 		return  timestamp == 0
 					? Hypertable::AUTO_ASSIGN
-					: flag == Hypertable::FLAG_INSERT || Hypertable::FLAG_DELETE_CELL_VERSION
+					: flag == Hypertable::FLAG_INSERT || flag == Hypertable::FLAG_DELETE_CELL_VERSION
 					? timestamp
 					: timestamp + 1;
 	}
