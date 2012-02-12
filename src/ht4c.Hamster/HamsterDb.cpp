@@ -35,11 +35,15 @@ namespace ht4c { namespace Hamster { namespace Db {
 			}
 
 			inline char* KeyToString( ham::key& key ) {
-				return (reinterpret_cast<char*>(key.get_data()) + KeyClassifiers::Length);
+        char* k = reinterpret_cast<char*>( key.get_data() );
+        k += KeyClassifiers::Length;
+				return k;
 			}
 
 			inline const char* KeyToString( const ham::key& key ) {
-				return (reinterpret_cast<const char*>(key.get_data()) + KeyClassifiers::Length);
+				const char* k = reinterpret_cast<const char*>( key.get_data() );
+        k += KeyClassifiers::Length;
+				return k;
 			}
 
 			inline char* KeyToString( ham::key& key, char classifier ) {
@@ -224,7 +228,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	const char* Namespace::getName( ) const {
-		return keyName.c_str() + KeyClassifiers::Length;
+    const char* name = keyName.c_str();
+    name += KeyClassifiers::Length;
+		return name;
 	}
 
 	void Namespace::drop( const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
@@ -560,7 +566,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	const char* Table::getFullName( ) const {
-		return keyName.c_str() + KeyClassifiers::Length;
+    const char* name = keyName.c_str();
+    name += KeyClassifiers::Length;
+		return name;
 	}
 
 	void Table::getTableSchema( bool withIds, std::string& _schema ) {

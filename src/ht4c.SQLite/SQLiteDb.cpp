@@ -185,7 +185,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	const char* Namespace::getName( ) const {
-		return keyName.c_str() + KeyClassifiers::Length;
+    const char* name = keyName.c_str();
+    name += KeyClassifiers::Length;
+		return name;
 	}
 
 	void Namespace::drop( const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
@@ -489,7 +491,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	const char* Table::getFullName( ) const {
-		return keyName.c_str() + KeyClassifiers::Length;
+    const char* name = keyName.c_str();
+    name += KeyClassifiers::Length;
+		return name;
 	}
 
 	void Table::getTableSchema( bool withIds, std::string& _schema ) {

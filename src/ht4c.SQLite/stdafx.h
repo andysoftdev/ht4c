@@ -56,11 +56,15 @@ namespace ht4c { namespace SQLite { namespace Db { namespace Util {
 	}
 
 	inline char* KeyToString( void* key ) {
-		return (reinterpret_cast<char*>(key) + KeyClassifiers::Length);
+    char* k = reinterpret_cast<char*>( key );
+    k += KeyClassifiers::Length;
+		return k;
 	}
 
 	inline const char* KeyToString( const void* key ) {
-		return (reinterpret_cast<const char*>(key) + KeyClassifiers::Length);
+		const char* k = reinterpret_cast<const char*>( key );
+    k += KeyClassifiers::Length;
+		return k;
 	}
 
 	inline char* KeyToString( void* key, char classifier ) {
