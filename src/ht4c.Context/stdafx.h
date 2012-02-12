@@ -40,3 +40,9 @@
 #include "ht4c.Hamster/HamsterFactory.h"
 
 #endif
+
+#ifdef SUPPORT_SQLITEDB
+
+#include "ht4c.SQLite/SQLiteFactory.h"
+
+#endif

@@ -59,4 +59,18 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+	const char* Config::ProviderSQLite											= "SQLite";
+	const char* Config::SQLiteFilename											= "Hypertable.Client.SQLite.Filename";
+	const char* Config::SQLiteFilenameAlias									= "SQLite.Filename";
+	const char* Config::SQLiteCacheSizeMB										= "Hypertable.Client.SQLite.CacheSizeMB";
+	const char* Config::SQLiteCacheSizeMBAlias							= "SQLite.CacheSizeMB";
+	const char* Config::SQLitePageSizeKB										= "Hypertable.Client.SQLite.PageSizeKB";
+	const char* Config::SQLitePageSizeKBAlias								= "SQLite.PageSizeKB";
+	const char* Config::SQLiteSynchronous										= "Hypertable.Client.SQLite.Synchronous";
+	const char* Config::SQLiteSynchronousAlias							= "SQLite.Synchronous";
+
+#endif
+
 } }

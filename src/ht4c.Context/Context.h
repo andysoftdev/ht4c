@@ -126,6 +126,17 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+			/// <summary>
+			/// Returns the sqlite db environment.
+			/// </summary>
+			/// <returns>SQLIte db environment</returns>
+			/// <remarks>Pure native method.</remarks>
+			SQLite::SQLiteEnvPtr getSQLiteEnv( );
+
+#endif
+
 			#endif
 
 		private:
@@ -170,6 +181,12 @@ namespace ht4c {
 			Hamster::HamsterEnvPtr hamsterEnv;
 
 			static hamster_envs_t hamsterEnvs;
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+			SQLite::SQLiteEnvPtr sqliteEnv;
 
 #endif
 

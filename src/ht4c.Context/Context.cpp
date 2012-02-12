@@ -71,7 +71,7 @@ namespace ht4c {
 		const uint16_t defaultThriftBrokerPort				= 38080;
 
 		const int32_t defaultConnectionTimeoutMsec		= 30000;
-		const int32_t defaultLeaseIntervalMsec				= 300000;
+		const int32_t defaultLeaseIntervalMsec				= 1000000;
 		const int32_t defaultGracePeriodMsec					= 300000;
 
 		template<typename SequenceT, typename Range1T, typename Range2T>
@@ -155,6 +155,27 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+				cmdline_desc().add_options()
+					(Common::Config::SQLiteFilenameAlias, str(), "SQLite db filename\n")
+					(Common::Config::SQLiteCacheSizeMBAlias, i32()->default_value(64), "SQLite db cache size [MB] (default:64)\n")
+					(Common::Config::SQLitePageSizeKBAlias, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
+					(Common::Config::SQLiteSynchronousAlias, boo()->default_value(false), "SQLite synchronous (default:false)\n");
+
+				alias( Common::Config::SQLiteFilenameAlias, Common::Config::SQLiteFilename );
+				alias( Common::Config::SQLiteCacheSizeMBAlias, Common::Config::SQLiteCacheSizeMB );
+				alias( Common::Config::SQLitePageSizeKBAlias, Common::Config::SQLitePageSizeKB );
+				alias( Common::Config::SQLiteSynchronousAlias, Common::Config::SQLiteSynchronous );
+
+				file_desc().add_options()
+					(Common::Config::SQLiteFilename, str(), "SQLite db filename\n")
+					(Common::Config::SQLiteCacheSizeMB, i32()->default_value(64), "SQLite db cache size [MB] (default:64)\n")
+					(Common::Config::SQLitePageSizeKB, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
+					(Common::Config::SQLiteSynchronous, boo()->default_value(false), "SQLite synchronous (default:false)\n");
+
+#endif
+
 				JoinedPolicyList::init_options();
 			}
 
@@ -203,32 +224,27 @@ namespace ht4c {
 				std::string providerName = properties->get_str( Common::Config::ProviderName );
 				if( providerName == Common::Config::ProviderHyper ) {
 					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(hyperspace) ) {
-						properties->set( hyperspace, get_uri(hyperspacePort, defaultHyperspacePort) );
+						properties->set( hyperspace, get_nettcp_uri(hyperspacePort, defaultHyperspacePort) );
 					}
 				}
 				else if( providerName == Common::Config::ProviderThrift ) {
 					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(thriftBroker) ) {
-						properties->set( thriftBroker, get_uri(thriftBrokerPort, defaultThriftBrokerPort) );
+						properties->set( thriftBroker, get_nettcp_uri(thriftBrokerPort, defaultThriftBrokerPort) );
 					}
 				}
 
 #ifdef SUPPORT_HAMSTERDB
 
 				else if( providerName == Common::Config::ProviderHamster ) {
-					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(Common::Config::HamsterFilenameAlias) ) {
-						std::string filename = get_uri();
-						replace_all_recursive( filename, "//", "/" );
-						if( filename.find("file:") != 0 ) {
-							HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file://[drive][/path/]filename required" );
-						}
-						filename = filename.substr( 5 );
-						boost::trim_left_if( filename, boost::is_any_of("/") );
-						if( filename.empty() ) {
-							HT_THROW( Error::CONFIG_BAD_VALUE, "Empty filename, file://[drive][/path/]filename required" );
-						}
-						replace_all_recursive( filename, "/", "\\" );
-						properties->set( Common::Config::HamsterFilenameAlias, filename );
-					}
+					set_file_uri( Common::Config::HamsterFilenameAlias );
+				}
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+				else if( providerName == Common::Config::ProviderSQLite ) {
+					set_file_uri( Common::Config::SQLiteFilenameAlias );
 				}
 
 #endif
@@ -255,7 +271,7 @@ namespace ht4c {
 				return uri;
 			}
 
-			static std::string get_uri( const char* portProperty, uint16_t defaultPort ) {
+			static std::string get_nettcp_uri( const char* portProperty, uint16_t defaultPort ) {
 				std::string uri = get_uri();
 				if( uri.empty() ) {
 					uri = localhost;
@@ -276,6 +292,23 @@ namespace ht4c {
 					uri = format( "%s:%d", uri.c_str(), port );
 				}
 				return uri;
+			}
+
+			static void set_file_uri( const char* filenameProperty ) {
+				if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(filenameProperty) ) {
+					std::string filename = get_uri();
+					replace_all_recursive( filename, "//", "/" );
+					if( filename.find("file:") != 0 ) {
+						HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file://[drive][/path/]filename required" );
+					}
+					filename = filename.substr( 5 );
+					boost::trim_left_if( filename, boost::is_any_of("/") );
+					if( filename.empty() ) {
+						HT_THROW( Error::CONFIG_BAD_VALUE, "Empty filename, file://[drive][/path/]filename required" );
+					}
+					replace_all_recursive( filename, "/", "\\" );
+					properties->set( filenameProperty, filename );
+				}
 			}
 
 		};
@@ -356,6 +389,13 @@ namespace ht4c {
 
 				case Common::CK_Hamster:
 					return getHamsterEnv()->createClient( );
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+				case Common::CK_SQLite:
+					return getSQLiteEnv()->createClient( );
 
 #endif
 
@@ -490,6 +530,26 @@ namespace ht4c {
 		}
 
 		return hamsterEnv;
+	}
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+	SQLite::SQLiteEnvPtr Context::getSQLiteEnv( ) {
+		if( !sqliteEnv ) {
+			ScopedRecLock lock( mutex );
+			std::string filename = properties->get_str( Common::Config::SQLiteFilenameAlias );
+			SQLite::SQLiteEnvConfig config;
+			config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMBAlias );
+			config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKBAlias );
+			config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronousAlias );
+
+			HT_INFO_OUT << "Creating sqlite environment " << filename << HT_END;
+			sqliteEnv = SQLite::SQLiteFactory::create( filename, config );
+		}
+
+		return sqliteEnv;
 	}
 
 #endif
@@ -693,6 +753,14 @@ namespace ht4c {
 
 		else if( providerName == Common::Config::ProviderHamster ) {
 			contextKind = Common::CK_Hamster;
+		}
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+		else if( providerName == Common::Config::ProviderSQLite ) {
+			contextKind = Common::CK_SQLite;
 		}
 
 #endif

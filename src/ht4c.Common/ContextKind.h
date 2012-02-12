@@ -57,6 +57,15 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+		/// <summary>
+		/// Hypertable SQLite API context kind.
+		/// </summary>
+	, CK_SQLite
+
+#endif
+
 		/// <summary>
 		/// Terminator.
 		/// </summary>

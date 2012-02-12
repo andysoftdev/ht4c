@@ -63,6 +63,15 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+			/// <summary>
+			/// Provider name value - SQLite.
+			/// </summary>
+			static const char* ProviderSQLite;
+
+#endif
+
 			/// <summary>
 			/// Uri, hostname:port.
 			/// </summary>
@@ -141,9 +150,54 @@ namespace ht4c { namespace Common {
 			static const char* HamsterPageSizeKB;
 
 			/// <summary>
-			/// Hamster db cache size alias.
+			/// Hamster db page size alias.
 			/// </summary>
 			static const char* HamsterPageSizeKBAlias;
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+			/// <summary>
+			/// SQLite db filename.
+			/// </summary>
+			static const char* SQLiteFilename;
+
+			/// <summary>
+			/// SQLite db filename alias.
+			/// </summary>
+			static const char* SQLiteFilenameAlias;
+
+			/// <summary>
+			/// SQLite db cache size [MB].
+			/// </summary>
+			static const char* SQLiteCacheSizeMB;
+
+			/// <summary>
+			/// SQLite db cache size [MB] alias.
+			/// </summary>
+			static const char* SQLiteCacheSizeMBAlias;
+
+			/// <summary>
+			/// SQLite db page size [KB].
+			/// </summary>
+			static const char* SQLitePageSizeKB;
+
+			/// <summary>
+			/// SQLite db page size alias.
+			/// </summary>
+			static const char* SQLitePageSizeKBAlias;
+
+			/// <summary>
+			/// SQLite synchronous.
+			/// </summary>
+			static const char* SQLiteSynchronous;
+
+			/// <summary>
+			/// SQLite synchronous alias.
+			/// </summary>
+			static const char* SQLiteSynchronousAlias;
+
 
 #endif
 

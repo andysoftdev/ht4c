@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteClient.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteNamespace.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteTable.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteTableMutator.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteTableScanner.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteFactory.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteException.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteAsyncResult.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteBlockingAsyncResult.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteAsyncTableMutator.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLiteAsyncTableScanner.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteNamespace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteTableMutator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteTableScanner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteFactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteAsyncResult.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteBlockingAsyncResult.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteAsyncTableMutator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SQLiteAsyncTableScanner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
