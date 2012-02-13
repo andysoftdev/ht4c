@@ -274,7 +274,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 			sqlite3_stmt* stmtDeleteCf;
 			sqlite3_stmt* stmtDeleteCell;
 			sqlite3_stmt* stmtDeleteCellVersion;
-			bool tx;
 	};
 
 	class MutatorAsync : public Hypertable::ReferenceCount {

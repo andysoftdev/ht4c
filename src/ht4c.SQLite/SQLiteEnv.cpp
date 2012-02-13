@@ -34,6 +34,7 @@ namespace ht4c { namespace SQLite {
 
 	SQLiteEnv::SQLiteEnv( const std::string &filename, const SQLiteEnvConfig& config )
 	: db( 0 )
+	, tx( false )
 	, stmtBegin( 0 )
 	, stmtCommit( 0 )
 	, stmtRollback( 0 )
@@ -148,18 +149,27 @@ namespace ht4c { namespace SQLite {
 	}
 
 	void SQLiteEnv::txBegin() {
-		int st = sqlite3_step( stmtBegin );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		if( !tx ) {
+			int st = sqlite3_step( stmtBegin );
+			HT4C_SQLITE_VERIFY( st, db, 0 );
+			tx = true;
+		}
 	}
 
 	void SQLiteEnv::txCommit() {
-		int st = sqlite3_step( stmtCommit );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		if( tx ) {
+			int st = sqlite3_step( stmtCommit );
+			HT4C_SQLITE_VERIFY( st, db, 0 );
+			tx = false;
+		}
 	}
 
 	void SQLiteEnv::txRollback() {
-		int st = sqlite3_step( stmtRollback );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		if( tx ) {
+			int st = sqlite3_step( stmtRollback );
+			HT4C_SQLITE_VERIFY( st, db, 0 );
+			tx = false;
+		}
 	}
 
 	void SQLiteEnv::sysDbInsert( const char* name, int len, const void* value, int size, int64_t* rowid ) {

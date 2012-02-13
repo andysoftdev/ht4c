@@ -589,8 +589,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, stmtDeleteRow( 0 )
 	, stmtDeleteCf( 0 )
 	, stmtDeleteCell( 0 )
-	, stmtDeleteCellVersion( 0 )
-	, tx( false ) {
+	, stmtDeleteCellVersion( 0 ) {
 
 		int st = sqlite3_prepare_v2( db, Hypertable::format("INSERT OR REPLACE INTO t%lld (r, cf, cq, ts, v) VALUES(?, ?, ?, ?, ?);", table->getId()).c_str(), -1, &stmtInsert, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
@@ -609,11 +608,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	Mutator::~Mutator( ) {
-		if( tx ) {
-			env->txRollback();
-			tx = false;
-		}
-
 		Util::stmt_finalize( db, &stmtInsert );
 		Util::stmt_finalize( db, &stmtDeleteRow );
 		Util::stmt_finalize( db, &stmtDeleteCf );
@@ -676,10 +670,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Mutator::flush( ) {
-		if( tx ) {
-			env->txCommit();
-			tx = false;
-		}
+		env->txCommit();
 	}
 
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
@@ -764,10 +755,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Mutator::set( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
-		if( !tx ) {
-			env->txBegin();
-			tx = true;
-		}
+		env->txBegin();
 
 		if( key.flag == Hypertable::FLAG_INSERT ) {
 			insert( key, value, valueLength );

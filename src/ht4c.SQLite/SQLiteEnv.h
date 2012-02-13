@@ -103,6 +103,7 @@ namespace ht4c { namespace SQLite {
 			}
 
 			sqlite3* db;
+			bool tx;
 
 			sqlite3_stmt* stmtBegin;
 			sqlite3_stmt* stmtCommit;
