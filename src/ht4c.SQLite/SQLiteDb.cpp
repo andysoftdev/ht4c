@@ -1072,7 +1072,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 					predicate += Hypertable::format("%scf=%d", predicate.empty() ? "" : " OR ", cf->id ); //TODO use cf IN ('A', 'B')
 				}
 				else {
-					predicate += Hypertable::format("%s(cf=%d AND cq='%s')", predicate.empty() ? "" : " OR ", cf->id, qualifier.c_str() ); //TODO use cf IN ('A', 'B')
+					predicate += Hypertable::format("%s(cf=%d AND cq=\"%s\")", predicate.empty() ? "" : " OR ", cf->id, qualifier.c_str() ); //TODO use cf IN ('A', 'B')
 				}
 			}
 		}
@@ -1445,7 +1445,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		std::string select;
 		if( strcmp(*scanContext->rowset.begin(),*scanContext->rowset.rbegin()) ) {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>=\"%s\" AND r <=\"%s\")%s ORDER BY r, cf, cq, ts;"
 																	, scanContext->columns.c_str()
 																	, tableId
 																	, *scanContext->rowset.begin()
@@ -1454,7 +1454,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 																	);
 		}
 		else {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM t%lld WHERE r=\"%s\"%s ORDER BY r, cf, cq, ts;"
 																	, scanContext->columns.c_str()
 																	, tableId
 																	, *scanContext->rowset.begin()
@@ -1498,7 +1498,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 			std::string select;
 			if( strcmp(it->start, it->end) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s'%s' AND r <%s'%s')%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s\"%s\" AND r <%s\"%s\")%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , it->start_inclusive ? "=" : ""
@@ -1509,7 +1509,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 																	 );
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r=\"%s\"%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , (*it).start
@@ -1592,7 +1592,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 			std::string select;
 			if( strcmp(it->start_row, it->end_row) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>=\"%s\" AND r <=\"%s\")%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , it->start_row
@@ -1600,13 +1600,22 @@ namespace ht4c { namespace SQLite { namespace Db {
 																	 , predicate.c_str()
 																	 );
 			}
-			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf>=%d AND cf<=%d%s ORDER BY r, cf, cq, ts;"
+			else if( startColumnFamilyCode != endColumnFamilyCode ) {
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r=\"%s\" AND cf>=%d AND cf<=%d%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , (*it).start_row
 																	 , startColumnFamilyCode
 																	 , endColumnFamilyCode
+																	 , predicate.c_str()
+																	 );
+			}
+			else {
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r=\"%s\" AND cf=%d%s ORDER BY r, cf, cq, ts;"
+																	 , scanContext->columns.c_str()
+																	 , tableId
+																	 , (*it).start_row
+																	 , startColumnFamilyCode
 																	 , predicate.c_str()
 																	 );
 			}
