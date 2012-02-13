@@ -327,6 +327,12 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+	Context::sqlite_envs_t Context::sqliteEnvs;
+
+#endif
+
 	Context* Context::create( const Common::Properties& _properties ) {
 		HT4C_TRY {
 			Hypertable::PropertiesPtr properties = convertProperties( _properties );
@@ -345,6 +351,12 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 				hamsterEnvs.clear();
+
+#endif
+
+#ifdef SUPPORT_SQLITEDB
+
+				sqliteEnvs.clear();
 
 #endif
 
@@ -449,6 +461,23 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_SQLITEDB
+
+		if( sqliteEnv ) {
+			ScopedRecLock lock( mutex );
+			for( sqlite_envs_t::iterator it = sqliteEnvs.begin(); it != sqliteEnvs.end(); ++it ) {
+				if( (*it).second.first == sqliteEnv ) {
+					if( --(*it).second.second == 0 ) {
+						sqliteEnvs.erase( it );
+					}
+					break;
+				}
+			}
+			sqliteEnv = 0;
+		}
+
+#endif
+
 		thriftClient = 0;
 		if( session ) {
 			unregisterSession( session );
@@ -540,13 +569,21 @@ namespace ht4c {
 		if( !sqliteEnv ) {
 			ScopedRecLock lock( mutex );
 			std::string filename = properties->get_str( Common::Config::SQLiteFilenameAlias );
-			SQLite::SQLiteEnvConfig config;
-			config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMBAlias );
-			config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKBAlias );
-			config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronousAlias );
+			sqlite_envs_t::iterator it = sqliteEnvs.find( filename );
+			if( it == sqliteEnvs.end() ) {
+				SQLite::SQLiteEnvConfig config;
+				config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMBAlias );
+				config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKBAlias );
+				config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronousAlias );
 
-			HT_INFO_OUT << "Creating sqlite environment " << filename << HT_END;
-			sqliteEnv = SQLite::SQLiteFactory::create( filename, config );
+				HT_INFO_OUT << "Creating sqlite environment " << filename << HT_END;
+				sqliteEnv = SQLite::SQLiteFactory::create( filename, config );
+				sqliteEnvs.insert( sqlite_envs_t::value_type(filename, std::make_pair(sqliteEnv, 1)) );
+			}
+			else {
+				++(*it).second.second;
+				sqliteEnv = (*it).second.first;
+			}
 		}
 
 		return sqliteEnv;

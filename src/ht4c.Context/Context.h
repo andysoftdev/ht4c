@@ -167,26 +167,29 @@ namespace ht4c {
 			Hyperspace::SessionPtr session;
 			Hypertable::Thrift::ClientPtr thriftClient;
 
-#ifdef SUPPORT_HAMSTERDB
-
 			struct stricmp_t {
 				bool operator () ( const std::string& a, const std::string& b ) const {
 					return stricmp( a.c_str(), b.c_str() ) < 0;
 				}
 			};
 
+#ifdef SUPPORT_HAMSTERDB
+
 			typedef std::pair<Hamster::HamsterEnvPtr, uint32_t> hamster_env_t;
 			typedef std::map<std::string, hamster_env_t> hamster_envs_t;
 
 			Hamster::HamsterEnvPtr hamsterEnv;
-
 			static hamster_envs_t hamsterEnvs;
 
 #endif
 
 #ifdef SUPPORT_SQLITEDB
 
+			typedef std::pair<SQLite::SQLiteEnvPtr, uint32_t> sqlite_env_t;
+			typedef std::map<std::string, sqlite_env_t> sqlite_envs_t;
+
 			SQLite::SQLiteEnvPtr sqliteEnv;
+			static sqlite_envs_t sqliteEnvs;
 
 #endif
 
