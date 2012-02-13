@@ -61,3 +61,23 @@ inline uint8_t FLAG_DELETE( const char* columnFamily, const char* columnQualifie
 inline uint64_t TIMESTAMP( uint64_t timestamp, uint8_t flag ) {
 	return ht4c::Common::TIMESTAMP( timestamp, flag );
 }
+
+/// <summary>
+/// Ugly hack in order to avoid alloc & memcpy using the regular std::string assign.
+/// </summary>
+class CellsSerializedNoCopy : public Hypertable::ThriftGen::CellsSerialized
+{
+	public:
+
+		inline CellsSerializedNoCopy( char* p, size_t len ) {
+			_Myres = len > _BUF_SIZE ? len : _BUF_SIZE;
+			_Bx._Ptr = p;
+			_Mysize = len;
+		}
+
+		inline ~CellsSerializedNoCopy( ) {
+			_Myres = 0;
+			_Bx._Ptr = 0;
+			_Mysize = 0;
+		}
+};

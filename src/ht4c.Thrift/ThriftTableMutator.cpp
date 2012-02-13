@@ -57,7 +57,8 @@ namespace ht4c { namespace Thrift {
 			writer.add( row, CF(columnFamily), columnQualifier, TIMESTAMP(timestamp, flag), value, valueLength, flag );
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->mutator_set_cells_serialized( tableMutator, CellsSerializedNoCopy(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			needFlush = true;
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -76,7 +77,8 @@ namespace ht4c { namespace Thrift {
 			}
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->mutator_set_cells_serialized( tableMutator, CellsSerializedNoCopy(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			needFlush = true;
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -88,7 +90,8 @@ namespace ht4c { namespace Thrift {
 			writer.add( row, CF(columnFamily), columnQualifier, TIMESTAMP(timestamp, flag), 0, 0, flag );
 			writer.finalize( Hypertable::SerializedCellsFlag::EOS );
 			ThriftClientLock sync( client.get() );
-			client->mutator_set_cells_serialized( tableMutator, Hypertable::ThriftGen::CellsSerialized(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			client->mutator_set_cells_serialized( tableMutator, CellsSerializedNoCopy(reinterpret_cast<char*>(writer.get_buffer()), writer.get_buffer_length()), false );
+			needFlush = true;
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -96,7 +99,10 @@ namespace ht4c { namespace Thrift {
 	void ThriftTableMutator::flush() {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->mutator_flush( tableMutator );
+			if( needFlush ) {
+				client->mutator_flush( tableMutator );
+				needFlush = false;
+			}
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -104,6 +110,7 @@ namespace ht4c { namespace Thrift {
 	ThriftTableMutator::ThriftTableMutator( Hypertable::Thrift::ClientPtr _client, const Hypertable::ThriftGen::Mutator& _tableMutator )
 	: client( )
 	, tableMutator( _tableMutator )
+	, needFlush( false )
 	{
 		HT4C_TRY {
 			client = _client;

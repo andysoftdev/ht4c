@@ -82,6 +82,7 @@ namespace ht4c { namespace Thrift {
 
 			Hypertable::Thrift::ClientPtr client;
 			Hypertable::ThriftGen::MutatorAsync tableMutator;
+			bool needFlush;
 	};
 
 } }
