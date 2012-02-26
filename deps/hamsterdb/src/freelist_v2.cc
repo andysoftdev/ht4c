@@ -17,21 +17,21 @@
 #define DUMMY_LSN  1
 
 ham_status_t
-__freel_flush_stats32(ham_device_t *dev, Environment *env)
+__freel_flush_stats32(Device *device, Environment *env)
 {
     ham_status_t st;
 
-    ham_assert(!(env_get_rt_flags(env)&HAM_IN_MEMORY_DB), (0));
-    ham_assert(device_get_freelist_cache(dev), (0));
+    ham_assert(!(env->get_flags()&HAM_IN_MEMORY_DB), (0));
+    ham_assert(device->get_freelist_cache(), (0));
 
     /*
      * do not update the statistics in a READ ONLY database!
      */
-    if (!(env_get_rt_flags(env) & HAM_READ_ONLY)) {
+    if (!(env->get_flags() & HAM_READ_ONLY)) {
         freelist_cache_t *cache;
         freelist_entry_t *entries;
 
-        cache=device_get_freelist_cache(dev);
+        cache=device->get_freelist_cache();
         ham_assert(cache, (0));
 
         entries = freel_cache_get_entries(cache);
@@ -53,15 +53,15 @@ __freel_flush_stats32(ham_device_t *dev, Environment *env)
 
                     if (!freel_entry_get_page_id(entry)) {
                         /* header page */
-                        fp = env_get_freelist(env);
-                        env_set_dirty(env);
+                        fp = env->get_freelist();
+                        env->set_dirty();
                     }
                     else {
                         /*
                          * otherwise just fetch the page from the cache or the 
                          * disk
                          */
-                        ham_page_t *page;
+                        Page *page;
                         
                         st = env_fetch_page(&page, env,
                                 freel_entry_get_page_id(entry), 0);
@@ -88,10 +88,10 @@ __freel_flush_stats32(ham_device_t *dev, Environment *env)
         }
     }
 
-    if (env_get_rt_flags(env)&HAM_ENABLE_RECOVERY)
-        return (env_get_changeset(env).flush(DUMMY_LSN));
+    if (env->get_flags()&HAM_ENABLE_RECOVERY)
+        return (env->get_changeset().flush(DUMMY_LSN));
 
-    env_get_changeset(env).clear();
+    env->get_changeset().clear();
 
     return (0);
 }

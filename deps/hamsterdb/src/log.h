@@ -101,7 +101,7 @@ class Log
     bool is_empty(void);
 
     /** adds an AFTER-image of a page */
-    ham_status_t append_page(ham_page_t *page, ham_u64_t lsn, 
+    ham_status_t append_page(Page *page, ham_u64_t lsn, 
                 ham_size_t page_count);
 
     /** retrieves the current lsn */
@@ -159,6 +159,9 @@ class Log
      */
     ham_status_t append_write(ham_u64_t lsn, ham_u32_t flags, 
                     ham_offset_t offset, ham_u8_t *data, ham_size_t size);
+
+    /** returns the path of the log file */
+    std::string get_path();
 
   private:
     /** writes a byte buffer to the logfile */

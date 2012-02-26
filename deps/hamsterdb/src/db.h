@@ -75,60 +75,57 @@
 /**
  * the persistent database index header
  */
-typedef HAM_PACK_0 union HAM_PACK_1 
+HAM_PACK_0 struct HAM_PACK_1 db_indexdata_t
 {
-    HAM_PACK_0 struct HAM_PACK_1 {
-        /** name of the DB: 1..HAM_DEFAULT_DATABASE_NAME-1 */
-        ham_u16_t _dbname;
+    /** name of the DB: 1..HAM_DEFAULT_DATABASE_NAME-1 */
+    ham_u16_t _dbname;
 
-        /** maximum keys in an internal page */
-        ham_u16_t _maxkeys;
+    /** maximum keys in an internal page */
+    ham_u16_t _maxkeys;
 
-        /** key size in this page */
-        ham_u16_t _keysize;
+    /** key size in this page */
+    ham_u16_t _keysize;
 
-        /* reserved */
-        ham_u16_t  _reserved1;
-    
-        /** address of this page */
-        ham_offset_t _self;
+    /* reserved */
+    ham_u16_t _reserved1;
 
-        /** flags for this database */
-        ham_u32_t _flags;
+    /** address of this page */
+    ham_offset_t _self;
 
-        /** last used record number value */
-        ham_offset_t _recno;
+    /** flags for this database */
+    ham_u32_t _flags;
 
-        /* reserved */
-        ham_u32_t _reserved2;
-    } HAM_PACK_2 b;
+    /** last used record number value */
+    ham_offset_t _recno;
 
-    ham_u8_t _space[32];
-} HAM_PACK_2 db_indexdata_t;
+    /* reserved */
+    ham_u32_t _reserved2;
+
+} HAM_PACK_2;
 
 #include "packstop.h"
 
 
-#define index_get_dbname(p)               ham_db2h16((p)->b._dbname)
-#define index_set_dbname(p, n)            (p)->b._dbname = ham_h2db16(n)
+#define index_get_dbname(p)               ham_db2h16((p)->_dbname)
+#define index_set_dbname(p, n)            (p)->_dbname=ham_h2db16(n)
 
-#define index_get_max_keys(p)             ham_db2h16((p)->b._maxkeys)
-#define index_set_max_keys(p, n)          (p)->b._maxkeys = ham_h2db16(n)
+#define index_get_max_keys(p)             ham_db2h16((p)->_maxkeys)
+#define index_set_max_keys(p, n)          (p)->_maxkeys=ham_h2db16(n)
 
-#define index_get_keysize(p)              ham_db2h16((p)->b._keysize)
-#define index_set_keysize(p, n)           (p)->b._keysize = ham_h2db16(n)
+#define index_get_keysize(p)              ham_db2h16((p)->_keysize)
+#define index_set_keysize(p, n)           (p)->_keysize=ham_h2db16(n)
 
-#define index_get_self(p)                 ham_db2h_offset((p)->b._self)
-#define index_set_self(p, n)              (p)->b._self=ham_h2db_offset(n)
+#define index_get_self(p)                 ham_db2h_offset((p)->_self)
+#define index_set_self(p, n)              (p)->_self=ham_h2db_offset(n)
 
-#define index_get_flags(p)                ham_db2h32((p)->b._flags)
-#define index_set_flags(p, n)             (p)->b._flags = ham_h2db32(n)
+#define index_get_flags(p)                ham_db2h32((p)->_flags)
+#define index_set_flags(p, n)             (p)->_flags=ham_h2db32(n)
 
-#define index_get_recno(p)                ham_db2h_offset((p)->b._recno)
-#define index_set_recno(p, n)             (p)->b._recno=ham_h2db_offset(n)
+#define index_get_recno(p)                ham_db2h_offset((p)->_recno)
+#define index_set_recno(p, n)             (p)->_recno=ham_h2db_offset(n)
 
-#define index_clear_reserved(p)           { (p)->b._reserved1 = 0;            \
-                                            (p)->b._reserved2 = 0; }
+#define index_clear_reserved(p)           { (p)->_reserved1=0;            \
+                                            (p)->_reserved2=0; }
 
 /** 
  * This helper class provides the actual implementation of the 
@@ -480,7 +477,7 @@ class Database
         if (raw)
             return (m_rt_flags);
         else
-            return (env_get_rt_flags(m_env)|m_rt_flags);
+            return (m_env->get_flags()|m_rt_flags);
     }
 
     /** set the runtime-flags - NOT setting environment flags!  */
@@ -643,11 +640,7 @@ class Database
     }
 
     /** get the database name */
-    ham_u16_t get_name(void) {
-        db_indexdata_t *idx=env_get_indexdata_ptr(get_env(), 
-            get_indexdata_offset());
-        return (index_get_dbname(idx));
-    }
+    ham_u16_t get_name(void);
 
     /**
      * function which compares two keys
@@ -747,10 +740,9 @@ class Database
             if (!(dest->flags&HAM_KEY_USER_ALLOC)) {
                 if (!dest->data || dest->size<source->size) {
                     if (dest->data)
-                        allocator_free(env_get_allocator(get_env()), 
-                                dest->data);
-                    dest->data=(ham_u8_t *)allocator_alloc(
-                                env_get_allocator(get_env()), source->size);
+                        get_env()->get_allocator()->free(dest->data);
+                    dest->data=(ham_u8_t *)
+                                get_env()->get_allocator()->alloc(source->size);
                     if (!dest->data) 
                         return (HAM_OUT_OF_MEMORY);
                 }
@@ -763,7 +755,7 @@ class Database
             /* key.size is 0 */
             if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
                 if (dest->data)
-                    allocator_free(env_get_allocator(get_env()), dest->data);
+                    get_env()->get_allocator()->free(dest->data);
                 dest->data=0;
             }
             dest->size=0;
@@ -939,7 +931,7 @@ db_default_dupe_compare(ham_db_t *db,
  * fetch a page.
  *
  * @param page_ref call-by-reference variable which will be set to 
- *      point to the retrieved @ref ham_page_t instance.
+ *      point to the retrieved @ref Page instance.
  * @param db the database handle - if it's not available then please
  *      use env_fetch_page()
  * @param address the storage address (a.k.a. 'RID') where the page is 
@@ -955,7 +947,7 @@ db_default_dupe_compare(ham_db_t *db,
  * @return one of the @ref ham_status_codes error codes as an error occurred.
  */
 extern ham_status_t
-db_fetch_page(ham_page_t **page_ref, Database *db, 
+db_fetch_page(Page **page_ref, Database *db, 
                     ham_offset_t address, ham_u32_t flags);
 
 /*
@@ -963,7 +955,7 @@ db_fetch_page(ham_page_t **page_ref, Database *db,
  * doing.
  */
 extern ham_status_t
-db_fetch_page_impl(ham_page_t **page_ref, Environment *env, Database *db, 
+db_fetch_page_impl(Page **page_ref, Environment *env, Database *db, 
                     ham_offset_t address, ham_u32_t flags);
 
 /**
@@ -977,7 +969,7 @@ db_fetch_page_impl(ham_page_t **page_ref, Environment *env, Database *db,
  */
 
 /**
- * Force @ref db_fetch_page to only return a valid @ref ham_page_t instance 
+ * Force @ref db_fetch_page to only return a valid @ref Page instance 
  * reference when it is still stored in the cache, otherwise a NULL pointer 
  * will be returned instead (and no error code)!
  */
@@ -992,7 +984,7 @@ db_fetch_page_impl(ham_page_t **page_ref, Environment *env, Database *db,
  * flush a page
  */
 extern ham_status_t
-db_flush_page(Environment *env, ham_page_t *page);
+db_flush_page(Environment *env, Page *page);
 
 /**
  * Flush all pages, and clear the cache.
@@ -1009,7 +1001,7 @@ db_flush_all(Cache *cache, ham_u32_t flags);
 /**
  * Allocate a new page.
  *
- * @param page_ref call-by-reference result: will store the @ref ham_page_t 
+ * @param page_ref call-by-reference result: will store the @ref Page 
  *        instance reference.
  * @param db the database; if the database handle is not available, you
  *        can use env_alloc_page
@@ -1024,7 +1016,7 @@ db_flush_all(Cache *cache, ham_u32_t flags);
  * space (due to the alignment) is added to the freelist.
  */
 extern ham_status_t
-db_alloc_page(ham_page_t **page_ref, Database *db, 
+db_alloc_page(Page **page_ref, Database *db, 
                 ham_u32_t type, ham_u32_t flags);
 
 /*
@@ -1032,7 +1024,7 @@ db_alloc_page(ham_page_t **page_ref, Database *db,
  * doing.
  */
 extern ham_status_t
-db_alloc_page_impl(ham_page_t **page_ref, Environment *env, Database *db, 
+db_alloc_page_impl(Page **page_ref, Environment *env, Database *db, 
                 ham_u32_t type, ham_u32_t flags);
 
 #define PAGE_IGNORE_FREELIST          8
@@ -1048,7 +1040,7 @@ db_alloc_page_impl(ham_page_t **page_ref, Environment *env, Database *db,
  * in the freelist. Ignored in in-memory databases.
  */
 extern ham_status_t
-db_free_page(ham_page_t *page, ham_u32_t flags);
+db_free_page(Page *page, ham_u32_t flags);
 
 #define DB_MOVE_TO_FREELIST         1
 
@@ -1059,7 +1051,7 @@ db_free_page(ham_page_t *page, ham_u32_t flags);
  * anywhere else.
  */
 extern ham_status_t
-db_write_page_and_delete(ham_page_t *page, ham_u32_t flags);
+db_write_page_and_delete(Page *page, ham_u32_t flags);
 
 /**
 * @defgroup ham_database_flags 

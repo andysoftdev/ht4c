@@ -52,9 +52,7 @@ Journal::create(void)
 {
     int i;
     Header header;
-    const char *dbpath=env_get_filename(m_env).c_str();
     ham_status_t st;
-    char filename[HAM_OS_MAX_PATH];
 
     /* initialize the magic */
     memset(&header, 0, sizeof(header));
@@ -63,8 +61,8 @@ Journal::create(void)
 
     /* create the two files */
     for (i=0; i<2; i++) {
-        util_snprintf(filename, sizeof(filename), "%s.jrn%d", dbpath, i);
-        st=os_create(filename, 0, 0644, &m_fd[i]);
+        std::string path=get_path(i);
+        st=os_create(path.c_str(), 0, 0644, &m_fd[i]);
         if (st) {
             (void)close();
             return (st);
@@ -87,10 +85,8 @@ Journal::open(void)
     int i;
     Header header;
     JournalEntry entry;
-    const char *dbpath=env_get_filename(m_env).c_str();
     ham_u64_t lsn[2];
     ham_status_t st;
-    char filename[HAM_OS_MAX_PATH];
 
     memset(&header, 0, sizeof(header));
     m_lsn=0;
@@ -98,8 +94,8 @@ Journal::open(void)
 
     /* open the two files */
     for (i=0; i<2; i++) {
-        util_snprintf(filename, sizeof(filename), "%s.jrn%d", dbpath, i);
-        st=os_open(filename, 0, &m_fd[i]);
+        std::string path=get_path(i);
+        st=os_open(path.c_str(), 0, &m_fd[i]);
         if (st) {
             (void)close();
             return (st);
@@ -259,7 +255,7 @@ Journal::append_txn_abort(struct ham_txn_t *txn, ham_u64_t lsn)
     st=append_entry(idx, &entry, sizeof(entry));
     if (st)
         return (st);
-    if (env_get_rt_flags(m_env)&HAM_WRITE_THROUGH)
+    if (m_env->get_flags()&HAM_WRITE_THROUGH)
         return (os_flush(m_fd[idx]));
     return (0);
 }
@@ -284,7 +280,7 @@ Journal::append_txn_commit(struct ham_txn_t *txn, ham_u64_t lsn)
     st=append_entry(idx, &entry, sizeof(entry));
     if (st)
         return (st);
-    if (env_get_rt_flags(m_env)&HAM_WRITE_THROUGH)
+    if (m_env->get_flags()&HAM_WRITE_THROUGH)
         return (os_flush(m_fd[idx]));
     return (0);
 }
@@ -472,9 +468,9 @@ __recover_get_db(Environment *env, ham_u16_t dbname, Database **pdb)
     ham_status_t st;
 
     /* first check if the Database is already open */
-    Database *db=env_get_list(env);
+    Database *db=env->get_databases();
     while (db) {
-        ham_u16_t name=index_get_dbname(env_get_indexdata_ptr(env,
+        ham_u16_t name=index_get_dbname(env->get_indexdata_ptr(
                             db->get_indexdata_offset()));
         if (dbname==name) {
             *pdb=db;
@@ -499,7 +495,7 @@ __recover_get_db(Environment *env, ham_u16_t dbname, Database **pdb)
 static ham_status_t
 __recover_get_txn(Environment *env, ham_u32_t txn_id, ham_txn_t **ptxn)
 {
-    ham_txn_t *txn=env_get_oldest_txn(env);
+    ham_txn_t *txn=env->get_oldest_txn();
     while (txn) {
         if (txn_get_id(txn)==txn_id) {
             *ptxn=txn;
@@ -518,7 +514,7 @@ __close_all_databases(Environment *env)
     ham_status_t st;
     Database *db;
 
-    while ((db=env_get_list(env))) {
+    while ((db=env->get_databases())) {
         st=ham_close((ham_db_t *)db, 0);
         if (st) {
             ham_log(("ham_close() failed w/ error %d (%s)", st, 
@@ -536,16 +532,16 @@ static ham_status_t
 __abort_uncommitted_txns(Environment *env)
 {
     ham_status_t st;
-    ham_txn_t *older, *txn=env_get_oldest_txn(env);
+    ham_txn_t *newer, *txn=env->get_oldest_txn();
 
     while (txn) {
-        older=txn_get_older(txn);
+        newer=txn_get_newer(txn);
         if (!(txn_get_flags(txn)&TXN_STATE_COMMITTED)) {
             st=ham_txn_abort(txn, 0);
             if (st)
                 return (st);
         }
-        txn=older;
+        txn=newer;
     }
 
     return (0);
@@ -555,7 +551,7 @@ ham_status_t
 Journal::recover()
 {
     ham_status_t st;
-    ham_u64_t start_lsn=env_get_log(m_env)->get_lsn();
+    ham_u64_t start_lsn=m_env->get_log()->get_lsn();
     Iterator it;
     void *aux=0;
 
@@ -583,14 +579,14 @@ Journal::recover()
 
     /* make sure that there are no pending transactions - start with 
      * a clean state! */
-    ham_assert(env_get_oldest_txn(m_env)==0, (""));
+    ham_assert(m_env->get_oldest_txn()==0, (""));
 
-    ham_assert(env_get_rt_flags(m_env)&HAM_ENABLE_TRANSACTIONS, (""));
-    ham_assert(env_get_rt_flags(m_env)&HAM_ENABLE_RECOVERY, (""));
+    ham_assert(m_env->get_flags()&HAM_ENABLE_TRANSACTIONS, (""));
+    ham_assert(m_env->get_flags()&HAM_ENABLE_RECOVERY, (""));
 
     /* officially disable recovery - otherwise while recovering we log
      * more stuff */
-    env_set_rt_flags(m_env, env_get_rt_flags(m_env)&~HAM_ENABLE_RECOVERY);
+    m_env->set_flags(m_env->get_flags()&~HAM_ENABLE_RECOVERY);
 
     do {
         JournalEntry entry;
@@ -617,7 +613,7 @@ Journal::recover()
             /* on success: patch the txn ID */
             if (st==0) {
                 txn_set_id(txn, entry.txn_id);
-                env_set_txn_id(m_env, entry.txn_id);
+                m_env->set_txn_id(entry.txn_id);
             }
             break;
         }
@@ -722,7 +718,7 @@ bail:
     (void)__close_all_databases(m_env);
 
     /* restore original flags */
-    env_set_rt_flags(m_env, env_get_rt_flags(m_env)|HAM_ENABLE_RECOVERY);
+    m_env->set_flags(m_env->get_flags()|HAM_ENABLE_RECOVERY);
 
     if (st)
         return (st);
@@ -761,3 +757,34 @@ Journal::clear_file(int idx)
     return (0);
 }
 
+std::string
+Journal::get_path(int i)
+{
+    std::string path;
+
+    if (m_env->get_log_directory().empty()) {
+        path=m_env->get_filename();
+    }
+    else {
+        path=m_env->get_log_directory();
+#ifdef HAM_OS_WIN32
+        path+="\\";
+        path+="\\";
+        char fname[_MAX_FNAME];
+        char ext[_MAX_EXT];
+        _splitpath(m_env->get_filename().c_str(), 0, 0, fname, ext);
+		path+=fname;
+		path+=ext;
+#else
+        path+="/";
+        path+=::basename(m_env->get_filename().c_str());
+#endif
+    }
+    if (i==0)
+        path+=".jrn0";
+    else if (i==1)
+        path+=".jrn1";
+    else
+        ham_assert(!"invalid index", (""));
+    return (path);
+}

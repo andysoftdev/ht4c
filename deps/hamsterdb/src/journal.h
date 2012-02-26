@@ -155,6 +155,9 @@ class Journal
         return (m_lsn++);
     }
 
+    /** returns the path of the journal file */
+    std::string get_path(int i);
+
   private:
     /** appends an entry to the journal */
     ham_status_t append_entry(int fdidx,
@@ -173,12 +176,12 @@ class Journal
 
     /** helper function for the allocator */
     void *allocate(ham_size_t size) {
-        return (allocator_alloc(env_get_allocator(m_env), size));
+        return (m_env->get_allocator()->alloc(size));
     }
 
     /** helper function for the allocator */
     void alloc_free(void *ptr) {
-        return (allocator_free(env_get_allocator(m_env), ptr));
+        return (m_env->get_allocator()->free(ptr));
     }
 
 	/** references the Environment this journal file is for */

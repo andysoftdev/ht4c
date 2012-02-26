@@ -13,7 +13,7 @@
  * @file hamsterdb.h
  * @brief Include file for hamsterdb Embedded Storage
  * @author Christoph Rupp, chris@crupp.de
- * @version 2.0.0 UNSTABLE
+ * @version 2.0.1
  *
  * @mainpage
  *
@@ -110,6 +110,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * The interface revision
+ *  undefined: hamsterdb 1.x
+ *          1: hamsterdb 2.0 - ham_txn_begin() was changed
+ */
+#define HAM_API_REVISION                1
 
 /**
  * The hamsterdb Database structure
@@ -586,7 +593,8 @@ ham_env_create(ham_env_t *env, const char *filename,
  *      </ul>
  *
  * @param mode File access rights for the new file. This is the @a mode
- *          parameter for creat(2). Ignored on Microsoft Windows.
+ *          parameter for creat(2). Ignored on Microsoft Windows. Default
+ *          is 0644.
  * @param param An array of ham_parameter_t structures. The following
  *          parameters are available:
  *        <ul>
@@ -599,6 +607,9 @@ ham_env_create(ham_env_t *env, const char *filename,
  *            Page sizes must be 1024 or a multiple of 2048.
  *        <li>@ref HAM_PARAM_MAX_ENV_DATABASES</li> The number of maximum
  *            Databases in this Environment; default value: 16.
+ *        <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
+ *            and the journal files; default is the same path as the database
+ *            file
  *        </ul>
  *
  * @return @ref HAM_SUCCESS upon success
@@ -719,6 +730,9 @@ ham_env_open(ham_env_t *env, const char *filename, ham_u32_t flags);
  *            Databases within a single Environment.
  *            For more information about available DAM (Data Access Mode)
  *            flags, see @ref ham_data_access_modes. The DAM is not persistent.
+ *        <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
+ *            and the journal files; default is the same path as the database
+ *            file
  *      </ul>
  *
  * @return @ref HAM_SUCCESS upon success.
@@ -757,6 +771,8 @@ ham_env_open_ex(ham_env_t *env, const char *filename,
  *        <li>HAM_PARAM_GET_FILENAME</li> returns the filename (the @a value
  *              of this parameter is a const char * pointer casted to a
  *              ham_u64_t variable)
+ *        <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
+ *              and the journal files
  *      </ul>
  *
  * @param env A valid Environment handle
@@ -2098,6 +2114,8 @@ ham_get_key_count(ham_db_t *db, ham_txn_t *txn, ham_u32_t flags,
  *        <li>HAM_PARAM_KEYSIZE</li> returns the key size
  *        <li>HAM_PARAM_MAX_ENV_DATABASES</li> returns the max. number of 
  *              Databases of this Database's Environment
+ *        <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
+ *            and the journal files
  *        <li>HAM_PARAM_GET_FLAGS</li> returns the flags which were used to
  *              open or create this Database
  *        <li>HAM_PARAM_GET_FILEMODE</li> returns the @a mode parameter which
@@ -2121,8 +2139,8 @@ ham_get_key_count(ham_db_t *db, ham_txn_t *txn, ham_u32_t flags,
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_get_parameters(ham_db_t *db, ham_parameter_t *param);
 
-/** Parameter name for @ref ham_open_ex, @ref ham_create_ex; sets the cache
- * size */
+/** Parameter name for @ref ham_env_open_ex, @ref ham_env_create_ex, 
+ * @ref ham_open_ex, @ref ham_create_ex; sets the cache size */
 #define HAM_PARAM_CACHESIZE          0x00000100
 
 /** Parameter name for @ref ham_env_create_ex, @ref ham_create_ex; sets the page
@@ -2140,6 +2158,10 @@ ham_get_parameters(ham_db_t *db, ham_parameter_t *param);
  * expected access mode.
  */
 #define HAM_PARAM_DATA_ACCESS_MODE   0x00000104
+
+/** Parameter name for @ref ham_env_open_ex, @ref ham_env_create_ex, 
+ * @ref ham_open_ex, @ref ham_create_ex; sets the path of the log files */
+#define HAM_PARAM_LOG_DIRECTORY      0x00000105
 
 /**
  * Retrieve the Database/Environment flags as were specified at the time of 

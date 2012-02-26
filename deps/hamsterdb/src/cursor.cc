@@ -70,9 +70,9 @@ Cursor::update_dupecache(ham_u32_t what)
                 dc->append(DupeCacheLine(true, i));
             }
             if (needs_free)
-                allocator_free(env_get_allocator(env), table);
+                env->get_allocator()->free(table);
         }
-        env_get_changeset(env).clear();
+        env->get_changeset().clear();
     }
 
     /* read duplicates from the txn-cursor? */
@@ -503,6 +503,8 @@ Cursor::move_next_key(ham_u32_t flags)
         st=move_next_dupe();
         if (st!=HAM_LIMITS_REACHED)
             return (st);
+        else if (st==HAM_LIMITS_REACHED && (flags&HAM_ONLY_DUPLICATES))
+            return (HAM_KEY_NOT_FOUND);
     }
 
     clear_dupecache();
@@ -670,6 +672,8 @@ Cursor::move_previous_key(ham_u32_t flags)
         st=move_previous_dupe();
         if (st!=HAM_LIMITS_REACHED)
             return (st);
+        else if (st==HAM_LIMITS_REACHED && (flags&HAM_ONLY_DUPLICATES))
+            return (HAM_KEY_NOT_FOUND);
     }
 
     clear_dupecache();

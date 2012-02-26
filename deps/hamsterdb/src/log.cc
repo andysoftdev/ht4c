@@ -35,14 +35,10 @@ Log::create(void)
 {
     Log::Header header;
     ham_status_t st;
-    const char *dbpath=env_get_filename(m_env).c_str();
-    char filename[HAM_OS_MAX_PATH];
-
-    ham_assert(m_env, (0));
+    std::string path=get_path();
 
     /* create the files */
-    util_snprintf(filename, sizeof(filename), "%s.log%d", dbpath, 0);
-    st=os_create(filename, 0, env_get_file_mode(m_env), &m_fd);
+    st=os_create(path.c_str(), 0, 0644, &m_fd);
     if (st)
         return (st);
 
@@ -62,13 +58,11 @@ ham_status_t
 Log::open(void)
 {
     Log::Header header;
-    const char *dbpath=env_get_filename(m_env).c_str();
+    std::string path=get_path();
     ham_status_t st;
-    char filename[HAM_OS_MAX_PATH];
 
     /* open the file */
-    util_snprintf(filename, sizeof(filename), "%s.log%d", dbpath, 0);
-    st=os_open(filename, 0, &m_fd);
+    st=os_open(path.c_str(), 0, &m_fd);
     if (st) {
         close();
         return (st);
@@ -157,14 +151,14 @@ Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
         // pos += 8-1;
         pos -= (pos % 8);
 
-        *data=(ham_u8_t *)allocator_alloc(env_get_allocator(m_env), 
-                        (ham_size_t)entry->data_size);
+        *data=(ham_u8_t *)m_env->get_allocator()->alloc(
+                                (ham_size_t)entry->data_size);
         if (!*data)
             return (HAM_OUT_OF_MEMORY);
 
         st=os_pread(m_fd, pos, *data, (ham_size_t)entry->data_size);
         if (st) {
-            allocator_free(env_get_allocator(m_env), *data);
+            m_env->get_allocator()->free(*data);
             *data=0;
             return (st);
         }
@@ -204,20 +198,19 @@ Log::close(ham_bool_t noclear)
 }
 
 ham_status_t
-Log::append_page(ham_page_t *page, ham_u64_t lsn, ham_size_t page_count)
+Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
 {
     ham_status_t st=0;
-    ham_file_filter_t *head=env_get_file_filter(m_env);
+    ham_file_filter_t *head=m_env->get_file_filter();
     ham_u8_t *p;
-    ham_size_t size=env_get_pagesize(m_env);
+    ham_size_t size=m_env->get_pagesize();
 
     /*
      * run page through page-level filters, but not for the 
      * root-page!
      */
-    if (head && page_get_self(page)!=0) {
-        p=(ham_u8_t *)allocator_alloc(env_get_allocator(m_env), 
-                env_get_pagesize(m_env));
+    if (head && !page->is_header()) {
+        p=(ham_u8_t *)m_env->get_allocator()->alloc(m_env->get_pagesize());
         if (!p)
             return (HAM_OUT_OF_MEMORY);
         memcpy(p, page_get_raw_payload(page), size);
@@ -236,10 +229,10 @@ Log::append_page(ham_page_t *page, ham_u64_t lsn, ham_size_t page_count)
 
     if (st==0)
         st=append_write(lsn, page_count==0 ? CHANGESET_IS_COMPLETE : 0, 
-                        page_get_self(page), p, size);
+                        page->get_self(), p, size);
 
     if (p!=page_get_raw_payload(page))
-        allocator_free(env_get_allocator(m_env), p);
+        m_env->get_allocator()->free(p);
 
     return (st);
 }
@@ -248,8 +241,8 @@ ham_status_t
 Log::recover()
 {
     ham_status_t st;
-    ham_page_t *page;
-    ham_device_t *device=env_get_device(m_env);
+    Page *page;
+    Device *device=m_env->get_device();
     Log::Entry entry;
     Iterator it=0;
     ham_u8_t *data=0;
@@ -259,23 +252,23 @@ Log::recover()
 
     /* get the file size of the database; otherwise we do not know if we
      * modify an existing page or if one of the pages has to be allocated */
-    st=device->get_filesize(device, &filesize);
+    st=device->get_filesize(&filesize);
     if (st)
         return (st);
 
     /* temporarily disable logging */
-    env_set_rt_flags(m_env, env_get_rt_flags(m_env)&~HAM_ENABLE_RECOVERY);
+    m_env->set_flags(m_env->get_flags()&~HAM_ENABLE_RECOVERY);
 
     /* disable file filters - the logged pages were already filtered */
-    head=env_get_file_filter(m_env);
+    head=m_env->get_file_filter();
     if (head)
-        env_set_file_filter(m_env, 0);
+        m_env->set_file_filter(0);
 
     /* now start the loop once more and apply the log */
     while (1) {
         /* clean up memory of the previous loop */
         if (data) {
-            allocator_free(env_get_allocator(m_env), data);
+            m_env->get_allocator()->free(data);
             data=0;
         }
 
@@ -323,14 +316,14 @@ Log::recover()
             page=page_new(m_env);
             if (st)
                 goto bail;
-            page_set_self(page, entry.offset);
+            page->set_self(entry.offset);
             st=page_fetch(page);
             if (st)
                 goto bail;
         }
 
-        ham_assert(page_get_self(page)==entry.offset, (""));
-        ham_assert(env_get_pagesize(m_env)==entry.data_size, (""));
+        ham_assert(page->get_self()==entry.offset, (""));
+        ham_assert(m_env->get_pagesize()==entry.data_size, (""));
 
         /* overwrite the page data */
         memcpy(page_get_pers(page), data, entry.data_size);
@@ -361,15 +354,15 @@ clear:
 
 bail:
     /* re-enable the logging */
-    env_set_rt_flags(m_env, env_get_rt_flags(m_env)|HAM_ENABLE_RECOVERY);
+    m_env->set_flags(m_env->get_flags()|HAM_ENABLE_RECOVERY);
 
     /* restore the file filters */
     if (head) 
-        env_set_file_filter(m_env, head);
+        m_env->set_file_filter(head);
     
     /* clean up memory */
     if (data) {
-        allocator_free(env_get_allocator(m_env), data);
+        m_env->get_allocator()->free(data);
         data=0;
     }
 
@@ -398,5 +391,31 @@ Log::append_write(ham_u64_t lsn, ham_u32_t flags, ham_offset_t offset,
     entry.data_size=size;
 
     return (os_writev(m_fd, data, size, &entry, sizeof(entry)));
+}
+
+std::string
+Log::get_path()
+{
+    std::string path;
+
+    if (m_env->get_log_directory().empty()) {
+        path=m_env->get_filename();
+    }
+    else {
+        path=m_env->get_log_directory();
+#ifdef HAM_OS_WIN32
+        path+="\\";
+        char fname[_MAX_FNAME];
+        char ext[_MAX_EXT];
+        _splitpath(m_env->get_filename().c_str(), 0, 0, fname, ext);
+		path+=fname;
+		path+=ext;
+#else
+        path+="/";
+		path+=::basename(m_env->get_filename().c_str());
+#endif
+    }
+    path+=".log0";
+    return (path);
 }
 
