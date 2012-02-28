@@ -2382,6 +2382,7 @@ ham_enable_compression(ham_db_t *hdb, ham_u32_t level, ham_u32_t flags)
     Database *db=(Database *)hdb;
     if (db)
         return (db->set_error(HAM_NOT_IMPLEMENTED));
+    return (HAM_NOT_IMPLEMENTED);
 #endif /* ifndef HAM_DISABLE_COMPRESSION */
 }
 
