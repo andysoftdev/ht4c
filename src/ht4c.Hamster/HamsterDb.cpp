@@ -785,19 +785,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		}
 
 		if( timestamp == Hypertable::AUTO_ASSIGN ) {
-			static Hypertable::HRTimer timer;
-			static int64_t prevTimestamp = Hypertable::TIMESTAMP_NULL;
-			boost::xtime now;
-			boost::xtime_get( &now, boost::TIME_UTC );
-			timestamp = ((int64_t)now.sec * 1000000000LL) + (int64_t)now.nsec;
-			if( prevTimestamp >= timestamp ) {
-				int64_t elapsed = timer.peek_ns( true );
-				timestamp = elapsed ? prevTimestamp + elapsed : prevTimestamp + 1;
-			}
-			else {
-				timer.reset();
-			}
-			prevTimestamp = timestamp;
+			timestamp = Hypertable::get_ts64();
 		}
 
 		fullKey.row = row;
@@ -1483,7 +1471,19 @@ namespace ht4c { namespace Hamster { namespace Db {
 			cursor->find( &k, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
 		}
 		else {
-			cursor->move_next( &k );
+			try {
+				cursor->move_next( &k );
+			}
+			catch( ham::error& e ) {
+				if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
+					throw;
+				}
+
+				it++;
+				rowIntervalDone = true;
+
+				return moveNext( k );
+			}
 		}
 
 		return true;
@@ -1564,7 +1564,19 @@ namespace ht4c { namespace Hamster { namespace Db {
 			cursor->find( &k, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
 		}
 		else {
-			cursor->move_next( &k );
+			try {
+				cursor->move_next( &k );
+			}
+			catch( ham::error& e ) {
+				if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
+					throw;
+				}
+
+				it++;
+				cellIntervalDone = true;
+
+				return moveNext( k );
+			}
 		}
 
 		return true;
@@ -1585,13 +1597,19 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 	const Hypertable::Schema::ColumnFamily* Scanner::ReaderCellIntervals::filterCell( ham::key& k, const Hypertable::Key& key ) {
 		int cmpStartColumnFamilyCode;
-		int cmpEndColumnFamilyCode;
+		int cmpEndColumnFamilyCode = 1;
+		int cmpEndColumnQualifier = 1;
 		if(    (cmpStartRow > 0
 				|| (   (cmpStartColumnFamilyCode = key.column_family_code - startColumnFamilyCode) >= (startColumnQualifier ? 0 : cmpStart)
 						&& (cmpStartColumnFamilyCode > 0 || !startColumnQualifier || strcmp(key.column_qualifier, startColumnQualifier) >= cmpStart)))
 			&&   (cmpEndRow < 0
 				|| (   (cmpEndColumnFamilyCode = key.column_family_code - endColumnFamilyCode) <= (endColumnQualifier ? 0 : cmpEnd)
-						&& (cmpEndColumnFamilyCode < 0 || !endColumnQualifier || strcmp(key.column_qualifier, endColumnQualifier) <= cmpEnd))) ) {
+						&& (cmpEndColumnFamilyCode < 0 || !endColumnQualifier || (cmpEndColumnQualifier = strcmp(key.column_qualifier, endColumnQualifier)) <= cmpEnd))) ) {
+
+			if( !cmpEndColumnFamilyCode && !cmpEndColumnQualifier ) {
+				it++;
+				cellIntervalDone = true;
+			}
 
 			return Reader::filterCell( k, key );
 		}
