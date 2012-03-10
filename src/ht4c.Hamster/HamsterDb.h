@@ -315,7 +315,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 					};
 
 					std::vector<re2::RE2*> regexpQualifiers;
-					std::vector<std::string> exactQualifiers;
+					std::set<std::string> exactQualifiers;
 					typedef std::set<const char *, LtCstr> QualifierSet;
 					QualifierSet exactQualifiersSet;
 					bool filterByExactQualifier;

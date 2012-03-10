@@ -1019,8 +1019,10 @@ namespace ht4c { namespace Hamster { namespace Db {
 			filterByRegexpQualifier = true;
 		}
 		else {
-			exactQualifiers.push_back( qualifier );
-			exactQualifiersSet.insert( exactQualifiers.back().c_str() );
+			std::pair<std::set<std::string>::iterator, bool> r = exactQualifiers.insert( qualifier );
+			if( r.second ) {
+				exactQualifiersSet.insert( (*r.first).c_str() );
+			}
 			filterByExactQualifier = true;
 		}
 	}
