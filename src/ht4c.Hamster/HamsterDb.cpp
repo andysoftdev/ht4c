@@ -35,14 +35,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 			}
 
 			inline char* KeyToString( ham::key& key ) {
-        char* k = reinterpret_cast<char*>( key.get_data() );
-        k += KeyClassifiers::Length;
+				char* k = reinterpret_cast<char*>( key.get_data() );
+				k += KeyClassifiers::Length;
 				return k;
 			}
 
 			inline const char* KeyToString( const ham::key& key ) {
 				const char* k = reinterpret_cast<const char*>( key.get_data() );
-        k += KeyClassifiers::Length;
+				k += KeyClassifiers::Length;
 				return k;
 			}
 
@@ -228,8 +228,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	const char* Namespace::getName( ) const {
-    const char* name = keyName.c_str();
-    name += KeyClassifiers::Length;
+		const char* name = keyName.c_str();
+		name += KeyClassifiers::Length;
 		return name;
 	}
 
@@ -566,8 +566,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	const char* Table::getFullName( ) const {
-    const char* name = keyName.c_str();
-    name += KeyClassifiers::Length;
+		const char* name = keyName.c_str();
+		name += KeyClassifiers::Length;
 		return name;
 	}
 
@@ -677,32 +677,20 @@ namespace ht4c { namespace Hamster { namespace Db {
 		keySpec.sanity_check();
 
 		Hypertable::Key key;
-		bool unknownColumnFamily;
-		toKey( ignoreUnknownColumnFamily(), schema, keySpec, key, unknownColumnFamily );
-		if( ignoreUnknownColumnFamily() && unknownColumnFamily ) {
-			return;
-		}
-
+		toKey( schema, keySpec, key );
 		set( key, value, valueLength );
 	}
 
 	void Mutator::set( const Hypertable::Cells& cells ) {
-		bool ignoreUnknownColumnFamily( ignoreUnknownColumnFamily() );
-		bool unknownColumnFamily;
-
 		for each( const Hypertable::Cell& cell in cells ) {
 			cell.sanity_check();
 
 			Hypertable::Key key;
-			toKey( ignoreUnknownColumnFamily
-					 , schema
+			toKey( schema
 					 , cell
-					 , key
-					 , unknownColumnFamily );
+					 , key );
 
-			if( !(ignoreUnknownColumnFamily && unknownColumnFamily) ) {
-				set( key, cell.value, cell.value_len );
-			}
+			set( key, cell.value, cell.value_len );
 		}
 	}
 
@@ -710,11 +698,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		keySpec.sanity_check();
 
 		Hypertable::Key key;
-		bool unknownColumnFamily;
-		toKey( ignoreUnknownColumnFamily(), schema, keySpec, key, unknownColumnFamily );
-		if( ignoreUnknownColumnFamily() && unknownColumnFamily ) {
-			return;
-		}
+		toKey( schema, keySpec, key );
 
 		if( key.flag == Hypertable::FLAG_INSERT ) {
 			HT4C_HAMSTER_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Invalid delete flag '%d'", key.flag).c_str() );
@@ -752,19 +736,15 @@ namespace ht4c { namespace Hamster { namespace Db {
 		k.set_data( reinterpret_cast<void*>(buf.base) );
 	}
 
-	void Mutator::toKey( bool ignoreUnknownColumnFamily
-										 , Hypertable::Schema* schema
-										 , const char *row
-										 , const char *columnFamily
-										 , const char *columnQualifier
+	void Mutator::toKey( Hypertable::Schema* schema
+										 , const char* row
+										 , const char* columnFamily
+										 , const char* columnQualifier
 										 , int64_t timestamp
 										 , int64_t revision
 										 , uint8_t flag
-										 , Hypertable::Key &fullKey
-										 , bool &unknownColumnFamily )
+										 , Hypertable::Key &fullKey )
 	{
-		unknownColumnFamily = false;
-
 		if( flag > Hypertable::FLAG_DELETE_ROW ) {
 			if( !columnFamily ) {
 				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_KEY, "Column family not specified" );
@@ -772,10 +752,6 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 			Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( columnFamily );
 			if( !cf ) {
-				unknownColumnFamily = true;
-				if( ignoreUnknownColumnFamily ) {
-					return;
-				}
 				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Bad column family '%s'", columnFamily).c_str() );
 			}
 			fullKey.column_family_code = (uint8_t)cf->id;
@@ -942,233 +918,6 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	Scanner::CellFilterInfo::CellFilterInfo( )
-	: cutoffTime(0)
-	, maxVersions(0)
-	, filterByExactQualifier(false)
-	, filterByRegexpQualifier(false)
-	{
-	}
-
-	Scanner::CellFilterInfo::CellFilterInfo( const CellFilterInfo& other ) {
-		cutoffTime = other.cutoffTime;
-		maxVersions = other.maxVersions;
-		for each( re2::RE2* re in other.regexpQualifiers ) {
-			regexpQualifiers.push_back( new re2::RE2(re->pattern()) );
-		}
-		exactQualifiers = other.exactQualifiers;
-		for each( const std::string& q in exactQualifiers ) {
-			exactQualifiersSet.insert( q.c_str() );
-		}
-		filterByExactQualifier = other.filterByExactQualifier;
-		filterByRegexpQualifier = other.filterByRegexpQualifier;
-	}
-
-	Scanner::CellFilterInfo& Scanner::CellFilterInfo::operator = ( const CellFilterInfo& other ) {
-		for each( re2::RE2* re in regexpQualifiers ) {
-			delete re;
-		}
-		regexpQualifiers.clear();
-
-		cutoffTime = other.cutoffTime;
-		maxVersions = other.maxVersions;
-		for each( re2::RE2* re in other.regexpQualifiers ) {
-			regexpQualifiers.push_back( new re2::RE2(re->pattern()) );
-		}
-		exactQualifiers = other.exactQualifiers;
-		for each( const std::string& q in exactQualifiers ) {
-			exactQualifiersSet.insert( q.c_str() );
-		}
-		filterByExactQualifier = other.filterByExactQualifier;
-		filterByRegexpQualifier = other.filterByRegexpQualifier;
-
-		return *this;
-	}
-
-	Scanner::CellFilterInfo::~CellFilterInfo() {
-		for each( re2::RE2* re in regexpQualifiers ) {
-			delete re;
-		}
-		regexpQualifiers.clear();
-	}
-
-	bool Scanner::CellFilterInfo::qualifierMatches( const char *qualifier ) {
-		if( !filterByExactQualifier && !filterByRegexpQualifier ) {
-			return true;
-		}
-		// check exact match first
-		if( exactQualifiersSet.find(qualifier) != exactQualifiersSet.end() ) {
-			return true;
-		}
-		// check for regexp match
-		for each( re2::RE2* re in regexpQualifiers ) {
-			if( RE2::PartialMatch(qualifier, *re) ) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	void Scanner::CellFilterInfo::addQualifier(const char *qualifier, bool is_regexp) {
-		if( is_regexp ) {
-			re2::RE2* regexp = new re2::RE2( qualifier );
-			if( !regexp->ok() ) {
-				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Can't convert qualifier '%s' to regexp (%s)", qualifier, regexp->error_arg()).c_str() );
-			}
-			regexpQualifiers.push_back( regexp );
-			filterByRegexpQualifier = true;
-		}
-		else {
-			std::pair<std::set<std::string>::iterator, bool> r = exactQualifiers.insert( qualifier );
-			if( r.second ) {
-				exactQualifiersSet.insert( (*r.first).c_str() );
-			}
-			filterByExactQualifier = true;
-		}
-	}
-
-	Scanner::ScanContext::ScanContext( const Hypertable::ScanSpec& _scanSpec, Hypertable::SchemaPtr _schema )
-	: schema( _schema )
-	, scanSpec( _scanSpec )
-	, timeInterval( _scanSpec.time_interval )
-	, rowRegexp( 0 )
-	, valueRegexp( 0 )
-	, keysOnly( scanSpec.keys_only )
-	, rowOffset( scanSpec.row_offset )
-	, cellOffset( scanSpec.cell_offset )
-	, rowLimit( scanSpec.row_limit )
-	, cellLimit( scanSpec.cell_limit )
-	, cellLimitPerFamily( scanSpec.cell_limit_per_family )
-	{
-		ZeroMemory( familyMask, sizeof(familyMask) );
-		ZeroMemory( columnFamilies, sizeof(columnFamilies) );
-
-		boost::xtime xtnow;
-		boost::xtime_get( &xtnow, boost::TIME_UTC );
-		int64_t now = ((int64_t)xtnow.sec * 1000000000LL) + (int64_t)xtnow.nsec;
-		uint32_t maxVersions = scanSpec.max_versions;
-
-		if( scanSpec.columns.size() > 0 ) {
-			std::string family, qualifier;
-			bool hasQualifier, isRegexp;
-
-			for each( const char *cfstr in scanSpec.columns ) {
-				Hypertable::ScanSpec::parse_column( cfstr, family, qualifier, &hasQualifier, &isRegexp );
-				Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( family.c_str() );
-
-				if( cf == 0 ) {
-					HT4C_HAMSTER_THROW( Hypertable::Error::RANGESERVER_INVALID_COLUMNFAMILY, Hypertable::format("Invalid column family '%s'", cfstr).c_str() );
-				}
-				if( cf->id == 0 ) {
-					HT4C_HAMSTER_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", cf->name.c_str()).c_str() );
-				}
-				if( cf->counter ) {
-					HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, "Counters are not yet supported" );
-				}
-
-				columnFamilies[cf->id] = cf;
-				familyMask[cf->id] = true;
-				if( hasQualifier ) {
-					familyInfo[cf->id].addQualifier( qualifier.c_str(), isRegexp );
-				}
-				if( cf->ttl == 0 ) {
-					familyInfo[cf->id].cutoffTime = Hypertable::TIMESTAMP_MIN;
-				}
-				else {
-					familyInfo[cf->id].cutoffTime = now - ((int64_t)cf->ttl * 1000000000LL);
-				}
-
-				if( maxVersions == 0 ) {
-					familyInfo[cf->id].maxVersions = cf->max_versions;
-				}
-				else {
-					if( cf->max_versions == 0 ) {
-						familyInfo[cf->id].maxVersions = maxVersions;
-					}
-					else {
-						familyInfo[cf->id].maxVersions = maxVersions < cf->max_versions ?  maxVersions : cf->max_versions;
-					}
-				}
-			}
-		}
-		else {
-			Hypertable::Schema::AccessGroups& aglist = schema->get_access_groups();
-
-			// ROW_DELETE records have 0 column family, so this allows them to pass through
-			familyMask[0] = true;
-			for( Hypertable::Schema::AccessGroups::iterator ag = aglist.begin(); ag != aglist.end(); ++ag ) {
-				for( Hypertable::Schema::ColumnFamilies::iterator cf = (*ag)->columns.begin(); cf != (*ag)->columns.end(); ++cf ) {
-					if( (*cf)->id == 0 ) {
-						HT4C_HAMSTER_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", (*cf)->name.c_str()).c_str() );
-					}
-					if( (*cf)->deleted ) {
-						familyMask[(*cf)->id] = false;
-						continue;
-					}
-					if( (*cf)->counter ) {
-						HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, "Counters are not yet supported" );
-					}
-					columnFamilies[(*cf)->id] = *cf;
-					familyMask[(*cf)->id] = true;
-					if( (*cf)->ttl == 0 ) {
-						familyInfo[(*cf)->id].cutoffTime = Hypertable::TIMESTAMP_MIN;
-					}
-					else {
-						familyInfo[(*cf)->id].cutoffTime = now- ((int64_t)(*cf)->ttl * 1000000000LL);
-					}
-
-					if( maxVersions == 0 ) {
-						familyInfo[(*cf)->id].maxVersions = (*cf)->max_versions;
-					}
-					else {
-						if( (*cf)->max_versions == 0 ) {
-							familyInfo[(*cf)->id].maxVersions = maxVersions;
-						}
-						else {
-							familyInfo[(*cf)->id].maxVersions = (maxVersions < (*cf)->max_versions) ? maxVersions : (*cf)->max_versions;
-						}
-					}
-				}
-			}
-		}
-
-		if( scanSpec.scan_and_filter_rows ) {
-			for each( const Hypertable::RowInterval& ri in scanSpec.row_intervals ) {
-				if( ri.start && *ri.start ) {
-					rowset.insert( ri.start );
-				}
-				if( ri.end && *ri.end && ri.start != ri.end ) {
-					rowset.insert( ri.end );
-				}
-			}
-		}
-
-		if( scanSpec.row_regexp && *scanSpec.row_regexp ) {
-			rowRegexp = new re2::RE2( scanSpec.row_regexp );
-			if( !rowRegexp->ok() ) {
-				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Can't convert row regexp %s to regexp (%s)", scanSpec.row_regexp, rowRegexp->error_arg()).c_str() );
-			}
-		}
-		if( scanSpec.value_regexp && *scanSpec.value_regexp ) {
-			valueRegexp = new re2::RE2( scanSpec.value_regexp );
-			if( !valueRegexp->ok() ) {
-				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Can't convert value regexp %s to regexp (%s)", scanSpec.value_regexp, valueRegexp->error_arg()).c_str() );
-			}
-		}
-
-	}
-
-	Scanner::ScanContext::~ScanContext() {
-		if( rowRegexp ) {
-			delete rowRegexp;
-			rowRegexp = 0;
-		}
-		if( valueRegexp ) {
-			delete valueRegexp;
-			valueRegexp = 0;
-		}
-	}
-
 	Scanner::Reader::Reader( ham::cursor* _cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
 	: cursor( _cursor )
 	, scanContext( new ScanContext(scanSpec, schema) )
@@ -1307,14 +1056,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 			bool cached, match;
 			regexpCache.checkColumn( key.column_family_code, key.column_qualifier, &cached, &match );
 			if( !cached ) {
-				match = cfi.qualifierMatches(key.column_qualifier);
+				match = cfi.qualifierMatches(key.column_qualifier, key.column_qualifier_len);
 				regexpCache.setColumn( key.column_family_code, key.column_qualifier, match );
 			}
 			if( !match ) {
 				return 0;
 			}
 		}
-		else if( !cfi.qualifierMatches(key.column_qualifier) ) {
+		else if( !cfi.qualifierMatches(key.column_qualifier, key.column_qualifier_len) ) {
 			return 0;
 		}
 
@@ -1328,6 +1077,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 			}
 		}
 
+		CellFilterInfo& cfi = scanContext->familyInfo[key.column_family_code];
+
 		cell.row_key = key.row;
 		cell.column_family = cf.name.c_str();
 		cell.column_qualifier = key.column_qualifier;
@@ -1337,9 +1088,16 @@ namespace ht4c { namespace Hamster { namespace Db {
 		cell.value = 0;
 		cell.value_len = 0;
 
-		if( !scanContext->keysOnly || scanContext->valueRegexp ) {
+		if( !scanContext->keysOnly || (scanContext->valueRegexp || cfi.hasColumnPredicateFilter()) ) {
 			ham::record record;
 			cursor->move( 0, &record );
+
+			// filter by column predicate
+			if( cfi.hasColumnPredicateFilter() ) {
+				if( !cfi.columnPredicateMatches(record.get_data(), record.get_size()) ) {
+					return false;
+				}
+			}
 
 			// filter by value regexp
 			if( scanContext->valueRegexp ) {
@@ -1532,11 +1290,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 			cellPerFamilyCount = 0;
 
 			std::string family;
-			bool hasQualifier, isRegexp;
+			bool hasQualifier, isRegexp, isPrefix; //TODO(isPrefix)
 
 			cmpStart = it->start_inclusive ? 0 : 1;
 			cmpEnd = it->end_inclusive ? 0 : -1;
-			Hypertable::ScanSpec::parse_column( it->start_column, family, startColumnQualifierBuf, &hasQualifier, &isRegexp );
+			Hypertable::ScanSpec::parse_column( it->start_column, family, startColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
 			const Hypertable::Schema::ColumnFamily* cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
 				HT4C_HAMSTER_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
@@ -1544,7 +1302,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			startColumnFamilyCode = cf->id;
 			startColumnQualifier = hasQualifier && !isRegexp ? startColumnQualifierBuf.c_str() : 0;
 
-			Hypertable::ScanSpec::parse_column( it->end_column, family, endColumnQualifierBuf, &hasQualifier, &isRegexp );
+			Hypertable::ScanSpec::parse_column( it->end_column, family, endColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
 			cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
 				HT4C_HAMSTER_THROW(Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );

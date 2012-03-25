@@ -113,6 +113,13 @@ namespace ht4c { namespace Common {
 		}
 	}
 
+	void ScanSpec::addColumnPredicate( const char* columnFamily, uint32_t match, const char* value, uint32_t valueLength ) {
+		if( columnFamily && *columnFamily ) {
+			// Unfortunately Hypertable cannot distinguish between NULL and ""
+			scanSpecBuilder.add_column_predicate( columnFamily, match, value ? value : "", valueLength );
+		}
+	}
+
 	void ScanSpec::reserveCells( int reserveCells ) {
 		scanSpecBuilder.reserve_cells( reserveCells );
 	}

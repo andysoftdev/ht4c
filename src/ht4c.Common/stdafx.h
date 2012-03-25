@@ -29,6 +29,7 @@
 #include "Hypertable/Lib/KeySpec.h"
 #include "Hypertable/Lib/Cell.h"
 #include "Hypertable/Lib/Cells.h"
+#include "Hypertable/Lib/Schema.h"
 
 #pragma warning( pop )
 

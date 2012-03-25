@@ -198,17 +198,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 			void set( const Hypertable::Cells& cells );
 			void del( Hypertable::KeySpec& keySpec );
 			void flush( );
-			inline bool ignoreUnknownColumnFamily( ) const {
-					return (flags & Hypertable::Table::MUTATOR_FLAG_IGNORE_UNKNOWN_CFS) > 0;
-			}
 
 		private:
 
 			void insert( Hypertable::Key& key, const void* value, uint32_t valueLength );
 			void set( Hypertable::Key& key, const void* value, uint32_t valueLength );
 			void del( Hypertable::Key& key );
-			void toKey( bool ignoreUnknownColumnFamily
-								, Hypertable::Schema* schema
+			void toKey( Hypertable::Schema* schema
 								, const char* row
 								, int rowLen
 								, const char* columnFamily
@@ -217,17 +213,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 								, int64_t timestamp
 								, int64_t revision
 								, uint8_t flag
-								, Hypertable::Key& fullKey
-								, bool& unknownColumnFamily );
+								, Hypertable::Key& fullKey );
 
-			inline void toKey( bool ignoreUnknownColumnFamily
-											 , Hypertable::Schema* schema
+			inline void toKey( Hypertable::Schema* schema
 											 , const Hypertable::KeySpec& key
-											 , Hypertable::Key& fullKey
-											 , bool& unknownColumnFamily )
+											 , Hypertable::Key& fullKey )
 			{
-				toKey( ignoreUnknownColumnFamily
-						 , schema
+				toKey( schema
 						 , reinterpret_cast<const char*>(key.row)
 						 , key.row_len
 						 , key.column_family
@@ -236,18 +228,14 @@ namespace ht4c { namespace SQLite { namespace Db {
 						 , key.timestamp
 						 , key.revision
 						 , key.flag
-						 , fullKey
-						 , unknownColumnFamily );
+						 , fullKey );
 			}
 
-			inline void toKey( bool ignoreUnknownColumnFamily
-											 , Hypertable::Schema* schema
+			inline void toKey( Hypertable::Schema* schema
 											 , const Hypertable::Cell& cell
-											 , Hypertable::Key& fullKey
-											 , bool& unknownColumnFamily )
+											 , Hypertable::Key& fullKey )
 			{
-				toKey( ignoreUnknownColumnFamily
-						 , schema
+				toKey( schema
 						 , cell.row_key
 						 , cell.row_key ? strlen(cell.row_key) : 0
 						 , cell.column_family
@@ -256,8 +244,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 						 , cell.timestamp
 						 , cell.revision
 						 , cell.flag
-						 , fullKey
-						 , unknownColumnFamily );
+						 , fullKey );
 			}
 
 			Db::TablePtr table;
@@ -309,113 +296,21 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		private:
 
-			class CellFilterInfo {
+			typedef Common::CellFilterInfo CellFilterInfo;
+			typedef Common::RegexpCache RegexpCache;
+
+			class ScanContext : public Common::ScanContext {
 
 				public:
-
-					CellFilterInfo( );
-					CellFilterInfo( const CellFilterInfo& other );
-					CellFilterInfo& operator = (const CellFilterInfo& other);
-					~CellFilterInfo( );
-
-					bool qualifierMatches( const char *qualifier );
-					void addQualifier( const char *qualifier, bool is_regexp );
-					inline bool hasQualifierFilter() const {
-						return filterByExactQualifier || filterByRegexpQualifier;
-					}
-					inline bool hasQualifierRegexpFilter( ) const {
-						return filterByRegexpQualifier;
-					}
-
-					int64_t cutoffTime;
-					uint32_t maxVersions;
-
-				private:
-
-					struct LtCstr {
-						bool operator( ) ( const char* s1, const char* s2 ) const {
-							return strcmp( s1, s2 ) < 0;
-						}
-					};
-
-					std::vector<re2::RE2*> regexpQualifiers;
-					std::set<std::string> exactQualifiers;
-					typedef std::set<const char *, LtCstr> QualifierSet;
-					QualifierSet exactQualifiersSet;
-					bool filterByExactQualifier;
-					bool filterByRegexpQualifier;
-			};
-
-			class ScanContext {
-
-				public:
-
-					enum {
-						MAX_CF = 256
-					};
 
 					ScanContext( const Hypertable::ScanSpec& scanSpec, Hypertable::SchemaPtr schema );
-					~ScanContext( );
 
-					Hypertable::SchemaPtr schema;
-					const Hypertable::ScanSpec& scanSpec;
-					std::pair<int64_t, int64_t> timeInterval;
-					bool familyMask[ScanContext::MAX_CF];
-					const Hypertable::Schema::ColumnFamily* columnFamilies[MAX_CF];
-					CellFilterInfo familyInfo[ScanContext::MAX_CF];
-					re2::RE2* rowRegexp;
-					re2::RE2* valueRegexp;
-					typedef std::set<const char *, LtCstr, Hypertable::CstrAlloc> CstrRowSet;
-					CstrRowSet rowset;
-					bool keysOnly;
-					int rowOffset;
-					int cellOffset;
-					int rowLimit;
-					int cellLimit;
-					int cellLimitPerFamily;
 					std::string predicate;
 					std::string columns;
-			};
 
-			class RegexpCache {
+			protected:
 
-				public:
-
-				RegexpCache( )
-				: lastFamily(-1)
-				, lastRowMatch(false)
-				, lastColumnMatch(false)
-				{
-				}
-
-				void checkRow(const char *rowkey, bool *cached, bool *match) {
-					*match = lastRowMatch;
-					*cached = !strcmp( rowkey, lastRow.c_str() );
-				}
-
-				void checkColumn(int family, const char *qualifier, bool *cached, bool *match) {
-					*match = lastColumnMatch;
-					*cached = lastFamily == family && !strcmp( qualifier, lastQualifier.c_str() );
-				}
-
-				void setRow( const char *rowkey, bool match ) {
-					lastRow = rowkey;
-					lastRowMatch = match;
-				}
-
-				void setColumn( int family, const char *qualifier, bool match ) {
-					lastFamily = family;
-					lastQualifier = qualifier;
-					lastColumnMatch = match;
-				}
-
-				private:
-
-					std::string lastRow;
-					std::string lastQualifier;
-					int lastFamily;
-					bool lastRowMatch;
-					bool lastColumnMatch;
+				virtual void initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier );
 			};
 
 			class Reader {

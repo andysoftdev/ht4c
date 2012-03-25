@@ -202,6 +202,28 @@ namespace ht4c { namespace Thrift {
 		tss.scan_and_filter_rows = hss.scan_and_filter_rows;
 		tss.__isset.scan_and_filter_rows = true;
 
+		if( hss.column_predicates.size() ) {
+			tss.column_predicates.reserve( hss.row_intervals.size() );
+			tss.__isset.column_predicates = true;
+
+			Hypertable::ThriftGen::ColumnPredicate tcp;
+			tcp.__isset.operation = true;
+
+			foreach( const Hypertable::ColumnPredicate& cp, hss.column_predicates ) {
+				tcp.__isset.column_family = cp.column_family != 0;
+				if( cp.column_family ) {
+					tcp.column_family = cp.column_family;
+				}
+				tcp.operation = (Hypertable::ThriftGen::ColumnPredicateOperation::type)cp.operation;
+				tcp.__isset.value = cp.value != 0;
+				if( tcp.__isset.value ) {
+					tcp.value = std::string( cp.value, cp.value_len );
+				}
+
+				tss.column_predicates.push_back( tcp );
+			}
+		}
+
 		if( hss.row_intervals.size() ) {
 			tss.row_intervals.reserve( hss.row_intervals.size() );
 			tss.__isset.row_intervals = true;

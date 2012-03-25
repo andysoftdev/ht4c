@@ -164,6 +164,15 @@ namespace ht4c { namespace Common {
 			void addColumn( const char* column );
 
 			/// <summary>
+			/// Adda a column predicate to the scan.
+			/// </summary>
+			/// <param name="columnFamily">Column family</param>
+			/// <param name="match">Prefix or exact match</param>
+			/// <param name="value">Value to match</param>
+			/// <param name="valueLength">Value length</param>
+			void addColumnPredicate( const char* columnFamily, uint32_t match, const char* value, uint32_t valueLength = 0 );
+
+			/// <summary>
 			/// Sets the capacity for a bunch of cells.
 			/// </summary>
 			/// <param name="reserveCells">Capacity to reserve</param>

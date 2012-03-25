@@ -27,10 +27,9 @@
 #include "Hypertable/Lib/KeySpec.h"
 #include "Hypertable/Lib/Namespace.h"
 #include "re2/re2.h"
+#include "ht4c.Common/Utils.h"
 
 #include "HamsterDb.h"
-
-#include "ht4c.Common/Utils.h"
 
 inline const char* CF( const char* columnFamily ) {
 	return ht4c::Common::CF( columnFamily );
