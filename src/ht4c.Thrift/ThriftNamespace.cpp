@@ -57,6 +57,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftNamespace::createTable( const char* name, const char* schema ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			ThriftClientLock sync( client.get() );
 			client->table_create( ns, name, schema );
 		}
@@ -65,6 +66,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftNamespace::createTableLike( const char* name, const char* like ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			std::string schemaLike;
 			ThriftClientLock sync( client.get() );
 			client->table_get_schema_str_with_ids( schemaLike, ns, like );
@@ -83,6 +85,8 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftNamespace::renameTable( const char* nameOld, const char* nameNew ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( nameOld );
+			Common::Namespace::validateTableName( nameNew );
 			ThriftClientLock sync( client.get() );
 			client->table_rename( ns, nameOld, nameNew );
 		}
@@ -91,6 +95,7 @@ namespace ht4c { namespace Thrift {
 
 	Common::Table* ThriftNamespace::openTable( const char* name, bool /*force*/ ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			ThriftClientLock sync( client.get() );
 			if( !client->table_exists(ns, name) ) {
 				using namespace Hypertable;
@@ -103,6 +108,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftNamespace::dropTable( const char* name, bool ifExists ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			ThriftClientLock sync( client.get() );
 			return client->table_drop( ns, name, ifExists );
 		}
@@ -214,7 +220,7 @@ namespace ht4c { namespace Thrift {
 				}
 				//FIXME getListing( (*it).sub_entries, nsListing.addNamespace(ht4c::Common::NamespaceListing((*it).name)));
 			}
-			else {
+			else if( (*it).name.size() && (*it).name.front() != '^' ) {
 				nsListing.addTable( (*it).name );
 			}
 		}

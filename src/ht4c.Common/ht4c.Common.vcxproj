@@ -206,6 +206,7 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Exception.cpp" />
     <ClCompile Include="KeyBuilder.cpp" />
+    <ClCompile Include="Namespace.cpp" />
     <ClCompile Include="Properties.cpp" />
     <ClCompile Include="ScanSpec.cpp" />
     <ClCompile Include="stdafx.cpp">

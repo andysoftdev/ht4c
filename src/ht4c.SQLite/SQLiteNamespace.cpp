@@ -53,6 +53,7 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteNamespace::createTable( const char* name, const char* schema ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			SQLiteEnvLock sync( ns->getEnv() );
 			ns->createTable( name, schema );
 		}
@@ -61,6 +62,7 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteNamespace::createTableLike( const char* name, const char* like ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			std::string schemaLike;
 			SQLiteEnvLock sync( ns->getEnv() );
 			ns->getTableSchema( like, true, schemaLike );
@@ -79,6 +81,8 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteNamespace::renameTable( const char* nameOld, const char* nameNew ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( nameOld );
+			Common::Namespace::validateTableName( nameNew );
 			SQLiteEnvLock sync( ns->getEnv() );
 			ns->renameTable( nameOld, nameNew );
 		}
@@ -87,6 +91,7 @@ namespace ht4c { namespace SQLite {
 
 	Common::Table* SQLiteNamespace::openTable( const char* name, bool /*force*/ ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			SQLiteEnvLock sync( ns->getEnv() );
 			if( !ns->tableExists(name) ) {
 				using namespace Hypertable;
@@ -99,6 +104,7 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteNamespace::dropTable( const char* name, bool ifExists ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			SQLiteEnvLock sync( ns->getEnv() );
 			return ns->dropTable( name, ifExists );
 		}
@@ -156,7 +162,7 @@ namespace ht4c { namespace SQLite {
 			if( (*it).isNamespace ) {
 				getListing( (*it).subEntries, nsListing.addNamespace(ht4c::Common::NamespaceListing((*it).name)));
 			}
-			else {
+			else if( (*it).name.size() && (*it).name.front() != '^' ) {
 				nsListing.addTable( (*it).name );
 			}
 		}

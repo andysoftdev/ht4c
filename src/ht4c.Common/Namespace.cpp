@@ -19,19 +19,27 @@
  * 02110-1301, USA.
  */
 
-#pragma once
+#ifdef __cplusplus_cli
+#error compile native
+#endif
 
-#include "Common/Compat.h"
+#include "stdafx.h"
+#include "Namespace.h"
 
-#pragma warning( push, 3 )
+#define HT4C_THROW( error, msg ) \
+	throw Hypertable::Exception( error, msg, __LINE__, __FUNCTION__, __FILE__ );
 
-#include "Common/Filesystem.h"
-#include "Hypertable/Lib/ScanSpec.h"
-#include "Hypertable/Lib/KeySpec.h"
-#include "Hypertable/Lib/Cell.h"
-#include "Hypertable/Lib/Cells.h"
-#include "Hypertable/Lib/Schema.h"
+namespace ht4c { namespace Common { 
 
-#pragma warning( pop )
+	void Namespace::validateTableName( const char* name ) {
+		if( name && *name ) {
+			Hypertable::String basename = Hypertable::Filesystem::basename( name );
+			if( basename.size() && basename[0] != '^' ) {
+				return;
+			}
+		}
 
-#include "Utils.h"
+		HT4C_THROW( Hypertable::Error::SYNTAX_ERROR, "Invalid table name" );
+	}
+
+} }

@@ -57,6 +57,7 @@ namespace ht4c { namespace Hyper {
 
 	void HyperNamespace::createTable( const char* name, const char* schema ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			ns->create_table( name, schema );
 		}
 		HT4C_RETHROW
@@ -64,6 +65,7 @@ namespace ht4c { namespace Hyper {
 
 	void HyperNamespace::createTableLike( const char* name, const char* like ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			Hypertable::String schemaLike = ns->get_schema_str( like, true );
 			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike.c_str(), schemaLike.size() );
 			schemaLike.clear();
@@ -82,6 +84,8 @@ namespace ht4c { namespace Hyper {
 
 	void HyperNamespace::renameTable( const char* nameOld, const char* nameNew ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( nameOld );
+			Common::Namespace::validateTableName( nameNew );
 			ns->rename_table( nameOld, nameNew );
 		}
 		HT4C_RETHROW
@@ -89,6 +93,7 @@ namespace ht4c { namespace Hyper {
 
 	Common::Table* HyperNamespace::openTable( const char* name, bool force ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			return HyperTable::create( ns->open_table(name, force) );
 		}
 		HT4C_RETHROW
@@ -96,6 +101,7 @@ namespace ht4c { namespace Hyper {
 
 	void HyperNamespace::dropTable( const char* name, bool ifExists ) {
 		HT4C_TRY {
+			Common::Namespace::validateTableName( name );
 			return ns->drop_table( name, ifExists );
 		}
 		HT4C_RETHROW
@@ -163,7 +169,7 @@ namespace ht4c { namespace Hyper {
 			if( (*it).is_namespace ) {
 				getListing( (*it).sub_entries, nsListing.addNamespace(ht4c::Common::NamespaceListing((*it).name)));
 			}
-			else {
+			else if( (*it).name.size() && (*it).name.front() != '^' ) {
 				nsListing.addTable( (*it).name );
 			}
 		}

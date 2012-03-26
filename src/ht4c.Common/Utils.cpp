@@ -28,7 +28,7 @@
 #include "re2/re2.h"
 
 #define HT4C_THROW( error, msg ) \
-			throw Hypertable::Exception( error, msg, __LINE__, __FUNCTION__, __FILE__ );
+	throw Hypertable::Exception( error, msg, __LINE__, __FUNCTION__, __FILE__ );
 
 namespace ht4c { namespace Common {
 

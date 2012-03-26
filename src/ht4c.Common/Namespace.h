@@ -131,6 +131,13 @@ namespace ht4c { namespace Common {
 			/// <remarks>To free the returned cells, use the delete operator.</remarks>
 			virtual Cells* query( const char* hql ) = 0;
 
+			/// <summary>
+			/// Validates a table name.
+			/// </summary>
+			/// <param name="name">Table name</param>
+			/// <remarks>Throws an exception if the table name is not valid.</remarks>
+			static void validateTableName( const char* name );
+
 		protected:
 
 			/// <summary>
