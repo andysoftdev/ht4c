@@ -294,19 +294,46 @@ namespace ht4c {
 				return uri;
 			}
 
+			static std::string uri_decode( const std::string& encoded ) {
+				std::stringstream decoded;
+				for( size_t i = 0; i < encoded.size(); ++i ) {
+					if (encoded[i] == '%' && (i + 2) < encoded.size() && isxdigit(encoded[i+1]) && isxdigit(encoded[i+2])) {
+						char buf[3];
+						++i;
+						buf[0] = encoded[i++];
+						buf[1] = encoded[i];
+						buf[2] = '\0';
+						decoded << ((char)strtol(buf, 0, 16));
+					}
+					else {
+						decoded << encoded[i];
+					}
+				}
+				return decoded.str();
+			}
+
+			static void uri_to_filename( std::string& uri ) {
+				if( uri.find("file://") != 0 ) {
+					HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file:///[drive][/path/]uri required" );
+				}
+				bool abs = uri.find("file:///") == 0;
+				uri = uri.substr( 7 );
+				if( abs && uri.size() >= 3 && isalpha(uri[1]) && uri[2] == '/' ) {
+					boost::trim_left_if( uri, boost::is_any_of("/") );
+					uri.insert(uri.begin() + 1, ':');
+				}
+				if( uri.empty() ) {
+					HT_THROW( Error::CONFIG_BAD_VALUE, "Empty uri, file:///[drive][/path/]uri required" );
+				}
+				replace_all_recursive( uri, "///", "//" );
+				replace_all_recursive( uri, "/", "\\" );
+				uri = uri_decode( uri );
+			}
+
 			static void set_file_uri( const char* filenameProperty ) {
 				if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(filenameProperty) ) {
 					std::string filename = get_uri();
-					replace_all_recursive( filename, "//", "/" );
-					if( filename.find("file:") != 0 ) {
-						HT_THROW( Error::CONFIG_BAD_VALUE, "Invalid uri scheme, file://[drive][/path/]filename required" );
-					}
-					filename = filename.substr( 5 );
-					boost::trim_left_if( filename, boost::is_any_of("/") );
-					if( filename.empty() ) {
-						HT_THROW( Error::CONFIG_BAD_VALUE, "Empty filename, file://[drive][/path/]filename required" );
-					}
-					replace_all_recursive( filename, "/", "\\" );
+					uri_to_filename( filename );
 					properties->set( filenameProperty, filename );
 				}
 			}
