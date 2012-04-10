@@ -318,9 +318,11 @@ namespace ht4c {
 				}
 				bool abs = uri.find("file:///") == 0;
 				uri = uri.substr( 7 );
-				if( abs && uri.size() >= 3 && isalpha(uri[1]) && uri[2] == '/' ) {
+				if( abs && uri.size() >= 3 && isalpha(uri[1]) && (uri[2] == ':' || uri[2] == '/') ) {
 					boost::trim_left_if( uri, boost::is_any_of("/") );
-					uri.insert(uri.begin() + 1, ':');
+					if( uri[1] != ':' ) {
+						uri.insert(uri.begin() + 1, ':');
+					}
 				}
 				if( uri.empty() ) {
 					HT_THROW( Error::CONFIG_BAD_VALUE, "Empty uri, file:///[drive][/path/]uri required" );
