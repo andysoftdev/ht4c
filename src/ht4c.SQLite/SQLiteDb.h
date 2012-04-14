@@ -253,6 +253,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 			sqlite3* db;
 			SQLiteEnv* env;
 			Hypertable::Schema* schema;
+			enum {
+				MAX_CF = 256
+			};
+			bool timeOrderAsc[MAX_CF];
+
 			sqlite3_stmt* stmtBegin;
 			sqlite3_stmt* stmtCommit;
 			sqlite3_stmt* stmtRollback;
@@ -340,6 +345,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 					int rowCount;
 					int cellCount;
 					int cellPerFamilyCount;
+					enum {
+						MAX_CF = 256
+					};
+					bool timeOrderAsc[MAX_CF];
 
 				private:
 

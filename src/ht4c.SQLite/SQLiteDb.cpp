@@ -270,6 +270,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
 		}
 
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			if( cf->counter ) {
+				HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
+			}
+		}
+
 		if( schema->need_id_assignment() ) {
 			schema->assign_ids();
 		}
@@ -589,7 +596,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, stmtDeleteRow( 0 )
 	, stmtDeleteCf( 0 )
 	, stmtDeleteCell( 0 )
-	, stmtDeleteCellVersion( 0 ) {
+	, stmtDeleteCellVersion( 0 )
+	{
+		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		}
 
 		int st = sqlite3_prepare_v2( db, Hypertable::format("INSERT OR REPLACE INTO t%lld (r, cf, cq, ts, v) VALUES(?, ?, ?, ?, ?);", table->getId()).c_str(), -1, &stmtInsert, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
@@ -669,7 +682,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		st = sqlite3_bind_text( stmtInsert, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
 
-		st = sqlite3_bind_int64( stmtInsert, 4, ~key.timestamp ); // ascending
+		st = sqlite3_bind_int64( stmtInsert, 4, timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
 
 		st = sqlite3_bind_blob( stmtInsert, 5, value, valueLength, 0 );
@@ -732,6 +745,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 	void Mutator::del( Hypertable::Key& key ) {
 		int st;
 
+		int64_t timestamp = timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp;
+
 		switch( key.flag ) {
 			case Hypertable::FLAG_DELETE_ROW: {
 				Util::StmtReset stmt( stmtDeleteRow );
@@ -739,7 +754,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				st = sqlite3_bind_text( stmtDeleteRow, 1, key.row, key.row_len, 0 );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
-				st = sqlite3_bind_int64( stmtDeleteRow, 2, ~key.timestamp );
+				st = sqlite3_bind_int64( stmtDeleteRow, 2, timestamp );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				st = sqlite3_step( stmtDeleteRow );
@@ -756,7 +771,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				st = sqlite3_bind_int( stmtDeleteCf, 2, key.column_family_code );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
-				st = sqlite3_bind_int64( stmtDeleteCf, 3, ~key.timestamp );
+				st = sqlite3_bind_int64( stmtDeleteCf, 3, timestamp );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				st = sqlite3_step( stmtDeleteCf );
@@ -776,7 +791,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				st = sqlite3_bind_text( stmtDeleteCell, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
-				st = sqlite3_bind_int64( stmtDeleteCell, 4, ~key.timestamp );
+				st = sqlite3_bind_int64( stmtDeleteCell, 4, timestamp );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				st = sqlite3_step( stmtDeleteCell );
@@ -796,7 +811,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				st = sqlite3_bind_text( stmtDeleteCellVersion, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
-				st = sqlite3_bind_int64( stmtDeleteCellVersion, 4, ~key.timestamp );
+				st = sqlite3_bind_int64( stmtDeleteCellVersion, 4, timestamp );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				st = sqlite3_step( stmtDeleteCellVersion );
@@ -876,13 +891,42 @@ namespace ht4c { namespace SQLite { namespace Db {
 	Scanner::ScanContext::ScanContext( const Hypertable::ScanSpec& _scanSpec, Hypertable::SchemaPtr _schema )
 	: Common::ScanContext( _scanSpec, _schema )
 	{
+		bool hasTimeOrderAsc = false;
+		bool hasTimeOrderDesc = false;
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			if( !cf->time_order_desc ) {
+				hasTimeOrderAsc = true;
+			}
+			else {
+				hasTimeOrderDesc = true;
+			}
+			if( hasTimeOrderAsc && hasTimeOrderDesc ) {
+				break;
+			}
+		}
+
 		std::string predicateTimestamp;
 		if( timeInterval.first > Hypertable::TIMESTAMP_MIN ) {
-			predicateTimestamp = Hypertable::format("ts<=%lld", ~timeInterval.first);
+			if( hasTimeOrderAsc != hasTimeOrderDesc ) {
+				if( hasTimeOrderAsc ) {
+					predicateTimestamp = Hypertable::format( "ts<=%lld", ~timeInterval.first );
+				}
+				else {
+					predicateTimestamp = Hypertable::format( "ts>=%lld", timeInterval.first );
+				}
+			}
 		}
 
 		if( timeInterval.second < Hypertable::TIMESTAMP_MAX ) {
-			predicateTimestamp += Hypertable::format("%sts>%lld", predicateTimestamp.empty() ? "" : " AND ", ~timeInterval.second);
+			if( hasTimeOrderAsc != hasTimeOrderDesc ) {
+				if( hasTimeOrderAsc ) {
+					predicateTimestamp += Hypertable::format( "%sts>%lld", predicateTimestamp.empty() ? "" : " AND ",  ~timeInterval.second );
+				}
+				else {
+					predicateTimestamp += Hypertable::format( "%sts<%lld", predicateTimestamp.empty() ? "" : " AND ",  timeInterval.second );
+				}
+			}
 		}
 
 		if( !predicateTimestamp.empty() ) {
@@ -897,10 +941,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Scanner::ScanContext::initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) {
 		if( !hasQualifier || isRegexp ) {
-			predicate += Hypertable::format("%scf=%d", predicate.empty() ? "" : " OR ", cf->id ); //TODO use cf IN ('A', 'B')
+			predicate += Hypertable::format("%scf=%d", predicate.empty() ? "" : " OR ", cf->id ); //FIXME use cf IN ('A', 'B')
 		}
 		else {
-			predicate += Hypertable::format("%s(cf=%d AND cq=\"%s\")", predicate.empty() ? "" : " OR ", cf->id, qualifier.c_str() ); //TODO use cf IN ('A', 'B')
+			predicate += Hypertable::format("%s(cf=%d AND cq=\"%s\")", predicate.empty() ? "" : " OR ", cf->id, qualifier.c_str() ); //FIXME use cf IN ('A', 'B')
 		}
 	}
 
@@ -919,6 +963,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, cellPerFamilyCount( 0 )
 	, eos( false )
 	{
+		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		}
+
 		int st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", tableId).c_str(), -1, &stmtDeleteCf, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
 	}
@@ -941,7 +991,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				key.column_family_code = sqlite3_column_int( stmtQuery, 1 );
 				key.column_qualifier = reinterpret_cast<const char*>( sqlite3_column_text(stmtQuery, 2) );
 				key.column_qualifier_len = sqlite3_column_bytes( stmtQuery, 2 );
-				key.timestamp = ~sqlite3_column_int64( stmtQuery, 3 ); // ascending
+				key.timestamp = timeOrderAsc[key.column_family_code] ? ~sqlite3_column_int64( stmtQuery, 3 ) : sqlite3_column_int64( stmtQuery, 3 );
 				const Hypertable::Schema::ColumnFamily* cf = filterCell( key );
 				if( cf ) {
 					if( getCell(key, *cf, cell) ) {
@@ -1018,7 +1068,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			st = sqlite3_bind_int( stmtDeleteCf, 2, key.column_family_code );
 			HT4C_SQLITE_VERIFY( st, db, 0 );
 
-			st = sqlite3_bind_int64( stmtDeleteCf, 3, ~key.timestamp );
+			st = sqlite3_bind_int64( stmtDeleteCf, 3, timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp );
 			HT4C_SQLITE_VERIFY( st, db, 0 );
 
 			st = sqlite3_step( stmtDeleteCf );
@@ -1306,7 +1356,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			cellPerFamilyCount = 0;
 
 			std::string family;
-			bool hasQualifier, isRegexp, isPrefix; //TODO(isPrefix)
+			bool hasQualifier, isRegexp, isPrefix;
 
 			cmpStart = it->start_inclusive ? 0 : 1;
 			cmpEnd = it->end_inclusive ? 0 : -1;

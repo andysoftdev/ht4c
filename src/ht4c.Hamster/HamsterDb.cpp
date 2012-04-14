@@ -327,6 +327,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 			HT4C_HAMSTER_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
 		}
 
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			if( cf->counter ) {
+				HT4C_HAMSTER_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
+			}
+		}
+
 		if( schema->need_id_assignment() ) {
 			schema->assign_ids();
 		}
@@ -664,7 +671,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 	, flushInterval( _flushInterval )
 	, buf( HamsterEnv::KEYSIZE_DB )
 	, db( _table->getDb() )
-	, schema( _table->getSchema().get() ) {
+	, schema( _table->getSchema().get() )
+	{
+		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		}
 	}
 
 	Mutator::~Mutator( ) {
@@ -730,7 +743,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 			, key.column_family_code
 			, key.column_qualifier
 			, key.timestamp
-			, key.revision );
+			, key.revision
+			, timeOrderAsc[key.column_family_code] );
 
 		k.set_size( buf.fill() );
 		k.set_data( reinterpret_cast<void*>(buf.base) );
@@ -1276,6 +1290,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 	, cellIntervalDone( true )
 	, buf( HamsterEnv::KEYSIZE_DB )
 	{
+		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
+		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
+		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
+			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		}
 	}
 
 	bool Scanner::ReaderCellIntervals::moveNext( ham::key& k ) {
@@ -1290,7 +1309,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			cellPerFamilyCount = 0;
 
 			std::string family;
-			bool hasQualifier, isRegexp, isPrefix; //TODO(isPrefix)
+			bool hasQualifier, isRegexp, isPrefix;
 
 			cmpStart = it->start_inclusive ? 0 : 1;
 			cmpEnd = it->end_inclusive ? 0 : -1;
@@ -1317,7 +1336,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 				, startColumnFamilyCode
 				, startColumnQualifier
 				, Hypertable::TIMESTAMP_MAX
-				, Hypertable::AUTO_ASSIGN );
+				, Hypertable::AUTO_ASSIGN
+				, timeOrderAsc[startColumnFamilyCode] );
 
 			k.set_size( buf.fill() );
 			k.set_data( (void*)buf.base );

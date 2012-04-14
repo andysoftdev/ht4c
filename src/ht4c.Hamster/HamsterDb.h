@@ -237,6 +237,10 @@ namespace ht4c { namespace Hamster { namespace Db {
 			Hypertable::DynamicBuffer buf;
 			ham::db* db;
 			Hypertable::Schema* schema;
+			enum {
+				MAX_CF = 256
+			};
+			bool timeOrderAsc[MAX_CF];
 	};
 
 	class MutatorAsync : public Hypertable::ReferenceCount {
@@ -386,6 +390,10 @@ namespace ht4c { namespace Hamster { namespace Db {
 					int cmpStartRow;
 					int cmpEndRow;
 					bool cellIntervalDone;
+					enum {
+						MAX_CF = 256
+					};
+					bool timeOrderAsc[MAX_CF];
 					Hypertable::DynamicBuffer buf;
 			};
 
