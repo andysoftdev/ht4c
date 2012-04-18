@@ -68,9 +68,9 @@ namespace ht4c { namespace Hamster {
 			inline ham::db* getSysDb( ) const {
 				return sysdb;
 			}
-			ham::db* createTable( uint16_t& id );
-			ham::db* openTable( uint16_t id, Db::Table* table );
-			void disposeTable( uint16_t id );
+			uint16_t createTable( );
+			ham::db* openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs );
+			void disposeTable( uint16_t id, Db::Table* table );
 			void eraseTable( uint16_t id );
 
 			class Lock {
@@ -98,6 +98,19 @@ namespace ht4c { namespace Hamster {
 			, FIRST_TABLE_DB = 2
 			};
 
+			struct db_t {
+				ham::db* db;
+				std::set<Db::Table*> ref;
+				CRITICAL_SECTION cs;
+
+				db_t()
+					: db(0)
+				{
+				}
+
+				void dispose( );
+			};
+
 			inline void lock( ) {
 				::EnterCriticalSection( &cs );
 			}
@@ -107,7 +120,8 @@ namespace ht4c { namespace Hamster {
 
 			ham::env* env;
 			ham::db* sysdb;
-			std::map<uint16_t, std::set<Db::Table*>> tables;
+			typedef std::map<uint16_t, db_t> tables_t;
+			tables_t tables;
 
 			CRITICAL_SECTION cs;
 	};

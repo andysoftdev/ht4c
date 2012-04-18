@@ -113,6 +113,15 @@ namespace ht4c { namespace Hamster {
 
 	}
 
+	void HamsterEnv::db_t::dispose( ) {
+		if( db ) {
+			delete db;
+			db = 0;
+		}
+		ref.clear();
+		::DeleteCriticalSection( &cs );
+	}
+
 	HamsterEnv::HamsterEnv( const std::string &filename, const HamsterEnvConfig& config )
 	: env( new ham::env() )
 	, sysdb( 0 )
@@ -160,11 +169,11 @@ namespace ht4c { namespace Hamster {
 	HamsterEnv::~HamsterEnv( ) {
 		::DeleteCriticalSection( &cs );
 		HT4C_TRY {
-			for( std::map<uint16_t, std::set<Db::Table*>>::iterator it = tables.begin(); it != tables.end(); ++it ) {
-				for each( Db::Table* table in (*it).second ) {
+			for( tables_t::iterator it = tables.begin(); it != tables.end(); ++it ) {
+				for each( Db::Table* table in (*it).second.ref ) {
 					table->dispose();
 				}
-				(*it).second.clear();
+				(*it).second.dispose();
 			}
 			tables.clear();
 
@@ -182,39 +191,62 @@ namespace ht4c { namespace Hamster {
 		return HamsterClient::create( new Db::Client(this) );
 	}
 
-	ham::db* HamsterEnv::createTable( uint16_t& id ) {
+	uint16_t HamsterEnv::createTable( ) {
 		std::vector<ham_u16_t> names = env->get_database_names();
 		std::set<uint16_t> ids( names.begin(), names.end() );
-		id = FIRST_TABLE_DB;
+		uint16_t id = FIRST_TABLE_DB;
 		while( ids.find(id) != ids.end() ) {
 			++id;
 		}
-		ham::db* db = From( env->create_db(id, dbCreateFlags, table_pars) );
-		db->set_prefix_compare_func( KeyPrefixCompare );
-		db->set_compare_func( KeyCompare );
-		return db;
+		
+		ham::db db = env->create_db( id, dbCreateFlags, table_pars );
+		db.set_prefix_compare_func( KeyPrefixCompare );
+		db.set_compare_func( KeyCompare );
+		return id;
 	}
 
-	ham::db* HamsterEnv::openTable( uint16_t id, Db::Table* table ) {
-		ham::db* db = From( env->open_db(id, dbOpenFlags) );
-		db->set_prefix_compare_func( KeyPrefixCompare );
-		db->set_compare_func( KeyCompare );
-		tables[id].insert( table );
-		return db;
+	ham::db* HamsterEnv::openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs ) {
+		tables_t::iterator it = tables.find( id );
+		if( it == tables.end() ) {
+			db_t db;
+			db.db = From( env->open_db(id, dbOpenFlags) );
+			db.db->set_prefix_compare_func( KeyPrefixCompare );
+			db.db->set_compare_func( KeyCompare );
+			db.ref.insert( table );
+			::InitializeCriticalSection( &db.cs );
+			it = tables.insert(std::make_pair(id, db)).first;
+		}
+		else {
+			(*it).second.ref.insert( table );
+		}
+		cs = (*it).second.cs;
+		return (*it).second.db;
 	}
 
-	void HamsterEnv::disposeTable( uint16_t id ) {
-		tables.erase( id );
+	void HamsterEnv::disposeTable( uint16_t id, Db::Table* table ) {
+		tables_t::iterator it = tables.find( id );
+		if( it != tables.end() ) {
+			(*it).second.ref.erase( table );
+			if( (*it).second.ref.empty()) {
+				(*it).second.dispose();
+				tables.erase( id );
+			}
+		}
 	}
 
 	void HamsterEnv::eraseTable( uint16_t id ) {
-		std::map<uint16_t, std::set<Db::Table*>>::iterator it = tables.find( id );
+		tables_t::iterator it = tables.find( id );
 		if( it != tables.end() ) {
-			std::set<Db::Table*> t( (*it).second ); // shallow copy, table->dispose() might call disposeTable( id )
+			std::set<Db::Table*> t( (*it).second.ref ); // shallow copy, table->dispose() might call disposeTable( id )
 			for each( Db::Table* table in t ) {
 				table->dispose();
 			}
-			tables.erase( id );
+
+			it = tables.find( id );
+			if( it != tables.end() ) {
+				(*it).second.dispose();
+				tables.erase( id );
+			}
 		}
 
 		env->erase_db( id );

@@ -341,9 +341,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 		std::string finalschema;
 		schema->render( finalschema, true );
 
-		uint16_t id;
-		ham::db* db = env->createTable( id );
-		Db::Table table( this, name, finalschema, id, db );
+		uint16_t id = env->createTable( );
+		Db::Table table( this, name, finalschema, id, 0 );
 		ham::key key;
 		table.toKey( key );
 		Hypertable::DynamicBuffer buf;
@@ -645,13 +644,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 		ham::key key;
 		toKey( key );
 		fromRecord( getEnv()->getSysDb()->find(&key) );
-		db = getEnv()->openTable( id, this );
+		db = getEnv()->openTable( id, this, cs );
 	}
 
 	void Table::dispose( ) {
 		if( db ) {
-			getEnv()->disposeTable( id );
-			delete db;
+			getEnv()->disposeTable( id, this );
 			db = 0;
 		}
 		id = 0;
@@ -873,6 +871,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 	: table( _table )
 	, flags( _flags )
 	, db( _table->getDb() )
+	, buf( 4 * 1024 )
+	, reader( 0 )
 	, scanSpec( _scanSpec )
 	{
 		cursor.create( db );
@@ -921,7 +921,27 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 	bool Scanner::nextCell( Hypertable::Cell& cell ) {
 		try {
-			return reader->nextCell( cell );
+			Hypertable::Key key;
+			bool got;
+			if( (got = reader->nextCell(key, cell)) ) {
+				buf.clear();
+				if( cell.row_key ) {
+					cell.row_key = reinterpret_cast<const char*>( buf.add(key.row, key.row_len + 1) );
+				}
+				if( cell.column_qualifier ) {
+					cell.column_qualifier = reinterpret_cast<const char*>( buf.add(key.column_qualifier, key.column_qualifier_len + 1) );
+				}
+				if( cell.value ) {
+					if( cell.value_len ) {
+						cell.value = reinterpret_cast<const uint8_t*>( buf.add(cell.value, cell.value_len) );
+					}
+					else {
+						cell.value = reinterpret_cast<const uint8_t*>( "" );
+					}
+				}
+			}
+
+			return got;
 		}
 		catch( ham::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
@@ -952,9 +972,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 		cursor = 0;
 	}
 
-	bool Scanner::Reader::nextCell( Hypertable::Cell& cell ) {
+	bool Scanner::Reader::nextCell( Hypertable::Key& key, Hypertable::Cell& cell ) {
 		ham::key k;
-		Hypertable::Key key;
 		for( bool moved = moveNext(k); moved && !eos; moved = moveNext(k) ) {
 			Hypertable::SerializedKey sk( reinterpret_cast<const uint8_t*>(k.get_data()) );
 			if( filterRow(k, sk.row()) ) {

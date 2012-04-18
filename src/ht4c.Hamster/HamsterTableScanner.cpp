@@ -43,6 +43,7 @@ namespace ht4c { namespace Hamster {
 
 	bool HamsterTableScanner::next( Common::Cell*& _cell ) {
 		HT4C_TRY {
+			HamsterEnvLock sync( tableScanner->getEnv() );
 			if( tableScanner->nextCell(cell.get()) ) {
 				_cell = &cell;
 				return true;
