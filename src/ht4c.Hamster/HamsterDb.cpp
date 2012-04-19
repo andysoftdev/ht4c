@@ -922,9 +922,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 	bool Scanner::nextCell( Hypertable::Cell& cell ) {
 		try {
 			Hypertable::Key key;
-			bool got;
-			if( (got = reader->nextCell(key, cell)) ) {
+			if( reader->nextCell(key, cell) ) {
 				buf.clear();
+				buf.ensure( key.row_len + 1 + key.column_qualifier_len + 1 + cell.value_len + 1 );
 				if( cell.row_key ) {
 					cell.row_key = reinterpret_cast<const char*>( buf.add(key.row, key.row_len + 1) );
 				}
@@ -939,9 +939,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 						cell.value = reinterpret_cast<const uint8_t*>( "" );
 					}
 				}
-			}
 
-			return got;
+				return true;
+			}
 		}
 		catch( ham::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
