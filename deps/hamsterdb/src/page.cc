@@ -26,99 +26,84 @@
 #include "os.h"
 #include "page.h"
 
-#ifdef HAM_DEBUG
-/*
-static ham_bool_t
-__is_in_list(Page *p, int which)
-{
-    return (p->m_next[which] || p->m_prev[which]);
-}
-*/
 
-static void
-__validate_page(Page *p)
+int Page::sizeof_persistent_header=(OFFSETOF(page_data_t, _s._payload));
+
+Page::Page(Environment *env, Database *db)
+  : m_self(0), m_db(db), m_device(0), m_flags(0), m_dirty(false),
+    m_cursors(0), m_pers(0)
 {
-    /* not allowed: in changeset but not in cache */
-    /* disabled - freelist pages can be in a changeset, but are never
-     * in a cache bucket; TODO rewrite this check only for non-freelist 
-     * pages!
-    if (__is_in_list(p, Page::LIST_CHANGESET))
-        ham_assert(__is_in_list(p, Page::LIST_BUCKET),
-            ("in changeset but not in cache")); */
+#if defined(HAM_OS_WIN32) || defined(HAM_OS_WIN64)
+    m_win32mmap=0;
+#endif
+    if (env)
+        m_device=env->get_device();
+    memset(&m_prev[0], 0, sizeof(m_prev));
+    memset(&m_next[0], 0, sizeof(m_next));
 }
 
-Page *
-page_get_next(Page *page, int which)
+Page::~Page()
 {
-    Page *p=page->m_next[which];
-    __validate_page(page);
-    if (p)
-        __validate_page(p);
-    return (p);
+    ham_assert(get_pers()==0, (0));
+    ham_assert(get_cursors()==0, (0));
+}
+
+ham_status_t
+Page::allocate()
+{
+    return (get_device()->alloc_page(this));
+}
+
+ham_status_t
+Page::fetch(ham_offset_t address)
+{
+    set_self(address);
+    return (get_device()->read_page(this));
+}
+
+ham_status_t
+Page::flush()
+{
+    if (!is_dirty() || get_device()->get_env()->get_flags()&HAM_IN_MEMORY_DB)
+        return (HAM_SUCCESS);
+
+    ham_status_t st=get_device()->write_page(this);
+    if (st)
+        return (st);
+
+    set_dirty(false);
+    return (HAM_SUCCESS);
+}
+
+ham_status_t
+Page::free()
+{
+    ham_assert(get_cursors()==0, (0));
+
+    return (get_device()->free_page(this));
 }
 
 void
-page_set_next(Page *page, int which, Page *other)
+Page::add_cursor(Cursor *cursor)
 {
-    page->m_next[which]=other;
-    __validate_page(page);
-    if (other)
-        __validate_page(other);
-}
-
-Page *
-page_get_previous(Page *page, int which)
-{
-    Page *p=page->m_prev[which];
-    __validate_page(page);
-    if (p)
-        __validate_page(p);
-    return (p);
-}
-
-void
-page_set_previous(Page *page, int which, Page *other)
-{
-    page->m_prev[which]=other;
-    __validate_page(page);
-    if (other)
-        __validate_page(other);
-}
-
-ham_bool_t 
-page_is_in_list(Page *head, Page *page, int which)
-{
-    if (page_get_next(page, which))
-        return (HAM_TRUE);
-    if (page_get_previous(page, which))
-        return (HAM_TRUE);
-    if (head==page)
-        return (HAM_TRUE);
-    return (HAM_FALSE);
-}
-#endif /* HAM_DEBUG */
-
-void
-page_add_cursor(Page *page, Cursor *cursor)
-{
-    if (page_get_cursors(page)) {
-        cursor->set_next_in_page(page_get_cursors(page));
+    if (get_cursors()) {
+        cursor->set_next_in_page(get_cursors());
         cursor->set_previous_in_page(0);
-        page_get_cursors(page)->set_previous_in_page(cursor);
+        get_cursors()->set_previous_in_page(cursor);
     }
-    page_set_cursors(page, cursor);
+    set_cursors(cursor);
 }
 
 void
-page_remove_cursor(Page *page, Cursor *cursor)
+Page::remove_cursor(Cursor *cursor)
 {
     Cursor *n, *p;
 
-    if (cursor==page_get_cursors(page)) {
+    if (cursor==get_cursors()) {
         n=cursor->get_next_in_page();
         if (n)
             n->set_previous_in_page(0);
-        page_set_cursors(page, n);
+        set_cursors(n);
     }
     else {
         n=cursor->get_next_in_page();
@@ -133,92 +118,17 @@ page_remove_cursor(Page *page, Cursor *cursor)
     cursor->set_previous_in_page(0);
 }
 
-Page *
-page_new(Environment *env)
-{
-    Page *page;
-    Allocator *alloc=env->get_allocator();
-
-    page=(Page *)alloc->alloc(sizeof(*page));
-    if (!page)
-        return (0);
-    memset(page, 0, sizeof(*page));
-    page_set_allocator(page, alloc);
-    page_set_device(page, env->get_device());
-
-    return (page);
-}
-
-void
-page_delete(Page *page)
-{
-    ham_assert(page!=0, (0));
-    ham_assert(page_get_pers(page)==0, (0));
-    ham_assert(page_get_cursors(page)==0, (0));
-
-    page_get_allocator(page)->free(page);
-}
-
 ham_status_t
-page_alloc(Page *page)
+Page::uncouple_all_cursors(ham_size_t start)
 {
-    Device *dev=page_get_device(page);
-
-    ham_assert(dev, (0));
-    return (dev->alloc_page(page));
-}
-
-ham_status_t
-page_fetch(Page *page)
-{
-    Device *dev=page_get_device(page);
-
-    ham_assert(dev, (0));
-    return (dev->read_page(page));
-}
-
-ham_status_t
-page_flush(Page *page)
-{
-    ham_status_t st;
-    Device *dev=page_get_device(page);
-
-    if (!page_is_dirty(page))
-        return (HAM_SUCCESS);
-
-    ham_assert(dev, (0));
-
-    st=dev->write_page(page);
-    if (st)
-        return (st);
-
-    page_set_undirty(page);
-    return (HAM_SUCCESS);
-}
-
-ham_status_t
-page_free(Page *page)
-{
-    Device *dev=page_get_device(page);
-
-    ham_assert(dev, (0));
-    ham_assert(page_get_cursors(page)==0, (0));
-
-    return (dev->free_page(page));
-}
-
-ham_status_t
-page_uncouple_all_cursors(Page *page, ham_size_t start)
-{
-    Cursor *c = page_get_cursors(page);
+    Cursor *c=get_cursors();
 
     if (c) {
         Database *db=c->get_db();
         if (db) {
-            ham_backend_t *be=db->get_backend();
-            
+            Backend *be=db->get_backend();
             if (be)
-                return (*be->_fun_uncouple_all_cursors)(be, page, start);
+                return be->uncouple_all_cursors(this, start);
         }
     }
 

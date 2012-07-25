@@ -13,7 +13,7 @@
  * @file hamsterdb.h
  * @brief Include file for hamsterdb Embedded Storage
  * @author Christoph Rupp, chris@crupp.de
- * @version 2.0.1
+ * @version 2.0.4
  *
  * @mainpage
  *
@@ -157,13 +157,19 @@ typedef struct ham_cursor_t ham_cursor_t;
  *
  * When hamsterdb returns a record structure, the pointer to the record
  * data is provided in @a data. This pointer is only temporary and will be
- * overwritten by subsequent hamsterdb API calls.
+ * overwritten by subsequent hamsterdb API calls using the same Transaction
+ * (or, if Transactions are disabled, using the same Database). The pointer
+ * will also be invalidated after the Transaction is aborted or committed.
  *
  * To avoid this, the calling application can allocate the @a data pointer.
  * In this case, you have to set the flag @ref HAM_RECORD_USER_ALLOC. The
  * @a size parameter will then return the size of the record. It's the
  * responsibility of the caller to make sure that the @a data parameter is
  * large enough for the record.
+ *
+ * The record->data pointer is not threadsafe. For threadsafe access it is
+ * recommended to use @a HAM_RECORD_USER_ALLOC or have each thread manage its
+ * own Transaction.
  */
 typedef struct
 {
@@ -207,13 +213,20 @@ typedef struct
  * However, when using Database Cursors and the function @ref ham_cursor_move,
  * hamsterdb also returns keys. In this case, the pointer to the key
  * data is provided in @a data. This pointer is only temporary and will be
- * overwritten by subsequent calls to @ref ham_cursor_move.
+ * overwritten by subsequent calls to @ref ham_cursor_move using the 
+ * same Transaction (or, if Transactions are disabled, using the same Database).
+ * The pointer will also be invalidated after the Transaction is aborted 
+ * or committed.
  *
  * To avoid this, the calling application can allocate the @a data pointer.
  * In this case, you have to set the flag @ref HAM_KEY_USER_ALLOC. The
  * @a size parameter will then return the size of the key. It's the
  * responsibility of the caller to make sure that the @a data parameter is
  * large enough for the key.
+ *
+ * The key->data pointer is not threadsafe. For threadsafe access it is
+ * recommended to use @a HAM_KEY_USER_ALLOC or have each thread manage its
+ * own Transaction.
  */
 typedef struct
 {
@@ -306,9 +319,6 @@ typedef struct {
  * This flag is non persistent.
  */
 #define HAM_DAM_SEQUENTIAL_INSERT        0x0002
-
-/* internal use only - will be set implicitly when opening a file from 1.0.x */ 
-#define HAM_DAM_ENFORCE_PRE110_FORMAT    0x8000
 
 /**
  * @}
@@ -989,6 +999,9 @@ ham_env_erase_db(ham_env_t *env, ham_u16_t name, ham_u32_t flags);
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_env_flush(ham_env_t *env, ham_u32_t flags);
 
+/* internal use only - don't lock mutex */
+#define HAM_DONT_LOCK                0xf0000000
+
 /**
  * Enables AES encryption
  *
@@ -1144,6 +1157,9 @@ ham_txn_begin(ham_txn_t **txn, ham_env_t *env, const char *name,
 
 /** Flag for @ref ham_txn_begin */
 #define HAM_TXN_READ_ONLY                                       1
+
+/* Internal flag for @ref ham_txn_begin */
+#define HAM_TXN_TEMPORARY                                       2
 
 /**
  * Retrieves the Transaction name
@@ -1760,10 +1776,11 @@ ham_enable_compression(ham_db_t *db, ham_u32_t level, ham_u32_t flags);
  * @a size is 0 and @a data points to NULL.
  *
  * The @a data pointer is a temporary pointer and will be overwritten
- * by subsequent hamsterdb API calls. You can alter this behaviour by
- * allocating the @a data pointer in the application and setting
- * @a record.flags to @ref HAM_RECORD_USER_ALLOC. Make sure that the allocated
- * buffer is large enough.
+ * by subsequent hamsterdb API calls using the same Transaction 
+ * (or, if Transactions are disabled, using the same Database).
+ * You can alter this behaviour by allocating the @a data pointer in 
+ * the application and setting @a record.flags to @ref HAM_RECORD_USER_ALLOC. 
+ * Make sure that the allocated buffer is large enough.
  *
  * When specifying @ref HAM_DIRECT_ACCESS, the @a data pointer will point
  * directly to the record that is stored in hamsterdb; the data can be modified,
@@ -2575,7 +2592,8 @@ ham_cursor_overwrite(ham_cursor_t *cursor, ham_record_t *record,
  * which must adhere to the same restrictions and conditions as specified
  * for @ref ham_cursor_move(...,HAM_CURSOR_*):
  * key->data will point to temporary data upon return. This pointer
- * will be invalidated by subsequent hamsterdb API calls. See
+ * will be invalidated by subsequent hamsterdb API calls using the same
+ * Transaction (or the same Database, if Transactions are disabled). See
  * @ref HAM_KEY_USER_ALLOC on how to change this behaviour.
  *
  * Further note that the @a key structure must be non-const at all times as its 
@@ -2723,7 +2741,8 @@ ham_cursor_find(ham_cursor_t *cursor, ham_key_t *key, ham_u32_t flags);
  * which must adhere to the same restrictions and conditions as specified
  * for @ref ham_cursor_move(...,HAM_CURSOR_*):
  * key->data will point to temporary data upon return. This pointer
- * will be invalidated by subsequent hamsterdb API calls. See
+ * will be invalidated by subsequent hamsterdb API calls using the same
+ * Transaction (or the same Database, if Transactions are disabled). See
  * @ref HAM_KEY_USER_ALLOC on how to change this behaviour.
  *
  * Further note that the @a key structure must be non-const at all times as its 

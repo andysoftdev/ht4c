@@ -61,9 +61,6 @@
     <ClInclude Include="src\freelist_statistics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\freelist_v2.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\hash-table.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -165,16 +162,10 @@
     <ClCompile Include="src\error.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\extkeys.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\freelist.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\freelist_statistics.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\freelist_v2.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\hamsterdb.cc">

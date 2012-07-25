@@ -31,7 +31,7 @@
 
 
 ham_status_t 
-btree_find_cursor(ham_btree_t *be, btree_cursor_t *cursor, 
+btree_find_cursor(BtreeBackend *be, Transaction *txn, btree_cursor_t *cursor, 
            ham_key_t *key, ham_record_t *record, ham_u32_t flags)
 {
 	ham_status_t st;
@@ -39,7 +39,7 @@ btree_find_cursor(ham_btree_t *be, btree_cursor_t *cursor,
     btree_node_t *node = NULL;
     btree_key_t *entry;
     ham_s32_t idx = -1;
-    Database *db=be_get_db(be);
+    Database *db=be->get_db();
     find_hints_t hints = {flags, flags, 0, HAM_FALSE, HAM_FALSE, 1};
 
     btree_find_get_hints(&hints, db, key);
@@ -96,18 +96,16 @@ no_fast_track:
 
     if (idx == -1) {
         /* get the address of the root page */
-        if (!btree_get_rootpage(be)) {
+        if (!be->get_rootpage()) {
             btree_stats_update_find_fail(db, &hints);
             return HAM_KEY_NOT_FOUND;
         }
 
         /* load the root page */
-        st=db_fetch_page(&page, db, btree_get_rootpage(be), 0);
-		ham_assert(st ? !page : 1, (0));
-        if (!page) {
-            ham_assert(st, (0));
+        st=db_fetch_page(&page, db, be->get_rootpage(), 0);
+        if (st) {
             btree_stats_update_find_fail(db, &hints);
-			return st ? st : HAM_INTERNAL_ERROR;
+			return (st);
         }
 
         /* now traverse the root to the leaf nodes, till we find a leaf */
@@ -186,12 +184,10 @@ no_fast_track:
                     }
 
                     hints.cost++;
-                    st = db_fetch_page(&page, db, btree_node_get_left(node), 0);
-					ham_assert(st ? !page : 1, (0));
-                    if (!page) {
-                        ham_assert(st, (0));
+                    st=db_fetch_page(&page, db, btree_node_get_left(node), 0);
+                    if (st) {
                         btree_stats_update_find_fail(db, &hints);
-						return st ? st : HAM_INTERNAL_ERROR;
+						return (st);
                     }
                     node = page_get_btree_node(page);
                     idx = btree_node_get_count(node) - 1;
@@ -222,12 +218,10 @@ no_fast_track:
                     }
 
                     hints.cost++;
-                    st = db_fetch_page(&page, db, 
-                                    btree_node_get_right(node), 0);
-                    if (!page) {
-                        ham_assert(st, (0));
+                    st=db_fetch_page(&page, db, btree_node_get_right(node), 0);
+                    if (st) {
                         btree_stats_update_find_fail(db, &hints);
-						return st ? st : HAM_INTERNAL_ERROR;
+						return (st);
                     }
                     node = page_get_btree_node(page);
                     idx = 0;
@@ -304,12 +298,11 @@ no_fast_track:
                                 }
 
                                 hints.cost++;
-                                st = db_fetch_page(&page, db,
+                                st=db_fetch_page(&page, db,
                                                 btree_node_get_right(node), 0);
-                                if (!page) {
-                                    ham_assert(st, (0));
+                                if (st) {
                                     btree_stats_update_find_fail(db, &hints);
-									return st ? st : HAM_INTERNAL_ERROR;
+									return (st);
                                 }
                                 node = page_get_btree_node(page);
                                 idx = 0;
@@ -331,11 +324,9 @@ no_fast_track:
                         hints.cost++;
                         st = db_fetch_page(&page, db,
                                         btree_node_get_left(node), 0);
-                        if (!page)
-                        {
-                            ham_assert(st, (0));
+                        if (st) {
                             btree_stats_update_find_fail(db, &hints);
-							return st ? st : HAM_INTERNAL_ERROR;
+							return (st);
                         }
                         node = page_get_btree_node(page);
                         idx = btree_node_get_count(node) - 1;
@@ -372,11 +363,9 @@ no_fast_track:
                     hints.cost++;
                     st = db_fetch_page(&page, db, 
                                 btree_node_get_right(node), 0);
-                    if (!page)
-                    {
-                        ham_assert(st, (0));
+                    if (st) {
                         btree_stats_update_find_fail(db, &hints);
-						return st ? st : HAM_INTERNAL_ERROR;
+						return (st);
                     }
                     node = page_get_btree_node(page);
                     idx = 0;
@@ -406,7 +395,7 @@ no_fast_track:
                 ("coupling an uncoupled cursor, but need a nil-cursor"));
         ham_assert(!btree_cursor_is_coupled(cursor),
                 ("coupling a coupled cursor, but need a nil-cursor"));
-        page_add_cursor(page, btree_cursor_get_parent(cursor));
+        page->add_cursor(btree_cursor_get_parent(cursor));
         btree_cursor_set_flags(cursor, 
                 btree_cursor_get_flags(cursor)|BTREE_CURSOR_FLAG_COUPLED);
         btree_cursor_set_coupled_page(cursor, page);
@@ -427,7 +416,7 @@ no_fast_track:
     if (key 
             && (ham_key_get_intflags(key) & KEY_IS_APPROXIMATE)
             && !(flags & Cursor::CURSOR_SYNC_DONT_LOAD_KEY)) {
-        ham_status_t st=btree_read_key(db, entry, key);
+        ham_status_t st=btree_read_key(db, txn, entry, key);
         if (st) {
             btree_stats_update_find_fail(db, &hints);
             return (st);
@@ -438,7 +427,7 @@ no_fast_track:
         ham_status_t st;
         record->_intflags=key_get_flags(entry);
         record->_rid=key_get_ptr(entry);
-        st=btree_read_record(db, record, 
+        st=btree_read_record(db, txn, record, 
                         (ham_u64_t *)&key_get_rawptr(entry), flags);
         if (st) {
             btree_stats_update_find_fail(db, &hints);
@@ -460,9 +449,9 @@ no_fast_track:
  @note This is a B+-tree 'backend' method.
  */                                                                 
 ham_status_t 
-btree_find(ham_btree_t *be, ham_key_t *key,
+BtreeBackend::find(Transaction *txn, ham_key_t *key,
            ham_record_t *record, ham_u32_t flags)
 {
-    return (btree_find_cursor(be, 0, key, record, flags));
+    return (btree_find_cursor(this, txn, 0, key, record, flags));
 }
 

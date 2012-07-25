@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2011 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2012 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -49,16 +49,16 @@
  * the maximum number of indices (if this file is an environment with 
  * multiple indices)
  */
-#define DB_MAX_INDICES      16  /* 16*32 = 512 byte wasted */
+#define DB_MAX_INDICES                  16 /* 16*32 = 512 byte wasted */
 
 /* the size of an index data */
-#define DB_INDEX_SIZE       sizeof(db_indexdata_t) /* 32 */
+#define DB_INDEX_SIZE                   sizeof(db_indexdata_t) /* 32 */
 
 /** get the key size */
-#define db_get_keysize(db)         be_get_keysize((db)->get_backend())
+#define db_get_keysize(db)              ((db)->get_backend()->get_keysize())
 
 /** get the (non-persisted) flags of a key */
-#define ham_key_get_intflags(key)         (key)->_flags
+#define ham_key_get_intflags(key)       (key)->_flags
 
 /**
  * set the flags of a key
@@ -67,7 +67,7 @@
  * be defined such that those can peacefully co-exist with these; that's
  * why those public flags start at the value 0x1000 (4096).
  */
-#define ham_key_set_intflags(key, f)      (key)->_flags=(f)
+#define ham_key_set_intflags(key, f)    (key)->_flags=(f)
 
 
 #include "packstart.h"
@@ -145,26 +145,26 @@ class DatabaseImplementation
     virtual ham_status_t get_parameters(ham_parameter_t *param) = 0;
 
     /** check Database integrity */
-    virtual ham_status_t check_integrity(ham_txn_t *txn) = 0;
+    virtual ham_status_t check_integrity(Transaction *txn) = 0;
 
     /** get number of keys */
-    virtual ham_status_t get_key_count(ham_txn_t *txn, ham_u32_t flags, 
+    virtual ham_status_t get_key_count(Transaction *txn, ham_u32_t flags, 
                     ham_offset_t *keycount) = 0;
 
     /** insert a key/value pair */
-    virtual ham_status_t insert(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t insert(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags) = 0;
 
     /** erase a key/value pair */
-    virtual ham_status_t erase(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t erase(Transaction *txn, ham_key_t *key, 
                     ham_u32_t flags) = 0;
 
     /** lookup of a key/value pair */
-    virtual ham_status_t find(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t find(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags) = 0;
 
     /** create a cursor */
-    virtual Cursor *cursor_create(ham_txn_t *txn, ham_u32_t flags) = 0;
+    virtual Cursor *cursor_create(Transaction *txn, ham_u32_t flags) = 0;
 
     /** clone a cursor */
     virtual Cursor *cursor_clone(Cursor *src) = 0;
@@ -220,25 +220,25 @@ class DatabaseImplementationLocal : public DatabaseImplementation
     virtual ham_status_t get_parameters(ham_parameter_t *param);
 
     /** check Database integrity */
-    virtual ham_status_t check_integrity(ham_txn_t *txn);
+    virtual ham_status_t check_integrity(Transaction *txn);
 
     /** get number of keys */
-    virtual ham_status_t get_key_count(ham_txn_t *txn, ham_u32_t flags, 
+    virtual ham_status_t get_key_count(Transaction *txn, ham_u32_t flags, 
                     ham_offset_t *keycount);
 
     /** insert a key/value pair */
-    virtual ham_status_t insert(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t insert(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags);
 
     /** erase a key/value pair */
-    virtual ham_status_t erase(ham_txn_t *txn, ham_key_t *key, ham_u32_t flags);
+    virtual ham_status_t erase(Transaction *txn, ham_key_t *key, ham_u32_t flags);
 
     /** lookup of a key/value pair */
-    virtual ham_status_t find(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t find(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags);
 
     /** create a cursor */
-    virtual Cursor *cursor_create(ham_txn_t *txn, ham_u32_t flags);
+    virtual Cursor *cursor_create(Transaction *txn, ham_u32_t flags);
 
     /** clone a cursor */
     virtual Cursor *cursor_clone(Cursor *src);
@@ -294,25 +294,25 @@ class DatabaseImplementationRemote : public DatabaseImplementation
     virtual ham_status_t get_parameters(ham_parameter_t *param);
 
     /** check Database integrity */
-    virtual ham_status_t check_integrity(ham_txn_t *txn);
+    virtual ham_status_t check_integrity(Transaction *txn);
 
     /** get number of keys */
-    virtual ham_status_t get_key_count(ham_txn_t *txn, ham_u32_t flags, 
+    virtual ham_status_t get_key_count(Transaction *txn, ham_u32_t flags, 
                     ham_offset_t *keycount);
 
     /** insert a key/value pair */
-    virtual ham_status_t insert(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t insert(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags);
 
     /** erase a key/value pair */
-    virtual ham_status_t erase(ham_txn_t *txn, ham_key_t *key, ham_u32_t flags);
+    virtual ham_status_t erase(Transaction *txn, ham_key_t *key, ham_u32_t flags);
 
     /** lookup of a key/value pair */
-    virtual ham_status_t find(ham_txn_t *txn, ham_key_t *key, 
+    virtual ham_status_t find(Transaction *txn, ham_key_t *key, 
                     ham_record_t *record, ham_u32_t flags);
 
     /** create a cursor */
-    virtual Cursor *cursor_create(ham_txn_t *txn, ham_u32_t flags);
+    virtual Cursor *cursor_create(Transaction *txn, ham_u32_t flags);
 
     /** clone a cursor */
     virtual Cursor *cursor_clone(Cursor *src);
@@ -420,12 +420,12 @@ class Database
     }
 
     /** get the backend pointer */
-    ham_backend_t *get_backend(void) {
+    Backend *get_backend(void) {
         return (m_backend);
     }
 
     /** set the backend pointer */
-    void set_backend(ham_backend_t *b) {
+    void set_backend(Backend *b) {
         m_backend=b;
     }
 
@@ -493,6 +493,10 @@ class Database
     /** set the environment pointer */
     void set_env(Environment *env) {
         m_env=env;
+        if (env) {
+            m_key_arena.set_allocator(env->get_allocator());
+            m_record_arena.set_allocator(env->get_allocator());
+        }
     }
 
     /** get the next database in a linked list of databases */
@@ -564,63 +568,21 @@ class Database
         return (&m_perf_data);
     }
 
-    /** get the size of the last allocated data blob */
-    ham_size_t get_record_allocsize(void) {
-        return (m_rec_allocsize);
+    /** Get the memory buffer for the key data */
+    ByteArray &get_key_arena() {
+        return (m_key_arena);
     }
 
-    /** set the size of the last allocated data blob */
-    void set_record_allocsize(ham_size_t size) {
-        m_rec_allocsize=size;
+    /** Get the memory buffer for the record data */
+    ByteArray &get_record_arena() {
+        return (m_record_arena);
     }
 
-    /** get the pointer to the last allocated data blob */
-    void *get_record_allocdata(void) {
-        return (m_rec_allocdata);
-    }
+    /** closes a cursor */
+    void close_cursor(Cursor *c);
 
-    /** set the pointer to the last allocated data blob */
-    void set_record_allocdata(void *p) {
-        m_rec_allocdata=p;
-    }
-
-    /** get the size of the last allocated key blob */
-    ham_size_t get_key_allocsize(void) {
-        return (m_key_allocsize);
-    }
-
-    /** set the size of the last allocated key blob */
-    void set_key_allocsize(ham_size_t size) {
-        m_key_allocsize=size;
-    }
-
-    /** get the pointer to the last allocated key blob */
-    void *get_key_allocdata(void) {
-        return (m_key_allocdata);
-    }
-
-    /** set the pointer to the last allocated key blob */
-    void set_key_allocdata(void *p) {
-        m_key_allocdata=p;
-    }
-
-    /**
-     * Resize the record data buffer. This buffer is an internal storage for 
-     * record buffers. When a ham_record_t structure is returned to the user,
-     * the record->data pointer will point to this buffer.
-     *
-     * Set the size to 0, and the data is freed.
-     */
-    ham_status_t resize_record_allocdata(ham_size_t size);
-
-    /**
-     * Resize the key data buffer. This buffer is an internal storage for 
-     * key buffers. When a ham_key_t structure is returned to the user,
-     * the key->data pointer will point to this buffer.
-     *
-     * Set the size to 0, and the data is freed.
-     */
-    ham_status_t resize_key_allocdata(ham_size_t size);
+    /** clones a cursor into *dest */
+    void clone_cursor(Cursor *src, Cursor **dest);
 
 #if HAM_ENABLE_REMOTE
     /** get the remote database handle */
@@ -772,7 +734,7 @@ class Database
     void *m_context;
 
     /** the backend pointer - btree, hashtable etc */
-    ham_backend_t *m_backend;
+    Backend *m_backend;
 
     /** linked list of all cursors */
     Cursor *m_cursors;
@@ -814,18 +776,6 @@ class Database
     /** some database specific run-time data */
     ham_runtime_statistics_dbdata_t m_perf_data;
 
-    /** the size of the last allocated data pointer for records */
-    ham_size_t m_rec_allocsize;
-
-    /** the last allocated data pointer for records */
-    void *m_rec_allocdata;
-
-    /** the size of the last allocated data pointer for keys */
-    ham_size_t m_key_allocsize;
-
-    /** the last allocated data pointer for keys */
-    void *m_key_allocdata;
-
 #if HAM_ENABLE_REMOTE
     /** the remote database handle */
     ham_u64_t m_remote_handle;
@@ -836,6 +786,14 @@ class Database
 
     /** the object which does the actual work */
     DatabaseImplementation *m_impl;
+
+    /** this is where key->data points to when returning a 
+     * key to the user; used if Transactions are disabled */
+    ByteArray m_key_arena;
+
+    /** this is where record->data points to when returning a 
+     * record to the user; used if Transactions are disabled */
+    ByteArray m_record_arena;
 };
 
 
@@ -981,12 +939,6 @@ db_fetch_page_impl(Page **page_ref, Environment *env, Database *db,
 
 
 /**
- * flush a page
- */
-extern ham_status_t
-db_flush_page(Environment *env, Page *page);
-
-/**
  * Flush all pages, and clear the cache.
  *
  * @param flags Set to DB_FLUSH_NODELETE if you do NOT want the cache to
@@ -1031,36 +983,11 @@ db_alloc_page_impl(Page **page_ref, Environment *env, Database *db,
 #define PAGE_CLEAR_WITH_ZERO         16
 
 /**
- * Free a page.
- *
- * @remark will also remove the page from the cache and free all extended keys,
- * if there are any.
- *
- * @remark valid flag: DB_MOVE_TO_FREELIST; marks the page as 'deleted'
- * in the freelist. Ignored in in-memory databases.
- */
-extern ham_status_t
-db_free_page(Page *page, ham_u32_t flags);
-
-#define DB_MOVE_TO_FREELIST         1
-
-/**
- * Write a page, then delete the page from memory.
- *
- * @remark This function is used by the cache; it shouldn't be used
- * anywhere else.
- */
-extern ham_status_t
-db_write_page_and_delete(Page *page, ham_u32_t flags);
-
-/**
 * @defgroup ham_database_flags 
 * @{
 */
 
-/**
- * An internal database flag - use mmap instead of read(2).
- */
+/** An internal database flag - use mmap instead of read(2).  */
 #define DB_USE_MMAP                  0x00000100
 
 /**
@@ -1069,15 +996,8 @@ db_write_page_and_delete(Page *page, ham_u32_t flags);
  */
 #define DB_ENV_IS_PRIVATE            0x00080000
 
-/**
- * An internal database flag - env handle is remote
- */
+/** An internal database flag - env handle is remote */
 #define DB_IS_REMOTE                 0x00200000
-
-/**
- * An internal database flag - disable txn flushin when they're committed
- */
-#define DB_DISABLE_AUTO_FLUSH        0x00400000
 
 /**
  * @}
@@ -1089,7 +1009,7 @@ db_write_page_and_delete(Page *page, ham_u32_t flags);
  */
 struct txn_cursor_t;
 extern ham_status_t 
-db_insert_txn(Database *db, ham_txn_t *txn, ham_key_t *key, 
+db_insert_txn(Database *db, Transaction *txn, ham_key_t *key, 
                 ham_record_t *record, ham_u32_t flags, 
                 struct txn_cursor_t *cursor);
 
@@ -1097,7 +1017,7 @@ db_insert_txn(Database *db, ham_txn_t *txn, ham_key_t *key,
  * erase a key/record pair from a txn; on success, cursor will be set to nil
  */
 extern ham_status_t
-db_erase_txn(Database *db, ham_txn_t *txn, ham_key_t *key, ham_u32_t flags,
+db_erase_txn(Database *db, Transaction *txn, ham_key_t *key, ham_u32_t flags,
                 struct txn_cursor_t *cursor);
 
 

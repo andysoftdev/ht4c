@@ -28,8 +28,6 @@
 #include "page.h"
 #include "changeset.h"
 
-#define OFFSETOF(type, member) ((size_t) &((type *)0)->member)
-
 /**
  * This is the minimum chunk size; all chunks (pages and blobs) are aligned
  * to this size. 
@@ -127,6 +125,9 @@ class Environment
     /** default constructor initializes all members */
     Environment();
 
+    /** destructor */
+    ~Environment();
+
     /*
      * following here: function pointers which implement access to 
      * local or remote databases. they are initialized in ham_env_create_ex
@@ -195,19 +196,19 @@ class Environment
     /**
      * create a transaction in this environment
      */
-    ham_status_t (*_fun_txn_begin)(Environment *env, ham_txn_t **txn, 
+    ham_status_t (*_fun_txn_begin)(Environment *env, Transaction **txn, 
                 const char *name, ham_u32_t flags);
 
     /**
      * aborts a transaction
      */
-    ham_status_t (*_fun_txn_abort)(Environment *env, ham_txn_t *txn, 
+    ham_status_t (*_fun_txn_abort)(Environment *env, Transaction *txn, 
                 ham_u32_t flags);
 
     /**
      * commits a transaction
      */
-    ham_status_t (*_fun_txn_commit)(Environment *env, ham_txn_t *txn, 
+    ham_status_t (*_fun_txn_commit)(Environment *env, Transaction *txn, 
                 ham_u32_t flags);
 
     /**
@@ -302,26 +303,26 @@ class Environment
 
     /** get a pointer to the header data */
     env_header_t *get_header() {
-        return ((env_header_t *)(page_get_payload(get_header_page())));
+        return ((env_header_t *)(get_header_page()->get_payload()));
     }
 
     /** get the oldest transaction */
-    ham_txn_t *get_oldest_txn() {
+    Transaction *get_oldest_txn() {
         return (m_oldest_txn);
     }
 
     /** set the oldest transaction */
-    void set_oldest_txn(ham_txn_t *txn) {
+    void set_oldest_txn(Transaction *txn) {
         m_oldest_txn=txn;
     }
 
     /** get the newest transaction */
-    ham_txn_t *get_newest_txn() {
+    Transaction *get_newest_txn() {
         return (m_newest_txn);
     }
 
     /** set the newest transaction */
-    void set_newest_txn(ham_txn_t *txn) {
+    void set_newest_txn(Transaction *txn) {
         m_newest_txn=txn;
     }
 
@@ -343,6 +344,16 @@ class Environment
     /** set the journal */
     void set_journal(Journal *j) {
         m_journal=j;
+    }
+
+    /** get the freelist */
+    Freelist *get_freelist() {
+        return (m_freelist);
+    }
+
+    /** set the freelist */
+    void set_freelist(Freelist *f) {
+        m_freelist=f;
     }
 
     /** get the flags */
@@ -377,7 +388,7 @@ class Environment
 
     /** get the size of the usable persistent payload of a page */
     ham_size_t get_usable_pagesize() {
-	    return (get_pagesize()-page_get_persistent_header_size());
+	    return (get_pagesize()-Page::sizeof_persistent_header);
     }
 
     /** set the pagesize as specified in ham_env_create_ex */
@@ -433,28 +444,18 @@ class Environment
         return (m_is_active);
     }
 
-    /** set the 'legacy' flag of the environment */
-    void set_legacy(bool l) {
-        m_is_legacy=l;
-    }
-
-    /** check whether this environment is a legacy file (pre 1.1.0) */
-    bool is_legacy() {
-        return (m_is_legacy);
-    }
-
     /** returns true if this Environment is private to a Database 
      * (was implicitly created in ham_create/ham_open) */
     bool is_private();
 
     /** set the dirty-flag - this is the same as db_set_dirty() */
-    void set_dirty() {
-        page_set_dirty(get_header_page());
+    void set_dirty(bool dirty) {
+        get_header_page()->set_dirty(dirty);
     }
 
     /** get the dirty-flag */
     bool is_dirty() {
-        return (page_is_dirty(get_header_page()));
+        return (get_header_page()->is_dirty());
     }
 
     /**
@@ -476,7 +477,7 @@ class Environment
     /** get the maximum number of databases for this file */
     ham_u16_t get_max_databases() {
         env_header_t *hdr=(env_header_t*)
-                    (page_get_payload(get_header_page()));
+                    (get_header_page()->get_payload());
         return (ham_db2h16(hdr->_max_databases));
     }
 
@@ -526,7 +527,7 @@ class Environment
     /** get byte @a i of the 'version'-header */
     ham_u8_t get_version(ham_size_t idx) {
         env_header_t *hdr=(env_header_t *)
-                    (page_get_payload(get_header_page()));
+                    (get_header_page()->get_payload());
         return (envheader_get_version(hdr, idx));
     }
 
@@ -541,19 +542,19 @@ class Environment
     /** get the serial number */
     ham_u32_t get_serialno() {
         env_header_t *hdr=(env_header_t*)
-                    (page_get_payload(get_header_page()));
+                    (get_header_page()->get_payload());
         return (ham_db2h32(hdr->_serialno));
     }
 
     /** set the serial number */
     void set_serialno(ham_u32_t n) {
         env_header_t *hdr=(env_header_t*)
-                    (page_get_payload(get_header_page()));
+                    (get_header_page()->get_payload());
         hdr->_serialno=ham_h2db32(n);
     }
 
     /** get the freelist object of the database */
-    freelist_payload_t *get_freelist();
+    FreelistPayload *get_freelist_payload();
 
     /** set the logfile directory */
     void set_log_directory(const std::string &dir) {
@@ -565,7 +566,15 @@ class Environment
         return (m_log_directory);
     }
 
+    /** get the mutex */
+    Mutex &get_mutex() {
+        return (m_mutex);
+    }
+
   private:
+    /** a mutex for this Environment */
+    Mutex m_mutex;
+
     /** the filename of the environment file */
     std::string m_filename;
 
@@ -591,16 +600,19 @@ class Environment
     Page *m_hdrpage;
 
     /** the head of the transaction list (the oldest transaction) */
-    ham_txn_t *m_oldest_txn;
+    Transaction *m_oldest_txn;
 
     /** the tail of the transaction list (the youngest/newest transaction) */
-    ham_txn_t *m_newest_txn;
+    Transaction *m_newest_txn;
 
     /** the physical log */
     Log *m_log;
 
     /** the logical journal */
     Journal *m_journal;
+
+    /** the Freelist manages the free space in the file */
+    Freelist *m_freelist;
 
     /** the Environment flags - a combination of the persistent flags
      * and runtime flags */
@@ -625,9 +637,6 @@ class Environment
 
 	/** true after this object is already in use */
 	bool m_is_active;
-
-    /** true if this Environment is pre-1.1.0 format */
-	bool m_is_legacy;
 
 #if HAM_ENABLE_REMOTE
     /** libcurl remote handle */
@@ -709,13 +718,13 @@ env_reserve_space(Environment *env, ham_offset_t minimum_page_count);
  * add a new transaction to this Environment
  */
 extern void
-env_append_txn(Environment *env, ham_txn_t *txn);
+env_append_txn(Environment *env, Transaction *txn);
 
 /**
  * remove a transaction to this Environment
  */
 extern void
-env_remove_txn(Environment *env, ham_txn_t *txn);
+env_remove_txn(Environment *env, Transaction *txn);
 
 /*
  * flush all committed Transactions to disk

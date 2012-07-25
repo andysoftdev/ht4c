@@ -145,7 +145,7 @@ typedef struct btree_cursor_t
  * Create a new cursor
  */
 extern void
-btree_cursor_create(Database *db, ham_txn_t *txn, ham_u32_t flags,
+btree_cursor_create(Database *db, Transaction *txn, ham_u32_t flags,
                 btree_cursor_t *cursor, Cursor *parent);
 
 /**                                                                 
@@ -187,7 +187,7 @@ btree_cursor_uncouple(btree_cursor_t *c, ham_u32_t flags);
 
 /**
  * flag for @ref btree_cursor_uncouple: uncouple from the page, but do not
- * call @ref page_remove_cursor()
+ * call @ref Page::remove_cursor()
  */
 #define BTREE_CURSOR_UNCOUPLE_NO_REMOVE        1
 
@@ -264,7 +264,7 @@ btree_cursor_overwrite(btree_cursor_t *c, ham_record_t *record,
  */
 extern ham_status_t
 btree_cursor_get_duplicate_table(btree_cursor_t *c, dupe_table_t **ptable,
-                ham_bool_t *needs_free);
+                bool *needs_free);
 
 /**
  * retrieves the record size of the current record

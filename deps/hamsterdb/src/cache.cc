@@ -38,7 +38,7 @@ Cache::Cache(Environment *env, ham_u64_t capacity_bytes)
 }
 
 ham_status_t
-Cache::check_integrity(void)
+Cache::check_integrity_nolock()
 {
     ham_size_t elements=0;
     Page *head;
@@ -48,7 +48,7 @@ Cache::check_integrity(void)
     head=m_totallist;
     while (head) {
         elements++;
-        head=page_get_next(head, Page::LIST_CACHED);
+        head=head->get_next(Page::LIST_CACHED);
     }
 
     /* did we count the correct numbers? */
@@ -62,12 +62,12 @@ Cache::check_integrity(void)
      * and that the TAIL is the chronologically oldest page */
     head=m_totallist;
     while (head) {
-        if (tail && !page_get_next(head, Page::LIST_CACHED))
+        if (tail && !head->get_next(Page::LIST_CACHED))
             ham_assert(head==tail, (""));
-        head=page_get_next(head, Page::LIST_CACHED);
+        head=head->get_next(Page::LIST_CACHED);
     }
     if (tail)
-        ham_assert(page_get_next(tail, Page::LIST_CACHED)==0, (""));
+        ham_assert(tail->get_next(Page::LIST_CACHED)==0, (""));
 
     return (0);
 }

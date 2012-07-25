@@ -13,6 +13,9 @@
 #include "config.h"
 
 #include <string.h>
+#ifndef HAM_OS_WIN32
+#  include <libgen.h>
+#endif
 
 #include "db.h"
 #include "device.h"
@@ -25,14 +28,10 @@
 #include "util.h"
 
 
-Log::Log(Environment *env, ham_u32_t flags)
-: m_env(env), m_flags(flags), m_lsn(0), m_fd(HAM_INVALID_FD)
-{
-}
-
 ham_status_t
-Log::create(void)
+Log::create()
 {
+    ScopedLock lock(m_mutex);
     Log::Header header;
     ham_status_t st;
     std::string path=get_path();
@@ -47,7 +46,7 @@ Log::create(void)
 
     st=os_write(m_fd, &header, sizeof(header));
     if (st) {
-        close();
+        close_nolock();
         return (st);
     }
 
@@ -55,8 +54,9 @@ Log::create(void)
 }
 
 ham_status_t
-Log::open(void)
+Log::open()
 {
+    ScopedLock lock(m_mutex);
     Log::Header header;
     std::string path=get_path();
     ham_status_t st;
@@ -64,19 +64,19 @@ Log::open(void)
     /* open the file */
     st=os_open(path.c_str(), 0, &m_fd);
     if (st) {
-        close();
+        close_nolock();
         return (st);
     }
 
     /* check the file header with the magic */
     st=os_pread(m_fd, 0, &header, sizeof(header));
     if (st) {
-        close();
+        close_nolock();
         return (st);
     }
     if (header.magic!=HEADER_MAGIC) {
         ham_trace(("logfile has unknown magic or is corrupt"));
-        close();
+        close_nolock();
         return (HAM_LOG_INV_FILE_HEADER);
     }
 
@@ -84,36 +84,6 @@ Log::open(void)
     m_lsn=header.lsn;
 
     return (0);
-}
-
-bool
-Log::is_empty(void)
-{
-    ham_status_t st; 
-    ham_offset_t size;
-
-    st=os_get_filesize(m_fd, &size);
-    if (st)
-		return (st ? false : true); /* TODO throw */
-    if (size && size!=sizeof(Log::Header))
-        return (false);
-
-    return (true);
-}
-
-ham_status_t
-Log::clear(void)
-{
-    ham_status_t st;
-
-    st=os_truncate(m_fd, sizeof(Log::Header));
-    if (st)
-        return (st);
-
-    /* after truncate, the file pointer is far beyond the new end of file;
-     * reset the file pointer, or the next write will resize the file to
-     * the original size */
-    return (os_seek(m_fd, sizeof(Log::Header), HAM_OS_SEEK_SET));
 }
 
 ham_status_t
@@ -148,7 +118,6 @@ Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
     /* now read the extended data, if it's available */
     if (entry->data_size) {
         ham_offset_t pos=(*iter)-entry->data_size;
-        // pos += 8-1;
         pos -= (pos % 8);
 
         *data=(ham_u8_t *)m_env->get_allocator()->alloc(
@@ -172,10 +141,13 @@ Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
 }
 
 ham_status_t
-Log::close(ham_bool_t noclear)
+Log::close_nolock(ham_bool_t noclear)
 {
     ham_status_t st=0;
     Log::Header header;
+
+    if (m_fd==HAM_INVALID_FD)
+        return (0);
 
     /* write the file header with the magic and the last used lsn */
     header.magic=HEADER_MAGIC;
@@ -186,13 +158,11 @@ Log::close(ham_bool_t noclear)
         return (st);
 
     if (!noclear)
-        clear();
+        clear_nolock();
 
-    if (m_fd!=HAM_INVALID_FD) {
-        if ((st=os_close(m_fd, 0)))
-            return (st);
-        m_fd=HAM_INVALID_FD;
-    }
+    if ((st=os_close(m_fd)))
+        return (st);
+    m_fd=HAM_INVALID_FD;
 
     return (0);
 }
@@ -200,6 +170,7 @@ Log::close(ham_bool_t noclear)
 ham_status_t
 Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
 {
+    ScopedLock lock(m_mutex);
     ham_status_t st=0;
     ham_file_filter_t *head=m_env->get_file_filter();
     ham_u8_t *p;
@@ -213,7 +184,7 @@ Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
         p=(ham_u8_t *)m_env->get_allocator()->alloc(m_env->get_pagesize());
         if (!p)
             return (HAM_OUT_OF_MEMORY);
-        memcpy(p, page_get_raw_payload(page), size);
+        memcpy(p, page->get_raw_payload(), size);
 
         while (head) {
             if (head->before_write_cb) {
@@ -225,13 +196,13 @@ Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
         }
     }
     else
-        p=(ham_u8_t *)page_get_raw_payload(page);
+        p=(ham_u8_t *)page->get_raw_payload();
 
     if (st==0)
         st=append_write(lsn, page_count==0 ? CHANGESET_IS_COMPLETE : 0, 
                         page->get_self(), p, size);
 
-    if (p!=page_get_raw_payload(page))
+    if (p!=page->get_raw_payload())
         m_env->get_allocator()->free(p);
 
     return (st);
@@ -240,6 +211,7 @@ Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
 ham_status_t
 Log::recover()
 {
+    ScopedLock lock(m_mutex);
     ham_status_t st;
     Page *page;
     Device *device=m_env->get_device();
@@ -304,20 +276,15 @@ Log::recover()
             /* appended... */
             filesize+=entry.data_size;
 
-            page=page_new(m_env);
-            if (st)
-                goto bail;
-            st=page_alloc(page);
+            page=new Page(m_env);
+            st=page->allocate();
             if (st)
                 goto bail;
         }
         else {
             /* overwritten... */
-            page=page_new(m_env);
-            if (st)
-                goto bail;
-            page->set_self(entry.offset);
-            st=page_fetch(page);
+            page=new Page(m_env);
+            st=page->fetch(entry.offset);
             if (st)
                 goto bail;
         }
@@ -326,17 +293,17 @@ Log::recover()
         ham_assert(m_env->get_pagesize()==entry.data_size, (""));
 
         /* overwrite the page data */
-        memcpy(page_get_pers(page), data, entry.data_size);
+        memcpy(page->get_pers(), data, entry.data_size);
 
         /* flush the modified page to disk */
-        page_set_dirty(page);
-        st=page_flush(page);
+        page->set_dirty(true);
+        st=page->flush();
         if (st)
             goto bail;
-        st=page_free(page);
+        st=page->free();
         if (st)
             goto bail;
-        page_delete(page);
+        delete page;
 
         /* store the lsn in the log - will be needed later when recovering
          * the journal */
@@ -345,7 +312,7 @@ Log::recover()
 
 clear:
     /* and finally clear the log */
-    st=clear();
+    st=clear_nolock();
     if (st) {
         ham_log(("unable to clear logfiles; please manually delete the "
                 ".log0 file of this Database, then open again."));
@@ -367,12 +334,6 @@ bail:
     }
 
     return (st);
-}
-
-ham_status_t
-Log::flush(void)
-{
-    return (os_flush(m_fd));
 }
 
 ham_status_t
@@ -412,7 +373,7 @@ Log::get_path()
 		path+=ext;
 #else
         path+="/";
-		path+=::basename(m_env->get_filename().c_str());
+		path+=::basename((char *)m_env->get_filename().c_str());
 #endif
     }
     path+=".log0";

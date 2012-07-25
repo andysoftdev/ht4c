@@ -36,7 +36,7 @@ typedef struct
     /**
      * the backend pointer
      */
-    ham_btree_t *be;
+    BtreeBackend *be;
 
     /**   
      * the flags of the ham_check_integrity()-call
@@ -69,46 +69,40 @@ __verify_page(Page *parent, Page *leftsib, Page *page,
  * @note This is a B+-tree 'backend' method.
  */                                                                 
 ham_status_t 
-btree_check_integrity(ham_btree_t *be)
+BtreeBackend::check_integrity()
 {
     Page *page, *parent=0; 
     ham_u32_t level=0;
     btree_node_t *node;
     ham_status_t st=0;
     ham_offset_t ptr_left;
-    Database *db=be_get_db(be);
+    Database *db=get_db();
     check_scratchpad_t scratchpad;
 
-    ham_assert(btree_get_rootpage(be)!=0, ("invalid root page"));
+    ham_assert(get_rootpage()!=0, ("invalid root page"));
 
-    scratchpad.be=be;
+    scratchpad.be=this;
     scratchpad.flags=0;
 
     /* get the root page of the tree */
-    st=db_fetch_page(&page, db, btree_get_rootpage(be), 0);
-    ham_assert(st ? !page : 1, (0));
-    if (!page)
-        return (st ? st : HAM_INTERNAL_ERROR);
+    st=db_fetch_page(&page, db, get_rootpage(), 0);
+    if (st)
+        return (st);
 
     /* while we found a page... */
     while (page) {
         node=page_get_btree_node(page);
         ptr_left=btree_node_get_ptr_left(node);
 
-        /*
-         * verify the page and all its siblings
-         */
+        /* verify the page and all its siblings */
         st=__verify_level(parent, page, level, &scratchpad);
         if (st)
             break;
         parent=page;
 
-        /*
-         * follow the pointer to the smallest child
-         */
+        /* follow the pointer to the smallest child */
         if (ptr_left) {
             st=db_fetch_page(&page, db, ptr_left, 0);
-            ham_assert(st ? !page : 1, (0));
             if (st)
                 return (st);
         }
@@ -132,8 +126,8 @@ __key_compare_int_to_int(Database *db, Page *page,
 	ham_key_t rhs;
 	ham_status_t st;
 
-    l=btree_node_get_key(page_get_owner(page), node, lhs_int);
-    r=btree_node_get_key(page_get_owner(page), node, rhs_int);
+    l=btree_node_get_key(page->get_db(), node, lhs_int);
+    r=btree_node_get_key(page->get_db(), node, rhs_int);
 
 	st=btree_prepare_key_for_compare(db, 0, l, &lhs);
 	if (st) {
@@ -146,7 +140,7 @@ __key_compare_int_to_int(Database *db, Page *page,
 		return (st);
 	}
 
-	return (page_get_owner(page)->compare_keys(&lhs, &rhs));
+	return (page->get_db()->compare_keys(&lhs, &rhs));
 }
 
 static ham_status_t 
@@ -158,7 +152,7 @@ __verify_level(Page *parent, Page *page,
     Page *child, *leftsib=0;
     ham_status_t st=0;
     btree_node_t *node=page_get_btree_node(page);
-    Database *db=page_get_owner(page);
+    Database *db=page->get_db();
 
     /* 
      * assert that the parent page's smallest item (item 0) is bigger
@@ -216,7 +210,7 @@ __verify_page(Page *parent, Page *leftsib, Page *page,
     int cmp;
     ham_size_t i=0;
     ham_size_t count;
-    Database *db=page_get_owner(page);
+    Database *db=page->get_db();
     btree_key_t *bte;
     btree_node_t *node=page_get_btree_node(page);
 
@@ -227,8 +221,8 @@ __verify_page(Page *parent, Page *leftsib, Page *page,
          * a rootpage can be empty! check if this page is the 
          * rootpage.
          */
-        ham_btree_t *be=(ham_btree_t *)db->get_backend();
-        if (page->get_self()==btree_get_rootpage(be))
+        BtreeBackend *be=(BtreeBackend *)db->get_backend();
+        if (page->get_self()==be->get_rootpage())
             return (0);
 
         ham_log(("integrity check failed in page 0x%llx: empty page!\n",
