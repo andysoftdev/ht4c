@@ -208,7 +208,7 @@ namespace ht4c { namespace Common {
 		ZeroMemory( columnFamilies, sizeof(columnFamilies) );
 
 		boost::xtime xtnow;
-		boost::xtime_get( &xtnow, boost::TIME_UTC );
+		boost::xtime_get( &xtnow, boost::TIME_UTC_ );
 		int64_t now = ((int64_t)xtnow.sec * 1000000000LL) + (int64_t)xtnow.nsec;
 		uint32_t maxVersions = scanSpec.max_versions;
 

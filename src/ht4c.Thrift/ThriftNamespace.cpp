@@ -176,7 +176,7 @@ namespace ht4c { namespace Thrift {
 					client->hql_query( result, ns, hql );
 				}
 				cells = Common::Cells::create( result.cells.size() );
-				foreach( const Hypertable::ThriftGen::Cell& cell, result.cells ) {
+				foreach_ht( const Hypertable::ThriftGen::Cell& cell, result.cells ) {
 					cells->add( cell.key.row.c_str(), cell.key.column_family.c_str(), cell.key.column_qualifier.c_str(), cell.key.timestamp, cell.value.data(), cell.value.size(), cell.key.flag );
 				}
 			}

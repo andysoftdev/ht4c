@@ -209,7 +209,7 @@ namespace ht4c { namespace Thrift {
 			Hypertable::ThriftGen::ColumnPredicate tcp;
 			tcp.__isset.operation = true;
 
-			foreach( const Hypertable::ColumnPredicate& cp, hss.column_predicates ) {
+			foreach_ht( const Hypertable::ColumnPredicate& cp, hss.column_predicates ) {
 				tcp.__isset.column_family = cp.column_family != 0;
 				if( cp.column_family ) {
 					tcp.column_family = cp.column_family;
@@ -232,7 +232,7 @@ namespace ht4c { namespace Thrift {
 			tri.__isset.start_inclusive = true;
 			tri.__isset.end_inclusive = true;
 
-			foreach( const Hypertable::RowInterval& ri, hss.row_intervals ) {
+			foreach_ht( const Hypertable::RowInterval& ri, hss.row_intervals ) {
 				tri.__isset.start_row = ri.start != 0;
 				if( ri.start ) {
 					tri.start_row = ri.start;
@@ -258,7 +258,7 @@ namespace ht4c { namespace Thrift {
 			tci.__isset.end_column = true;
 			tci.__isset.end_inclusive = true;
 
-			foreach( const Hypertable::CellInterval& ci, hss.cell_intervals ) {
+			foreach_ht( const Hypertable::CellInterval& ci, hss.cell_intervals ) {
 				tci.__isset.start_row = ci.start_row != 0;
 				if( ci.start_row ) {
 					tci.start_row = ci.start_row;
@@ -280,7 +280,7 @@ namespace ht4c { namespace Thrift {
 			tss.columns.reserve( hss.columns.size() );
 			tss.__isset.columns = true;
 
-			foreach( const std::string& col, hss.columns ) {
+			foreach_ht( const std::string& col, hss.columns ) {
 				tss.columns.push_back( col );
 			}
 		}
