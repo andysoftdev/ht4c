@@ -151,6 +151,7 @@ namespace ht4c { namespace Common {
 
 			Hypertable::CellsBuilderPtr cellsBuilder;
 			Hypertable::Cells* cells;
+			int initialCapacity;
 
 			#endif
 	};

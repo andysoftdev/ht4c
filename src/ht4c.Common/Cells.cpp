@@ -39,12 +39,14 @@ namespace ht4c { namespace Common {
 	Cells::Cells( Hypertable::Cells* _cells )
 	: cellsBuilder( )
 	, cells( _cells )
+	, initialCapacity( 0 )
 	{
 	}
 
 	Cells::Cells( int reserve )
 	: cellsBuilder( new Hypertable::CellsBuilder(reserve) )
 	, cells( &cellsBuilder->get() )
+	, initialCapacity( reserve )
 	{
 	}
 
@@ -90,7 +92,8 @@ namespace ht4c { namespace Common {
 	}
 
 	void Cells::clear( ) {
-		cellsBuilder->clear();
+		cellsBuilder = new Hypertable::CellsBuilder( initialCapacity );
+		cells = &cellsBuilder->get();
 	}
 
 } }
