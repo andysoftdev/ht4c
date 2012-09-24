@@ -105,6 +105,11 @@ namespace ht4c { namespace SQLite {
 			sqlite3* db;
 			bool tx;
 
+			bool indexColumn;
+			bool indexColumnFamily;
+			bool indexColumnQualifier;
+			bool indexTimestamp;
+
 			sqlite3_stmt* stmtBegin;
 			sqlite3_stmt* stmtCommit;
 			sqlite3_stmt* stmtRollback;

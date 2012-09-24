@@ -35,6 +35,10 @@ namespace ht4c { namespace SQLite {
 	SQLiteEnv::SQLiteEnv( const std::string &filename, const SQLiteEnvConfig& config )
 	: db( 0 )
 	, tx( false )
+	, indexColumn( config.indexColumn )
+	, indexColumnFamily( config.indexColumnFamily )
+	, indexColumnQualifier( config.indexColumnQualifier )
+	, indexTimestamp( config.indexTimestamp )
 	, stmtBegin( 0 )
 	, stmtCommit( 0 )
 	, stmtRollback( 0 )
@@ -54,13 +58,13 @@ namespace ht4c { namespace SQLite {
 				char* errmsg = 0;
 				st = sqlite3_exec( db
 												 , Hypertable::format(
-														"PRAGMA page_size=%d;"
-														"PRAGMA cache_size=%d;"
-														"PRAGMA journal_mode=TRUNCATE;"
-														"PRAGMA synchronous=%s;"
-														"PRAGMA temp_store=MEMORY;"
-														"CREATE TABLE IF NOT EXISTS "
-															"sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
+														  "PRAGMA page_size=%d;"
+														  "PRAGMA cache_size=%d;"
+														  "PRAGMA journal_mode=TRUNCATE;"
+														  "PRAGMA synchronous=%s;"
+														  "PRAGMA temp_store=MEMORY;"
+														  "CREATE TABLE IF NOT EXISTS "
+														  "sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
 														, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
 														, std::max(1, config.cacheSizeMB) * -1024
 														, config.synchronous ? "ON" : "OFF").c_str()
@@ -280,11 +284,43 @@ namespace ht4c { namespace SQLite {
 		char* errmsg = 0;
 		int st = sqlite3_exec( db
 												 , Hypertable::format("CREATE TABLE IF NOT EXISTS "
-																								"t%lld (r TEXT NOT NULL, cf INTEGER NOT NULL, cq TEXT NOT NULL, ts INTEGER NOT NULL, v BLOB,"
-																								"UNIQUE(r, cf, cq, ts));", id).c_str()
+																							"t%lld (r TEXT NOT NULL, cf INTEGER NOT NULL, cq TEXT NOT NULL, ts INTEGER NOT NULL, v BLOB,"
+																							"UNIQUE(r, cf, cq, ts));", id).c_str()
 												 , 0, 0, &errmsg );
 
 		HT4C_SQLITE_VERIFY( st, db, errmsg );
+
+		if( indexColumn ) {
+			st = sqlite3_exec( db
+											 , Hypertable::format("CREATE INDEX IF NOT EXISTS i_cfcq ON t%lld (cf, cq);", id).c_str()
+											 , 0, 0, &errmsg );
+
+			HT4C_SQLITE_VERIFY( st, db, errmsg );
+		}
+
+		if( indexColumnFamily ) {
+			st = sqlite3_exec( db
+											 , Hypertable::format("CREATE INDEX IF NOT EXISTS i_cf ON t%lld (cf);", id).c_str()
+											 , 0, 0, &errmsg );
+
+			HT4C_SQLITE_VERIFY( st, db, errmsg );
+		}
+
+		if( indexColumnQualifier ) {
+			st = sqlite3_exec( db
+											 , Hypertable::format("CREATE INDEX IF NOT EXISTS i_cq ON t%lld (cq);", id).c_str()
+											 , 0, 0, &errmsg );
+
+			HT4C_SQLITE_VERIFY( st, db, errmsg );
+		}
+
+		if( indexTimestamp ) {
+			st = sqlite3_exec( db
+											 , Hypertable::format("CREATE INDEX IF NOT EXISTS i_ts ON t%lld (ts);", id).c_str()
+											 , 0, 0, &errmsg );
+
+			HT4C_SQLITE_VERIFY( st, db, errmsg );
+		}
 	}
 
 	bool SQLiteEnv::sysDbOpenTable( Db::Table* table, int64_t& id ) {

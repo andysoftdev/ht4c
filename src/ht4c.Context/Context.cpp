@@ -130,21 +130,6 @@ namespace ht4c {
 
 #ifdef SUPPORT_HAMSTERDB
 
-				cmdline_desc().add_options()
-					(Common::Config::HamsterFilenameAlias, str(), "Hamster db filename\n")
-					(Common::Config::HamsterEnableRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
-					(Common::Config::HamsterEnableAutoRecoveryAlias, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
-					(Common::Config::HamsterMaxTablesAlias, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
-					(Common::Config::HamsterCacheSizeMBAlias, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n")
-					(Common::Config::HamsterPageSizeKBAlias, i32()->default_value(64), "Hamster db page size [KB] (default:64)\n");
-
-				alias( Common::Config::HamsterFilenameAlias, Common::Config::HamsterFilename );
-				alias( Common::Config::HamsterEnableRecoveryAlias, Common::Config::HamsterEnableRecovery );
-				alias( Common::Config::HamsterEnableAutoRecoveryAlias, Common::Config::HamsterEnableAutoRecovery );
-				alias( Common::Config::HamsterMaxTablesAlias, Common::Config::HamsterMaxTables );
-				alias( Common::Config::HamsterCacheSizeMBAlias, Common::Config::HamsterCacheSizeMB );
-				alias( Common::Config::HamsterPageSizeKBAlias, Common::Config::HamsterPageSizeKB );
-
 				file_desc().add_options()
 					(Common::Config::HamsterFilename, str(), "Hamster db filename\n")
 					(Common::Config::HamsterEnableRecovery, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
@@ -157,22 +142,15 @@ namespace ht4c {
 
 #ifdef SUPPORT_SQLITEDB
 
-				cmdline_desc().add_options()
-					(Common::Config::SQLiteFilenameAlias, str(), "SQLite db filename\n")
-					(Common::Config::SQLiteCacheSizeMBAlias, i32()->default_value(64), "SQLite db cache size [MB] (default:64)\n")
-					(Common::Config::SQLitePageSizeKBAlias, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
-					(Common::Config::SQLiteSynchronousAlias, boo()->default_value(false), "SQLite synchronous (default:false)\n");
-
-				alias( Common::Config::SQLiteFilenameAlias, Common::Config::SQLiteFilename );
-				alias( Common::Config::SQLiteCacheSizeMBAlias, Common::Config::SQLiteCacheSizeMB );
-				alias( Common::Config::SQLitePageSizeKBAlias, Common::Config::SQLitePageSizeKB );
-				alias( Common::Config::SQLiteSynchronousAlias, Common::Config::SQLiteSynchronous );
-
 				file_desc().add_options()
 					(Common::Config::SQLiteFilename, str(), "SQLite db filename\n")
 					(Common::Config::SQLiteCacheSizeMB, i32()->default_value(64), "SQLite db cache size [MB] (default:64)\n")
 					(Common::Config::SQLitePageSizeKB, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
-					(Common::Config::SQLiteSynchronous, boo()->default_value(false), "SQLite synchronous (default:false)\n");
+					(Common::Config::SQLiteSynchronous, boo()->default_value(false), "SQLite synchronous (default:false)\n")
+					(Common::Config::SQLiteIndexColumn, boo()->default_value(false), "Enables SQLite column index (default:false)\n")
+					(Common::Config::SQLiteIndexColumnFamily, boo()->default_value(false), "Enables SQLite column family index (default:false)\n")
+					(Common::Config::SQLiteIndexColumnQualifier, boo()->default_value(false), "Enables SQLite column qualifier index (default:false)\n")
+					(Common::Config::SQLiteIndexTimestamp, boo()->default_value(false), "Enables SQLite timestamp index (default:false)\n");
 
 #endif
 
@@ -236,7 +214,7 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 				else if( providerName == Common::Config::ProviderHamster ) {
-					set_file_uri( Common::Config::HamsterFilenameAlias );
+					set_file_uri( Common::Config::HamsterFilename );
 				}
 
 #endif
@@ -244,7 +222,7 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 				else if( providerName == Common::Config::ProviderSQLite ) {
-					set_file_uri( Common::Config::SQLiteFilenameAlias );
+					set_file_uri( Common::Config::SQLiteFilename );
 				}
 
 #endif
@@ -567,15 +545,15 @@ namespace ht4c {
 	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
 		if( !hamsterEnv ) {
 			ScopedRecLock lock( mutex );
-			std::string filename = properties->get_str( Common::Config::HamsterFilenameAlias );
+			std::string filename = properties->get_str( Common::Config::HamsterFilename );
 			hamster_envs_t::iterator it = hamsterEnvs.find( filename );
 			if( it == hamsterEnvs.end() ) {
 				Hamster::HamsterEnvConfig config;
-				config.enableRecovery = properties->get_bool( Common::Config::HamsterEnableRecoveryAlias );
-				config.enableAutoRecovery = properties->get_bool( Common::Config::HamsterEnableAutoRecoveryAlias );
-				config.maxTables = properties->get_i32( Common::Config::HamsterMaxTablesAlias );
-				config.cacheSizeMB = properties->get_i32( Common::Config::HamsterCacheSizeMBAlias );
-				config.pageSizeKB = properties->get_i32( Common::Config::HamsterPageSizeKBAlias );
+				config.enableRecovery = properties->get_bool( Common::Config::HamsterEnableRecovery );
+				config.enableAutoRecovery = properties->get_bool( Common::Config::HamsterEnableAutoRecovery );
+				config.maxTables = properties->get_i32( Common::Config::HamsterMaxTables );
+				config.cacheSizeMB = properties->get_i32( Common::Config::HamsterCacheSizeMB );
+				config.pageSizeKB = properties->get_i32( Common::Config::HamsterPageSizeKB );
 
 				HT_INFO_OUT << "Creating hamster environment " << filename << HT_END;
 				hamsterEnv = Hamster::HamsterFactory::create( filename, config );
@@ -597,13 +575,17 @@ namespace ht4c {
 	SQLite::SQLiteEnvPtr Context::getSQLiteEnv( ) {
 		if( !sqliteEnv ) {
 			ScopedRecLock lock( mutex );
-			std::string filename = properties->get_str( Common::Config::SQLiteFilenameAlias );
+			std::string filename = properties->get_str( Common::Config::SQLiteFilename );
 			sqlite_envs_t::iterator it = sqliteEnvs.find( filename );
 			if( it == sqliteEnvs.end() ) {
 				SQLite::SQLiteEnvConfig config;
-				config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMBAlias );
-				config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKBAlias );
-				config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronousAlias );
+				config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMB );
+				config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKB );
+				config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronous );
+				config.indexColumn = properties->get_bool( Common::Config::SQLiteIndexColumn );
+				config.indexColumnFamily = properties->get_bool( Common::Config::SQLiteIndexColumnFamily );
+				config.indexColumnQualifier = properties->get_bool( Common::Config::SQLiteIndexColumnQualifier );
+				config.indexTimestamp = properties->get_bool( Common::Config::SQLiteIndexTimestamp );
 
 				HT_INFO_OUT << "Creating sqlite environment " << filename << HT_END;
 				sqliteEnv = SQLite::SQLiteFactory::create( filename, config );

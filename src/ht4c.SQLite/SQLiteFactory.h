@@ -38,11 +38,19 @@ namespace ht4c { namespace SQLite {
 		int cacheSizeMB;
 		int pageSizeKB;
 		bool synchronous;
+		bool indexColumn;
+		bool indexColumnFamily;
+		bool indexColumnQualifier;
+		bool indexTimestamp;
 
 		SQLiteEnvConfig( )
 			: cacheSizeMB( 64 )
 			, pageSizeKB( 4 )
 			, synchronous( false )
+			, indexColumn( false )
+			, indexColumnFamily( false )
+			, indexColumnQualifier( false )
+			, indexTimestamp( false )
 		{
 		}
 	};

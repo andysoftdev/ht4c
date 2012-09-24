@@ -100,19 +100,9 @@ namespace ht4c { namespace Common {
 			static const char* HamsterFilename;
 
 			/// <summary>
-			/// Hamster db filename alias.
-			/// </summary>
-			static const char* HamsterFilenameAlias;
-
-			/// <summary>
 			/// Hamster db enable recovery.
 			/// </summary>
 			static const char* HamsterEnableRecovery;
-
-			/// <summary>
-			/// Hamster db enable recovery alias.
-			/// </summary>
-			static const char* HamsterEnableRecoveryAlias;
 
 			/// <summary>
 			/// Hamster db enable auto recovery.
@@ -120,19 +110,9 @@ namespace ht4c { namespace Common {
 			static const char* HamsterEnableAutoRecovery;
 
 			/// <summary>
-			/// Hamster db enable auto recovery alias.
-			/// </summary>
-			static const char* HamsterEnableAutoRecoveryAlias;
-
-			/// <summary>
 			/// Hamster db maximum table limit.
 			/// </summary>
 			static const char* HamsterMaxTables;
-
-			/// <summary>
-			/// Hamster db maximum table limit alias.
-			/// </summary>
-			static const char* HamsterMaxTablesAlias;
 
 			/// <summary>
 			/// Hamster db cache size [MB].
@@ -140,19 +120,9 @@ namespace ht4c { namespace Common {
 			static const char* HamsterCacheSizeMB;
 
 			/// <summary>
-			/// Hamster db cache size [MB] alias.
-			/// </summary>
-			static const char* HamsterCacheSizeMBAlias;
-
-			/// <summary>
 			/// Hamster db page size [KB], multiple of 64KB.
 			/// </summary>
 			static const char* HamsterPageSizeKB;
-
-			/// <summary>
-			/// Hamster db page size alias.
-			/// </summary>
-			static const char* HamsterPageSizeKBAlias;
 
 #endif
 
@@ -164,19 +134,9 @@ namespace ht4c { namespace Common {
 			static const char* SQLiteFilename;
 
 			/// <summary>
-			/// SQLite db filename alias.
-			/// </summary>
-			static const char* SQLiteFilenameAlias;
-
-			/// <summary>
 			/// SQLite db cache size [MB].
 			/// </summary>
 			static const char* SQLiteCacheSizeMB;
-
-			/// <summary>
-			/// SQLite db cache size [MB] alias.
-			/// </summary>
-			static const char* SQLiteCacheSizeMBAlias;
 
 			/// <summary>
 			/// SQLite db page size [KB].
@@ -184,19 +144,29 @@ namespace ht4c { namespace Common {
 			static const char* SQLitePageSizeKB;
 
 			/// <summary>
-			/// SQLite db page size alias.
-			/// </summary>
-			static const char* SQLitePageSizeKBAlias;
-
-			/// <summary>
 			/// SQLite synchronous.
 			/// </summary>
 			static const char* SQLiteSynchronous;
 
 			/// <summary>
-			/// SQLite synchronous alias.
+			/// SQLite column index.
 			/// </summary>
-			static const char* SQLiteSynchronousAlias;
+			static const char* SQLiteIndexColumn;
+
+			/// <summary>
+			/// SQLite column family index.
+			/// </summary>
+			static const char* SQLiteIndexColumnFamily;
+
+			/// <summary>
+			/// SQLite column qualifier index.
+			/// </summary>
+			static const char* SQLiteIndexColumnQualifier;
+
+			/// <summary>
+			/// SQLite timestamp index.
+			/// </summary>
+			static const char* SQLiteIndexTimestamp;
 
 
 #endif
