@@ -136,7 +136,6 @@ namespace ht4c {
 	void Logging::init( ) {
 		if( !initialized ) {
 			Logger::initialize( System::exe_name );
-			Logger::get()->set_level( Logger::Priority::ERROR );
 			Logger::get()->add_sink(&LogAppender::instance());
 
 			initialized = true;
