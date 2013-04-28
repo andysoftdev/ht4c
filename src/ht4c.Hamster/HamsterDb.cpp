@@ -30,31 +30,31 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 	namespace Util {
 
-			inline bool KeyHasClassifier( const ham::key& key, char classifier ) {
+			inline bool KeyHasClassifier( const hamsterdb::key& key, char classifier ) {
 				return key.get_data() && *reinterpret_cast<const char*>(key.get_data()) == classifier;
 			}
 
-			inline char* KeyToString( ham::key& key ) {
+			inline char* KeyToString( hamsterdb::key& key ) {
 				char* k = reinterpret_cast<char*>( key.get_data() );
 				k += KeyClassifiers::Length;
 				return k;
 			}
 
-			inline const char* KeyToString( const ham::key& key ) {
+			inline const char* KeyToString( const hamsterdb::key& key ) {
 				const char* k = reinterpret_cast<const char*>( key.get_data() );
 				k += KeyClassifiers::Length;
 				return k;
 			}
 
-			inline char* KeyToString( ham::key& key, char classifier ) {
+			inline char* KeyToString( hamsterdb::key& key, char classifier ) {
 				return KeyHasClassifier(key, classifier) ? KeyToString( key ) : 0;
 			}
 
-			inline const char* KeyToString( const ham::key& key, char classifier ) {
+			inline const char* KeyToString( const hamsterdb::key& key, char classifier ) {
 				return KeyHasClassifier(key, classifier) ? KeyToString( key ) : 0;
 			}
 
-			inline bool KeyStartWith( const ham::key& key, char classifier, const std::string& preffix ) {
+			inline bool KeyStartWith( const hamsterdb::key& key, char classifier, const std::string& preffix ) {
 				const char* name = KeyToString( key, classifier );
 				return name && strstr(name, preffix.c_str()) == name;
 			}
@@ -106,7 +106,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 				createNamespace( name );
 			}
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			std::string name( ns_tmp );
 			free( ns_tmp );
 
@@ -129,11 +129,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 		}
 
 		try {
-			ham::key key;
+			hamsterdb::key key;
 			ns->toKey( key );
 			sysdb->find( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -150,11 +150,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		try {
 			Db::Namespace ns( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			ns.toKey( key );
 			sysdb->find( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -170,19 +170,19 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		try {
 			Db::Namespace ns( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			ns.toKey( key );
 
 			// Is namespace empty?
-			ham::cursor cursor;
+			hamsterdb::cursor cursor;
 			cursor.create( sysdb );
 			try {
-				cursor.find( &key, HAM_FIND_GT_MATCH );
+				cursor.find( &key, 0, HAM_FIND_GT_MATCH );
 				if( Util::KeyStartWith(key, KeyClassifiers::NamespaceListing, name + "/") ) {
 					HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, Hypertable::format("Namespace '%s' is not empty", name.c_str()).c_str() );
 				}
 			}
-			catch( ham::error& e ) {
+			catch( hamsterdb::error& e ) {
 				if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 					throw;
 				}
@@ -192,7 +192,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			ns.toKey( key );
 			sysdb->erase( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -205,8 +205,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 	void Client::createNamespace( const std::string& name ) {
 		Db::Namespace ns( this, name );
-		ham::key key;
-		ham::record record;
+		hamsterdb::key key;
+		hamsterdb::record record;
 		ns.toKey( key );
 		sysdb->insert( &key, &record );
 	}
@@ -250,14 +250,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 	void Namespace::getNamespaceListing( bool deep, std::vector<Db::NamespaceListing>& listing ) {
 		listing.clear();
 
-		ham::key key;
-		ham::record record;
-		ham::cursor cursor;
+		hamsterdb::key key;
+		hamsterdb::record record;
+		hamsterdb::cursor cursor;
 		cursor.create( sysdb );
 
 		try {
 			toKey( key );
-			cursor.find( &key, HAM_FIND_GT_MATCH );
+			cursor.find( &key, 0, HAM_FIND_GT_MATCH );
 			std::string tmp( getName() );
 			if( !tmp.empty() ) {
 				tmp += "/";
@@ -280,7 +280,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 				cursor.move_next( &key, &record );
 			}
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -295,13 +295,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 		try {
 			// Table already exists?
 			Db::Table table( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			sysdb->find( &key );
 
 			HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -309,11 +309,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		try {
 			// Namespace exists?
-			ham::key key;
+			hamsterdb::key key;
 			toKey( key );
 			sysdb->find( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -343,10 +343,10 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		uint16_t id = env->createTable( );
 		Db::Table table( this, name, finalschema, id, 0 );
-		ham::key key;
+		hamsterdb::key key;
 		table.toKey( key );
 		Hypertable::DynamicBuffer buf;
-		ham::record record;
+		hamsterdb::record record;
 		table.toRecord( buf, record );
 		sysdb->insert( &key, &record );
 	}
@@ -365,11 +365,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 		Db::Table table( this, name );
 		try {
 			// Table exists?
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			table.fromRecord( sysdb->find(&key) );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -391,10 +391,10 @@ namespace ht4c { namespace Hamster { namespace Db {
 		schema->render( finalschema, true );
 
 		Db::Table alterTable( this, name, finalschema, table.getId(), 0 );
-		ham::key key;
+		hamsterdb::key key;
 		alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
-		ham::record record;
+		hamsterdb::record record;
 		alterTable.toRecord( buf, record );
 		sysdb->insert( &key, &record, HAM_OVERWRITE );
 	}
@@ -406,11 +406,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		try {
 			Db::Table table( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			sysdb->find( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -423,12 +423,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 		Db::Table table( this, name );
 		try {
 			// Table exists?
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			table.fromRecord( sysdb->find(&key) );
 			id = Hypertable::format( "%d", table.getId() );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -442,7 +442,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 		try {
 			Db::Table table( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			table.fromRecord( sysdb->find(&key) );
 
@@ -454,7 +454,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 				schema->render( _schema, false );
 			}
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -475,27 +475,27 @@ namespace ht4c { namespace Hamster { namespace Db {
 		try {
 			// New table already exists?
 			Db::Table table( this, newName );
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
 			sysdb->find( &key );
 
 			HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
 		}
 
 		Db::Table table( this, name );
-		ham::key key;
+		hamsterdb::key key;
 		table.toKey( key );
-		ham::record record;
+		hamsterdb::record record;
 		try {
 			// Table exists?
 			record = sysdb->find (&key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -517,14 +517,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 		try {
 			// Drop
 			Db::Table table( this, name );
-			ham::key key;
+			hamsterdb::key key;
 			table.toKey( key );
-			ham::record record = sysdb->find( &key );
+			hamsterdb::record record = sysdb->find( &key );
 			table.fromRecord( record );
 			env->eraseTable( table.getId() );
 			sysdb->erase( &key );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -535,7 +535,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		}
 	}
 
-	void Namespace::toKey( ham::key& key ) {
+	void Namespace::toKey( hamsterdb::key& key ) {
 		key.set_size(keyName.size() + 1);
 		key.set_data((void*)keyName.c_str()); 
 	}
@@ -548,7 +548,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		init();
 	}
 
-	Table::Table( NamespacePtr _ns, const std::string& _name, const std::string& _schema, uint16_t _id, ham::db* _db )
+	Table::Table( NamespacePtr _ns, const std::string& _name, const std::string& _schema, uint16_t _id, hamsterdb::db* _db )
 	: ns( _ns )
 	, name( _name )
 	, schemaSpec( _schema )
@@ -608,12 +608,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return schema;
 	}
 
-	void Table::toKey( ham::key& key ) {
+	void Table::toKey( hamsterdb::key& key ) {
 		key.set_size( keyName.size() + 1 );
 		key.set_data( (void*)keyName.c_str() ); 
 	}
 
-	void Table::toRecord( Hypertable::DynamicBuffer& buf, ham::record& record ) {
+	void Table::toRecord( Hypertable::DynamicBuffer& buf, hamsterdb::record& record ) {
 		if( schemaSpec.empty() ) {
 			HT4C_HAMSTER_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Undefined schema for table '%s'", getFullName()).c_str() );
 		}
@@ -627,7 +627,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		record.set_data( buf.base ); 
 	}
 
-	void Table::fromRecord( ham::record& record ) {
+	void Table::fromRecord( hamsterdb::record& record ) {
 		if( record.get_size() ) {
 			id = *((const uint16_t*)record.get_data());
 			schemaSpec = ((const char*)record.get_data() + sizeof(uint16_t));
@@ -641,7 +641,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	void Table::open( ) {
 		dispose();
 
-		ham::key key;
+		hamsterdb::key key;
 		toKey( key );
 		fromRecord( getEnv()->getSysDb()->find(&key) );
 		db = getEnv()->openTable( id, this, cs );
@@ -719,21 +719,20 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	void Mutator::flush( ) {
-		db->flush();
 	}
 
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
-		ham::key k;
+		hamsterdb::key k;
 		toKey( key, k );
 
-		ham::record r;
+		hamsterdb::record r;
 		r.set_size( valueLength );
 		r.set_data( const_cast<void*>(value) );
 
 		db->insert( &k, &r, HAM_OVERWRITE );
 	}
 
-	void Mutator::toKey( const Hypertable::Key& key, ham::key& k ) {
+	void Mutator::toKey( const Hypertable::Key& key, hamsterdb::key& k ) {
 		buf.clear();
 		Hypertable::create_key_and_append( buf
 			, Hypertable::FLAG_INSERT // always flag INSERT stored, key.flag
@@ -793,7 +792,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	void Mutator::del( Hypertable::Key& key ) {
-		ham::key k;
+		hamsterdb::key k;
 		toKey( key, k );
 
 		try {
@@ -801,9 +800,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 				db->erase( &k );
 			}
 			else {
-				ham::cursor cursor;
+				hamsterdb::cursor cursor;
 				cursor.create( db );
-				cursor.find( &k, HAM_FIND_GEQ_MATCH );
+				cursor.find( &k, 0, HAM_FIND_GEQ_MATCH );
 				while( true ) {
 					Hypertable::SerializedKey sk( reinterpret_cast<const uint8_t*>(k.get_data()) );
 					if( strcmp(sk.row(), key.row) != 0 ) {
@@ -844,11 +843,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 					}
 
 					cursor.erase();
-					cursor.find( &k, HAM_FIND_GEQ_MATCH );
+					cursor.find( &k, 0, HAM_FIND_GEQ_MATCH );
 				}
 			}
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -943,7 +942,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 				return true;
 			}
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 				throw;
 			}
@@ -952,7 +951,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	Scanner::Reader::Reader( ham::cursor* _cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	Scanner::Reader::Reader( hamsterdb::cursor* _cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
 	: cursor( _cursor )
 	, scanContext( new ScanContext(scanSpec, schema) )
 	, prevKey( HamsterEnv::KEYSIZE_DB )
@@ -973,7 +972,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	bool Scanner::Reader::nextCell( Hypertable::Key& key, Hypertable::Cell& cell ) {
-		ham::key k;
+		hamsterdb::key k;
 		for( bool moved = moveNext(k); moved && !eos; moved = moveNext(k) ) {
 			Hypertable::SerializedKey sk( reinterpret_cast<const uint8_t*>(k.get_data()) );
 			if( filterRow(k, sk.row()) ) {
@@ -993,12 +992,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	bool Scanner::Reader::moveNext( ham::key& k ) {
+	bool Scanner::Reader::moveNext( hamsterdb::key& k ) {
 		cursor->move_next( &k );
 		return true;
 	}
 
-	bool Scanner::Reader::filterRow( ham::key& k, const char* row ) {
+	bool Scanner::Reader::filterRow( hamsterdb::key& k, const char* row ) {
 		// row set
 		if( !scanContext->rowset.empty() ) {
 			int cmp = 1;
@@ -1026,7 +1025,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return true;
 	}
 
-	const Hypertable::Schema::ColumnFamily* Scanner::Reader::filterCell( ham::key& k, const Hypertable::Key& key ) {
+	const Hypertable::Schema::ColumnFamily* Scanner::Reader::filterCell( hamsterdb::key& k, const Hypertable::Key& key ) {
 		if( !scanContext->familyMask[key.column_family_code] ) {
 			return 0;
 		}
@@ -1122,7 +1121,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		cell.value_len = 0;
 
 		if( !scanContext->keysOnly || (scanContext->valueRegexp || cfi.hasColumnPredicateFilter()) ) {
-			ham::record record;
+			hamsterdb::record record;
 			cursor->move( 0, &record );
 
 			// filter by column predicate
@@ -1182,14 +1181,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return true;
 	}
 
-	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
 	: Reader(cursor, schema, scanSpec)
 	, nextRow( true )
 	, buf( HamsterEnv::KEYSIZE_DB )
 	{
 	}
 
-	bool Scanner::ReaderScanAndFilter::moveNext( ham::key& k ) {
+	bool Scanner::ReaderScanAndFilter::moveNext( hamsterdb::key& k ) {
 		if( scanContext->rowset.empty() ) {
 			return false;
 		}
@@ -1208,7 +1207,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 			k.set_size( buf.fill() );
 			k.set_data( (void*)buf.base );
-			cursor->find( &k, HAM_FIND_GEQ_MATCH );
+			cursor->find( &k, 0, HAM_FIND_GEQ_MATCH );
 		}
 		else {
 			cursor->move_next( &k );
@@ -1217,7 +1216,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return true;
 	}
 
-	bool Scanner::ReaderScanAndFilter::filterRow( ham::key& k, const char* row ) {
+	bool Scanner::ReaderScanAndFilter::filterRow( hamsterdb::key& k, const char* row ) {
 		if( Reader::filterRow(k, row) ) {
 			return true;
 		}
@@ -1226,7 +1225,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	Scanner::ReaderRowIntervals::ReaderRowIntervals( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	Scanner::ReaderRowIntervals::ReaderRowIntervals( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
 	: Reader(cursor, schema, _scanSpec)
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.row_intervals.begin() )
@@ -1237,7 +1236,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	{
 	}
 
-	bool Scanner::ReaderRowIntervals::moveNext( ham::key& k ) {
+	bool Scanner::ReaderRowIntervals::moveNext( hamsterdb::key& k ) {
 		if( rowIntervalDone ) {
 			rowIntervalDone = false;
 			if( it == scanSpec.row_intervals.end() ) {
@@ -1261,13 +1260,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 			k.set_size( buf.fill() );
 			k.set_data( (void*)buf.base );
-			cursor->find( &k, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
+			cursor->find( &k, 0, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
 		}
 		else {
 			try {
 				cursor->move_next( &k );
 			}
-			catch( ham::error& e ) {
+			catch( hamsterdb::error& e ) {
 				if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 					throw;
 				}
@@ -1282,7 +1281,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return true;
 	}
 
-	bool Scanner::ReaderRowIntervals::filterRow( ham::key& k, const char* row ) {
+	bool Scanner::ReaderRowIntervals::filterRow( hamsterdb::key& k, const char* row ) {
 		if( strcmp(row, it->start) >= cmpStart ) {
 			if( strcmp(row, it->end) <= cmpEnd ) {
 
@@ -1296,7 +1295,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	Scanner::ReaderCellIntervals::ReaderCellIntervals( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	Scanner::ReaderCellIntervals::ReaderCellIntervals( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
 	: Reader(cursor, schema, _scanSpec)
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.cell_intervals.begin() )
@@ -1316,7 +1315,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		}
 	}
 
-	bool Scanner::ReaderCellIntervals::moveNext( ham::key& k ) {
+	bool Scanner::ReaderCellIntervals::moveNext( hamsterdb::key& k ) {
 		if( cellIntervalDone ) {
 			cellIntervalDone = false;
 			if( it == scanSpec.cell_intervals.end() ) {
@@ -1360,13 +1359,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 			k.set_size( buf.fill() );
 			k.set_data( (void*)buf.base );
-			cursor->find( &k, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
+			cursor->find( &k, 0, it->start_inclusive ? HAM_FIND_GEQ_MATCH : HAM_FIND_GT_MATCH );
 		}
 		else {
 			try {
 				cursor->move_next( &k );
 			}
-			catch( ham::error& e ) {
+			catch( hamsterdb::error& e ) {
 				if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
 					throw;
 				}
@@ -1381,7 +1380,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return true;
 	}
 
-	bool Scanner::ReaderCellIntervals::filterRow( ham::key& k, const char* row ) {
+	bool Scanner::ReaderCellIntervals::filterRow( hamsterdb::key& k, const char* row ) {
 		if( (cmpStartRow = strcmp(row, it->start_row)) >= 0 /* not cmpStart */ ) {
 			if( (cmpEndRow = strcmp(row, it->end_row)) <= 0 /* not cmpEnd */ ) {
 				return Reader::filterRow( k, row );
@@ -1394,7 +1393,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return false;
 	}
 
-	const Hypertable::Schema::ColumnFamily* Scanner::ReaderCellIntervals::filterCell( ham::key& k, const Hypertable::Key& key ) {
+	const Hypertable::Schema::ColumnFamily* Scanner::ReaderCellIntervals::filterCell( hamsterdb::key& k, const Hypertable::Key& key ) {
 		int cmpStartColumnFamilyCode;
 		int cmpEndColumnFamilyCode = 1;
 		int cmpEndColumnQualifier = 1;

@@ -109,6 +109,18 @@
     <ClInclude Include="src\version.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\btree_node.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\duplicates.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\errorinducer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\statistics.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\blob.cc">
@@ -196,6 +208,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\util.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\duplicates.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

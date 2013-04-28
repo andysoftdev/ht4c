@@ -34,7 +34,7 @@
 /// Translates hamster exceptions into ht4c exceptions.
 /// </remarks>
 #define HT4C_HAMSTER_RETHROW \
-	catch( ham::error& e ) { \
+	catch( hamsterdb::error& e ) { \
 		std::stringstream ss; \
 		ss << e.get_string() << "\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')'; \
 		throw ht4c::Common::HypertableException( Hypertable::Error::EXTERNAL, ss.str(), __LINE__, __FUNCTION__, __FILE__ ); \

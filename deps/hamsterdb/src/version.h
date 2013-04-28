@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2005-2012 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or 
+ * Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * See files COPYING.* for License information.
@@ -29,9 +29,9 @@
  * means the release is a bugfix with a compatible database format.
  */
 #define HAM_VERSION_MAJ 2
-#define HAM_VERSION_MIN 0
-#define HAM_VERSION_REV 4
-#define HAM_VERSION_STR "2.0.4"
+#define HAM_VERSION_MIN 1
+#define HAM_VERSION_REV 0
+#define HAM_VERSION_STR "2.1.0"
 
 
 #endif /* HAM_VERSION_H__ */

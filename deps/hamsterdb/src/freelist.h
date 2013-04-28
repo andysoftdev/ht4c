@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2005-2012 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or 
+ * Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * See files COPYING.* for License information.
@@ -22,13 +22,17 @@
 #include "internal_fwd_decl.h"
 #include "freelist_statistics.h"
 
+namespace hamsterdb {
+
+#define HAM_DAM_RANDOM_WRITE                1
+#define HAM_DAM_SEQUENTIAL_INSERT           2
 
 /**
  * an entry in the freelist cache
  */
 struct FreelistEntry {
     /** the start address of this freelist page */
-    ham_offset_t start_address;
+    ham_u64_t start_address;
 
     /** maximum bits in this page */
     ham_size_t max_bits;
@@ -37,7 +41,7 @@ struct FreelistEntry {
     ham_size_t allocated_bits;
 
     /** the page ID */
-    ham_offset_t page_id;
+    ham_u64_t page_id;
 
     /**
      * freelist algorithm specific run-time data
@@ -53,15 +57,17 @@ struct FreelistEntry {
  * the freelist class structure
  */
 class Freelist
-{ 
+{
   public:
-
     /** constructor */
     Freelist(Environment *env)
       : m_env(env) { }
 
     /** destructor */
-    ~Freelist() { flush_statistics(); }
+    ~Freelist() {
+        if (m_entries.size() > 0)
+            flush_statistics();
+    }
 
     /**
      * mark an area in the file as "free"
@@ -71,7 +77,7 @@ class Freelist
      *
      * @note will assert that address and size are DB_CHUNKSIZE-aligned!
      */
-    ham_status_t mark_free(Database *db, ham_offset_t address, ham_size_t size,
+    ham_status_t mark_free(Database *db, ham_u64_t address, ham_size_t size,
                     ham_bool_t overwrite);
 
     /**
@@ -80,21 +86,21 @@ class Freelist
      * the given address.
      *
      * @note will assert that size is DB_CHUNKSIZE-aligned!
-     *    
+     *
      * @note The lower_bound_address is assumed to be on a DB_CHUNKSIZE
-     * boundary at least. @a aligned space will end up at a 
+     * boundary at least. @a aligned space will end up at a
      * @ref DB_PAGESIZE_MIN_REQD_ALIGNMENT bytes boundary.
      * Regardless, the lower address bound check will be performed
      * on a DB_CHUNKSIZE boundary level anyhow.
      */
-    ham_status_t alloc_area(ham_offset_t *addr_ref,
+    ham_status_t alloc_area(ham_u64_t *addr_ref,
                         Database *db, ham_size_t size, bool aligned=false,
-                        ham_offset_t lower_bound_address=0);
+                        ham_u64_t lower_bound_address=0);
 
     /**
      * try to allocate an (aligned) page from the freelist
      */
-    ham_status_t alloc_page(ham_offset_t *addr_ref, Database *db);
+    ham_status_t alloc_page(ham_u64_t *addr_ref, Database *db);
 
     /** get the number of freelist entries */
     size_t get_count() {
@@ -102,7 +108,7 @@ class Freelist
     }
 
     /** get the first freelist entry */
-    FreelistEntry *get_entries() { 
+    FreelistEntry *get_entries() {
         return m_entries.size() ? &m_entries[0] : 0;
     }
 
@@ -129,7 +135,7 @@ class Freelist
     ham_status_t initialize();
 
     /** retrieves the FreelistEntry which manages a specific address */
-    ham_status_t get_entry(FreelistEntry **entry_ref, ham_offset_t address);
+    ham_status_t get_entry(FreelistEntry **entry_ref, ham_u64_t address);
 
     /** returns maximum bits that fit in a page */
     ham_size_t get_entry_maxspan();
@@ -169,9 +175,6 @@ class Freelist
                     freelist_global_hints_t *hints, ham_s32_t start_index);
 
   private:
-    /** a mutex to protect the freelist */
-    Mutex m_mutex;
-
     /** the Environment */
     Environment *m_env;
 
@@ -193,12 +196,12 @@ HAM_PACK_0 struct HAM_PACK_1 FreelistPayload
     ham_u64_t _start_address;
 
     /** address of the next freelist page */
-    ham_offset_t _overflow;
+    ham_u64_t _overflow;
 
     /**
-     * 'zero': must be 0; serves as a doublecheck we're not 
-     * processing an old-style 16-bit freelist page, where this 
-     * spot would have the ham_u16_t _max_bits, which would 
+     * 'zero': must be 0; serves as a doublecheck we're not
+     * processing an old-style 16-bit freelist page, where this
+     * spot would have the ham_u16_t _max_bits, which would
      * always != 0 ...
      */
     ham_u16_t _zero;
@@ -218,9 +221,9 @@ HAM_PACK_0 struct HAM_PACK_1 FreelistPayload
      * each freelist entry; after all, it's ludicrous to keep
      * the cache clogged with freelist pages which our
      * statistics show are useless given our usage patterns
-     * (determined at run-time; this is meant to help many-insert, 
-     * few-delete usage patterns the most, while many-delete usage 
-     * patterns will benefit most from a good cache page aging system 
+     * (determined at run-time; this is meant to help many-insert,
+     * few-delete usage patterns the most, while many-delete usage
+     * patterns will benefit most from a good cache page aging system
      * (see elsewhere in the code) as that will ensure relevant
      * freelist pages stay in the cache for as long as we need
      * them. Meanwhile, we've complicated things a little here
@@ -271,5 +274,6 @@ HAM_PACK_0 struct HAM_PACK_1 FreelistPayload
 /** get the v1.1.0+ persisted entry performance statistics */
 #define freel_get_statistics(fl)         &((fl)->_statistics)
 
+} // namespace hamsterdb
 
 #endif /* HAM_FREELIST_H__ */

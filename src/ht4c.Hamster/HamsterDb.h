@@ -88,7 +88,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			void createNamespace( const std::string& name );
 
 			HamsterEnvPtr env;
-			ham::db* sysdb;
+			hamsterdb::db* sysdb;
 	};
 
 	class Namespace : public Hypertable::ReferenceCount {
@@ -112,13 +112,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 			void getTableSchema( const std::string& name, bool withIds, std::string& schema );
 			void renameTable( const std::string& name, const std::string& newName );
 			void dropTable( const std::string& name, bool ifExists );
-			void toKey( ham::key& key );
+			void toKey( hamsterdb::key& key );
 
 		private:
 
 			ClientPtr client;
 			HamsterEnv* env;
-			ham::db* sysdb;
+			hamsterdb::db* sysdb;
 			std::string keyName;
 	};
 
@@ -127,7 +127,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		public:
 
 			Table( NamespacePtr ns, const std::string& name );
-			Table( NamespacePtr ns, const std::string& name, const std::string& schema, uint16_t id, ham::db* db );
+			Table( NamespacePtr ns, const std::string& name, const std::string& schema, uint16_t id, hamsterdb::db* db );
 			Table( NamespacePtr ns, const std::string& name, const Table& other );
 			virtual ~Table( );
 
@@ -151,12 +151,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 			inline uint16_t getId( ) const {
 				return id;
 			}
-			inline ham::db* getDb( ) const {
+			inline hamsterdb::db* getDb( ) const {
 				return db;
 			}
-			void toKey( ham::key& key );
-			void toRecord( Hypertable::DynamicBuffer& buf, ham::record& record );
-			void fromRecord( ham::record& record );
+			void toKey( hamsterdb::key& key );
+			void toRecord( Hypertable::DynamicBuffer& buf, hamsterdb::record& record );
+			void fromRecord( hamsterdb::record& record );
 			void open( );
 			void dispose( );
 
@@ -195,7 +195,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			Hypertable::SchemaPtr schema;
 			std::string keyName;
 			uint16_t id;
-			ham::db* db;
+			hamsterdb::db* db;
 			CRITICAL_SECTION cs;
 	};
 
@@ -219,7 +219,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			void insert( Hypertable::Key& key, const void* value, uint32_t valueLength );
 			void set( Hypertable::Key& key, const void* value, uint32_t valueLength );
 			void del( Hypertable::Key& key );
-			void toKey( const Hypertable::Key& key, ham::key& k );
+			void toKey( const Hypertable::Key& key, hamsterdb::key& k );
 			void toKey( Hypertable::Schema* schema
 								, const char* row
 								, const char* columnFamily
@@ -261,7 +261,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			int32_t flags;
 			int32_t flushInterval;
 			Hypertable::DynamicBuffer buf;
-			ham::db* db;
+			hamsterdb::db* db;
 			Hypertable::Schema* schema;
 			enum {
 				MAX_CF = 256
@@ -284,7 +284,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		private:
 
 			Db::TablePtr table;
-			ham::db* db;
+			hamsterdb::db* db;
 			Hypertable::Schema* schema;
 	};
 
@@ -310,22 +310,22 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 				public:
 
-					Reader( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					Reader( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 					virtual ~Reader();
 
 					bool nextCell( Hypertable::Key& key, Hypertable::Cell& cell );
 
 				protected:
 
-					virtual bool moveNext( ham::key& k );
-					virtual bool filterRow( ham::key& k, const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( ham::key& k, const Hypertable::Key& key );
+					virtual bool moveNext( hamsterdb::key& k );
+					virtual bool filterRow( hamsterdb::key& k, const char* row );
+					virtual const Hypertable::Schema::ColumnFamily* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						eos = true;
 					}
 					bool getCell( const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell );
 
-					ham::cursor* cursor;
+					hamsterdb::cursor* cursor;
 					ScanContext* scanContext;
 					int rowCount;
 					int cellCount;
@@ -347,12 +347,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 				public:
 
-					ReaderScanAndFilter( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderScanAndFilter( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 				protected:
 
-					virtual bool moveNext( ham::key& k );
-					virtual bool filterRow( ham::key& k, const char* row );
+					virtual bool moveNext( hamsterdb::key& k );
+					virtual bool filterRow( hamsterdb::key& k, const char* row );
 
 				private:
 
@@ -364,12 +364,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 				public:
 
-					ReaderRowIntervals( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderRowIntervals( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 				protected:
 
-					virtual bool moveNext( ham::key& k );
-					virtual bool filterRow( ham::key& k, const char* row );
+					virtual bool moveNext( hamsterdb::key& k );
+					virtual bool filterRow( hamsterdb::key& k, const char* row );
 					virtual void limitReached( ) {
 						it++;
 						rowIntervalDone = true;
@@ -389,13 +389,13 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 				public:
 
-					ReaderCellIntervals( ham::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderCellIntervals( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 				protected:
 
-					virtual bool moveNext( ham::key& k );
-					virtual bool filterRow( ham::key& k, const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( ham::key& k, const Hypertable::Key& key );
+					virtual bool moveNext( hamsterdb::key& k );
+					virtual bool filterRow( hamsterdb::key& k, const char* row );
+					virtual const Hypertable::Schema::ColumnFamily* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						it++;
 						cellIntervalDone = true;
@@ -425,8 +425,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 			Db::TablePtr table;
 			int32_t flags;
-			ham::db* db;
-			ham::cursor cursor;
+			hamsterdb::db* db;
+			hamsterdb::cursor cursor;
 			Hypertable::DynamicBuffer buf;
 			Reader* reader;
 			Hypertable::ScanSpecBuilder scanSpec;
@@ -446,7 +446,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		private:
 
 			Db::TablePtr table;
-			ham::db* db;
+			hamsterdb::db* db;
 	};
 
 } } }

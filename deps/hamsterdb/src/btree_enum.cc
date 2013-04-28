@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2005-2010 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or 
+ * Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * See files COPYING.* for License information.
@@ -26,189 +26,138 @@
 #include "error.h"
 #include "mem.h"
 #include "page.h"
+#include "btree_node.h"
 
-/**
- * enumerate a whole level in the tree - start with "page" and traverse
- * the linked list of all the siblings
- */
-static ham_status_t 
-_enumerate_level(BtreeBackend *be, Page *page, ham_u32_t level, 
-        ham_enumerate_cb_t cb, ham_bool_t recursive, void *context);
+namespace hamsterdb {
 
-/**
- * enumerate a single page
- */
-static ham_status_t
-_enumerate_page(BtreeBackend *be, Page *page, ham_u32_t level, 
-        ham_u32_t count, ham_enumerate_cb_t cb, void *context);
-
-/**                                                                 
- * iterate the whole tree and enumerate every item.
- *
- * @note This is a B+-tree 'backend' method.
- */                                                                 
-ham_status_t
-BtreeBackend::enumerate(ham_enumerate_cb_t cb, void *context)
+class BtreeEnumAction
 {
-    Page *page;
-    ham_u32_t level=0;
-    ham_offset_t ptr_left;
-    btree_node_t *node;
-    ham_status_t st;
-    Database *db=get_db();
-    ham_status_t cb_st = CB_CONTINUE;
+  public:
+    BtreeEnumAction(BtreeIndex *btree, ham_enumerate_cb_t cb, void *context)
+      : m_btree(btree), m_cb(cb), m_context(context) {
+      ham_assert(m_btree->get_rootpage() != 0);
+      ham_assert(m_cb != 0);
+    }
 
-    ham_assert(get_rootpage()!=0, ("invalid root page"));
-    ham_assert(cb!=0, ("invalid parameter"));
+    ham_status_t run() {
+      Page *page;
+      ham_u32_t level = 0;
+      Database *db = m_btree->get_db();
+      ham_status_t cb_st = HAM_ENUM_CONTINUE;
 
-    /* get the root page of the tree */
-    st=db_fetch_page(&page, db, get_rootpage(), 0);
-    if (st)
+      /* get the root page of the tree */
+      ham_status_t st = db->fetch_page(&page, m_btree->get_rootpage());
+      if (st)
         return (st);
 
-    /* while we found a page... */
-    while (page) {
-        ham_size_t count;
+      /* while we found a page... */
+      while (page) {
+        BtreeNode *node = BtreeNode::from_page(page);
+        ham_u64_t ptr_left = node->get_ptr_left();
+        ham_size_t count = node->get_count();
 
-        node=page_get_btree_node(page);
-        ptr_left = btree_node_get_ptr_left(node);
+        st = m_cb(HAM_ENUM_EVENT_DESCEND, (void *)&level,
+                (void *)&count, m_context);
+        if (st != HAM_ENUM_CONTINUE)
+          return (st);
 
-        count=btree_node_get_count(node);
+        /* enumerate the page and all its siblings */
+        cb_st = enumerate_level(page, level,
+                        (cb_st == HAM_ENUM_DO_NOT_DESCEND));
+        if (cb_st == HAM_ENUM_STOP || cb_st < 0 /* error */)
+          break;
 
-        /*
-         * WARNING:WARNING:WARNING:WARNING:WARNING
-         * 
-         * the current Btree page must be 'pinned' during each callback 
-         * invocation during the enumeration; if you don't (by temporarily 
-         * bumping up its reference count) callback methods MAY flush the 
-         * page from the page cache without us being aware of such until after 
-         * the fact, when the hamster will CRASH as page pointers and content 
-         * are invalidated.
-         *    
-         * To prevent such mishaps, all user-callback invocations in here 
-         * are surrounded
-         * by this page 'pinning' countermeasure.
-         */
-        st = cb(ENUM_EVENT_DESCEND, (void *)&level, (void *)&count, context);
-        if (st != CB_CONTINUE)
+        /* follow the pointer to the smallest child */
+        if (ptr_left) {
+          st = db->fetch_page(&page, ptr_left);
+          if (st)
             return (st);
-
-        /*
-         * enumerate the page and all its siblings
-         */
-        cb_st = _enumerate_level(this, page, level, cb, 
-                        (cb_st == CB_DO_NOT_DESCEND), context);
-        if (cb_st == CB_STOP || cb_st < 0 /* error */)
-            break;
-
-        /*
-         * follow the pointer to the smallest child
-         */
-        if (ptr_left)
-        {
-            st = db_fetch_page(&page, db, ptr_left, 0);
-            ham_assert(st ? !page : 1, (0));
-            if (st)
-                return st;
         }
         else
-            page = 0;
+          page = 0;
 
         ++level;
+      }
+
+      return (cb_st < 0 ? cb_st : HAM_SUCCESS);
     }
 
-    return (cb_st < 0 ? cb_st : HAM_SUCCESS);
-}
+  private:
+    /**
+     * enumerate a whole level in the tree - start with "page" and traverse
+     * the linked list of all the siblings
+     */
+    ham_status_t enumerate_level(Page *page, ham_u32_t level, bool recursive) {
+      ham_status_t st;
+      ham_status_t cb_st = HAM_ENUM_CONTINUE;
 
-static ham_status_t 
-_enumerate_level(BtreeBackend *be, Page *page, ham_u32_t level, 
-        ham_enumerate_cb_t cb, ham_bool_t recursive, void *context)
-{
-    ham_status_t st;
-    ham_size_t count=0;
-    btree_node_t *node;
-    ham_status_t cb_st = CB_CONTINUE;
-
-    while (page) {
+      while (page) {
         /* enumerate the page */
-        cb_st = _enumerate_page(be, page, level, count, cb, context);
-        if (cb_st == CB_STOP || cb_st < 0 /* error */)
-            break;
+        cb_st = enumerate_page(page, level);
+        if (cb_st == HAM_ENUM_STOP || cb_st < 0 /* error */)
+          break;
 
-        /* 
-         * get the right sibling
-         */
-        node=page_get_btree_node(page);
-        if (btree_node_get_right(node)) {
-            st=db_fetch_page(&page, be->get_db(), 
-                    btree_node_get_right(node), 0);
-            ham_assert(st ? !page : 1, (0));
-            if (st)
-                return st;
+        /* get the right sibling */
+        BtreeNode *node = BtreeNode::from_page(page);
+        if (node->get_right()) {
+          st = m_btree->get_db()->fetch_page(&page, node->get_right());
+          if (st)
+            return (st);
         }
         else
-            break;
-
-        ++count;
+          break;
+      }
+      return (cb_st);
     }
 
-    return (cb_st);
-}
+    /** enumerate a single page */
+    ham_status_t enumerate_page(Page *page, ham_u32_t level) {
+      Database *db = page->get_db();
+      BtreeNode *node = BtreeNode::from_page(page);
+      ham_status_t cb_st;
+      ham_status_t cb_st2;
+
+      bool is_leaf;
+      if (node->get_ptr_left())
+        is_leaf = false;
+      else
+        is_leaf = true;
+
+      ham_size_t count = node->get_count();
+
+      cb_st = m_cb(HAM_ENUM_EVENT_PAGE_START, (void *)page, &is_leaf, m_context);
+      if (cb_st == HAM_ENUM_STOP || cb_st < 0 /* error */)
+        return (cb_st);
+
+      for (ham_size_t i = 0; (i < count) && (cb_st != HAM_ENUM_DO_NOT_DESCEND);
+          i++) {
+        BtreeKey *bte = node->get_key(db, i);
+        cb_st = m_cb(HAM_ENUM_EVENT_ITEM, (void *)bte, (void *)&count, m_context);
+        if (cb_st == HAM_ENUM_STOP || cb_st < 0 /* error */)
+          break;
+      }
+
+      cb_st2 = m_cb(HAM_ENUM_EVENT_PAGE_STOP, (void *)page, &is_leaf, m_context);
+
+      if (cb_st < 0 /* error */)
+        return (cb_st);
+      else if (cb_st == HAM_ENUM_STOP)
+        return (HAM_ENUM_STOP);
+      else
+        return (cb_st2);
+    }
+
+    BtreeIndex *m_btree;
+    ham_enumerate_cb_t m_cb;
+    void *m_context;
+};
 
 ham_status_t
-_enumerate_page(BtreeBackend *be, Page *page, ham_u32_t level, 
-        ham_u32_t sibcount, ham_enumerate_cb_t cb, void *context)
+BtreeIndex::enumerate(ham_enumerate_cb_t cb, void *context)
 {
-    ham_size_t i;
-    ham_size_t count;
-    Database *db=page->get_db();
-    btree_key_t *bte;
-    btree_node_t *node=page_get_btree_node(page);
-    ham_bool_t is_leaf;
-    ham_status_t cb_st;
-    ham_status_t cb_st2;
-
-    if (btree_node_get_ptr_left(node))
-        is_leaf=0;
-    else
-        is_leaf=1;
-
-    count=btree_node_get_count(node);
-
-    /*
-     * WARNING:WARNING:WARNING:WARNING:WARNING
-     * 
-     * the current Btree page must be 'pinned' during each callback 
-     * invocation during the enumeration; if you don't (by temporarily 
-     * bumping up its reference count) callback methods MAY flush the 
-     * page from the page cache without us being aware of such until after 
-     * the fact, when the hamster will CRASH as page pointers and content 
-     * are invalidated.
-     *    
-     * To prevent such mishaps, all user-callback invocations in here 
-     * are surrounded
-     * by this page 'pinning' countermeasure.
-     */
-    cb_st = cb(ENUM_EVENT_PAGE_START, (void *)page, &is_leaf, context);
-    if (cb_st == CB_STOP || cb_st < 0 /* error */)
-        return (cb_st);
-
-    for (i=0; (i < count) && (cb_st != CB_DO_NOT_DESCEND); i++) 
-    {
-        bte = btree_node_get_key(db, node, i);
-
-        cb_st = cb(ENUM_EVENT_ITEM, (void *)bte, (void *)&count, context);
-        if (cb_st == CB_STOP || cb_st < 0 /* error */)
-            break;
-    }
-
-    cb_st2 = cb(ENUM_EVENT_PAGE_STOP, (void *)page, &is_leaf, context);
-
-    if (cb_st < 0 /* error */)
-        return (cb_st);
-    else if (cb_st == CB_STOP)
-        return (CB_STOP);
-    else
-        return (cb_st2);
+  BtreeEnumAction bea(this, cb, context);
+  return (bea.run());
 }
+
+} // namespace hamsterdb
 

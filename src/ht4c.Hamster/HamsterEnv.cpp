@@ -105,8 +105,8 @@ namespace ht4c { namespace Hamster {
 		static void HAM_CALLCONV errhandler(int level, const char *message) {
 		}
 
-		inline ham::db* From( ham::db& db ) {
-			ham::db* p = new ham::db();
+		inline hamsterdb::db* From( hamsterdb::db& db ) {
+			hamsterdb::db* p = new hamsterdb::db();
 			*p = db;
 			return p;
 		}
@@ -123,7 +123,7 @@ namespace ht4c { namespace Hamster {
 	}
 
 	HamsterEnv::HamsterEnv( const std::string &filename, const HamsterEnvConfig& config )
-	: env( new ham::env() )
+	: env( new hamsterdb::env() )
 	, sysdb( 0 )
 	{
 		const uint32_t envFlags =		(config.enableRecovery ? HAM_ENABLE_RECOVERY : 0)
@@ -140,13 +140,13 @@ namespace ht4c { namespace Hamster {
 
 			env->open( filename.c_str(), envFlags );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_FILE_NOT_FOUND ) {
 				throw;
 			}
 
 			const ham_parameter_t env_pars[] = {
-					{ HAM_PARAM_MAX_ENV_DATABASES, std::min(config.maxTables, HAM_DEFAULT_DATABASE_NAME - 1) }
+					{ HAM_PARAM_MAX_DATABASES, std::min(config.maxTables, HAM_DEFAULT_DATABASE_NAME - 1) }
 				, { HAM_PARAM_CACHESIZE, std::max(1, config.cacheSizeMB) * 1024 * 1024 }
 				, { HAM_PARAM_PAGESIZE, (std::min(64, config.pageSizeKB) / 64) * 64 * 1024 }
 				, { 0, 0 }
@@ -158,7 +158,7 @@ namespace ht4c { namespace Hamster {
 		try {
 			sysdb = From( env->open_db(SYS_DB, dbOpenFlags) );
 		}
-		catch( ham::error& e ) {
+		catch( hamsterdb::error& e ) {
 			if( e.get_errno() != HAM_DATABASE_NOT_FOUND ) {
 				throw;
 			}
@@ -199,13 +199,13 @@ namespace ht4c { namespace Hamster {
 			++id;
 		}
 		
-		ham::db db = env->create_db( id, dbCreateFlags, table_pars );
+		hamsterdb::db db = env->create_db( id, dbCreateFlags, table_pars );
 		db.set_prefix_compare_func( KeyPrefixCompare );
 		db.set_compare_func( KeyCompare );
 		return id;
 	}
 
-	ham::db* HamsterEnv::openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs ) {
+	hamsterdb::db* HamsterEnv::openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs ) {
 		tables_t::iterator it = tables.find( id );
 		if( it == tables.end() ) {
 			db_t db;

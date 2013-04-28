@@ -24,6 +24,7 @@
     <ClInclude Include="src\btree.h" />
     <ClInclude Include="src\btree_cursor.h" />
     <ClInclude Include="src\btree_key.h" />
+    <ClInclude Include="src\btree_node.h" />
     <ClInclude Include="src\btree_stats.h" />
     <ClInclude Include="src\cache.h" />
     <ClInclude Include="src\changeset.h" />
@@ -31,9 +32,11 @@
     <ClInclude Include="src\cursor.h" />
     <ClInclude Include="src\db.h" />
     <ClInclude Include="src\device.h" />
+    <ClInclude Include="src\duplicates.h" />
     <ClInclude Include="src\endianswap.h" />
     <ClInclude Include="src\env.h" />
     <ClInclude Include="src\error.h" />
+    <ClInclude Include="src\errorinducer.h" />
     <ClInclude Include="src\extkeys.h" />
     <ClInclude Include="src\freelist.h" />
     <ClInclude Include="src\freelist_statistics.h" />
@@ -49,6 +52,7 @@
     <ClInclude Include="src\page.h" />
     <ClInclude Include="src\rb.h" />
     <ClInclude Include="src\serial.h" />
+    <ClInclude Include="src\statistics.h" />
     <ClInclude Include="src\txn.h" />
     <ClInclude Include="src\txn_cursor.h" />
     <ClInclude Include="src\util.h" />
@@ -70,6 +74,7 @@
     <ClCompile Include="src\cursor.cc" />
     <ClCompile Include="src\db.cc" />
     <ClCompile Include="src\device.cc" />
+    <ClCompile Include="src\duplicates.cc" />
     <ClCompile Include="src\env.cc" />
     <ClCompile Include="src\error.cc" />
     <ClCompile Include="src\freelist.cc" />

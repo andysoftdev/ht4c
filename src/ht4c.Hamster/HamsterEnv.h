@@ -25,7 +25,7 @@
 #error compile native
 #endif
 
-namespace ham {
+namespace hamsterdb {
 	class env;
 	class db;
 }
@@ -62,14 +62,14 @@ namespace ht4c { namespace Hamster {
 			virtual ~HamsterEnv( );
 
 			Common::Client* createClient( );
-			inline ham::env* getEnv( ) const {
+			inline hamsterdb::env* getEnv( ) const {
 				return env;
 			}
-			inline ham::db* getSysDb( ) const {
+			inline hamsterdb::db* getSysDb( ) const {
 				return sysdb;
 			}
 			uint16_t createTable( );
-			ham::db* openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs );
+			hamsterdb::db* openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs );
 			void disposeTable( uint16_t id, Db::Table* table );
 			void eraseTable( uint16_t id );
 
@@ -99,7 +99,7 @@ namespace ht4c { namespace Hamster {
 			};
 
 			struct db_t {
-				ham::db* db;
+				hamsterdb::db* db;
 				std::set<Db::Table*> ref;
 				CRITICAL_SECTION cs;
 
@@ -118,8 +118,8 @@ namespace ht4c { namespace Hamster {
 				::LeaveCriticalSection( &cs );
 			}
 
-			ham::env* env;
-			ham::db* sysdb;
+			hamsterdb::env* env;
+			hamsterdb::db* sysdb;
 			typedef std::map<uint16_t, db_t> tables_t;
 			tables_t tables;
 

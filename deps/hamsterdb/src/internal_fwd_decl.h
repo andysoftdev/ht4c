@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2005-2012 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or 
+ * Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * See files COPYING.* for License information.
@@ -12,14 +12,14 @@
 /**
  * @brief provides forward declarations of internally used types
  *
- * This header file provides these forward declarations to prevent several 
- * cyclic dependencies; in particular, the @ref Page is a type used 
- * throughout, but a @ref Page contains several other types, which 
+ * This header file provides these forward declarations to prevent several
+ * cyclic dependencies; in particular, the @ref Page is a type used
+ * throughout, but a @ref Page contains several other types, which
  * again reference @ref Page pointers either directly or indirectly.
  *
- * To solve this self-referential issue once and for all, all major hamster 
- * internal types are forward declared here; when the code requires the actual 
- * implementation of a type it can include the related header file any time it 
+ * To solve this self-referential issue once and for all, all major hamster
+ * internal types are forward declared here; when the code requires the actual
+ * implementation of a type it can include the related header file any time it
  * wishes.
  *
  * @remark This way of solving the cyclic dependency conundrum has the added
@@ -34,6 +34,8 @@
 #include <ham/hamsterdb_int.h>
 
 #include "config.h"
+
+namespace hamsterdb {
 
 #define OFFSETOF(type, member) ((size_t) &((type *)0)->member)
 
@@ -50,8 +52,6 @@ class Environment;
 class Transaction;
 
 class Page;
-
-class Backend;
 
 class Cache;
 
@@ -85,6 +85,7 @@ typedef struct insert_hints_t insert_hints_t;
 struct erase_hints_t;
 typedef struct erase_hints_t erase_hints_t;
 
+class TransactionCursor;
 
 #include "packstart.h"
 
@@ -95,10 +96,11 @@ struct FreelistPayload;
 
 #include "packstart.h"
 
-struct btree_key_t;
-typedef struct btree_key_t btree_key_t;
+struct BtreeKey;
 
 #include "packstop.h"
+
+} // namespace hamsterdb
 
 #include <boost/version.hpp>
 #include <boost/thread/mutex.hpp>
@@ -121,5 +123,5 @@ public:
 #endif
 };
 
-
 #endif
+

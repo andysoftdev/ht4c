@@ -3,7 +3,7 @@
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or 
+ * Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * See files COPYING.* for License information.
@@ -12,11 +12,11 @@
 /**
  * @brief structures and routines for physical logging/recovery
  *
- * The physical logging stores modifications on page level. It is required
+ * The physical WAL stores modifications on page level. It is required
  * since several logical operations are not atomic - i.e. SMOs (Btree structure
  * modification operations). The physical log only stores "redo" information
- * of the last operation that was written to the Btree (either an 
- * insert or an erase). We do not need "undo" information - all "undo" 
+ * of the last operation that was written to the Btree (either an
+ * insert or an erase). We do not need "undo" information - all "undo"
  * related logic is part of the journal, not of the log, and only committed
  * operations are written to the log.
  *
@@ -33,32 +33,35 @@
 
 #include "os.h"
 
-#include "packstart.h"
+namespace hamsterdb {
 
 /**
  * a Log object
  */
-class Log 
+class Log
 {
   public:
     /** the magic of the header */
-    static const ham_u32_t HEADER_MAGIC=(('h'<<24)|('l'<<16)|('o'<<8)|'g');
+    static const ham_u32_t HEADER_MAGIC = (('h' << 24) | ('l' << 16)
+                                         | ('o' << 8) | 'g');
+
+#include "packstart.h"
 
     /**
      * the header structure of a log file
      */
     HAM_PACK_0 struct HAM_PACK_1 Header
     {
-        Header() : magic(0), _reserved(0), lsn(0) { };
-    
-        /* the magic */
-        ham_u32_t magic;
+      Header() : magic(0), _reserved(0), lsn(0) { }
 
-        /* a reserved field */
-        ham_u32_t _reserved;
+      /* the magic */
+      ham_u32_t magic;
 
-        /* the last used lsn */
-        ham_u64_t lsn;
+      /* a reserved field */
+      ham_u32_t _reserved;
+
+      /* the last used lsn */
+      ham_u64_t lsn;
     } HAM_PACK_2;
 
     /**
@@ -66,32 +69,34 @@ class Log
      */
     HAM_PACK_0 struct HAM_PACK_1 Entry
     {
-        Entry() : lsn(0), flags(0), _reserved(0), offset(0), data_size(0) { };
+      Entry() : lsn(0), flags(0), _reserved(0), offset(0), data_size(0) { }
 
-        /** the lsn of this entry */
-        ham_u64_t lsn;
-    
-        /** the flags of this entry, see below */
-        ham_u32_t flags;
-    
-        /** a reserved value */
-        ham_u32_t _reserved;
+      /** the lsn of this entry */
+      ham_u64_t lsn;
 
-        /** the offset of this operation */
-        ham_u64_t offset;
+      /** the flags of this entry, see below */
+      ham_u32_t flags;
 
-        /** the size of the data */
-        ham_u64_t data_size;
+      /** a reserved value */
+      ham_u32_t _reserved;
+
+      /** the offset of this operation */
+      ham_u64_t offset;
+
+      /** the size of the data */
+      ham_u64_t data_size;
     } HAM_PACK_2;
+
+#include "packstop.h"
 
     /** flags for Entry::flags */
     static const ham_u32_t CHANGESET_IS_COMPLETE = 1;
 
     /** an "iterator" structure for traversing the log files */
-    typedef ham_offset_t Iterator;
+    typedef ham_u64_t Iterator;
 
     /** constructor */
-    Log(Environment *env, ham_u32_t flags=0)
+    Log(Environment *env, ham_u32_t flags = 0)
       : m_env(env), m_flags(flags), m_lsn(0), m_fd(HAM_INVALID_FD) {
     }
 
@@ -103,118 +108,99 @@ class Log
 
     /** checks if the log is empty */
     bool is_empty() {
-        ScopedLock lock(m_mutex);
-        ham_offset_t size;
+      ham_u64_t size;
 
-        if (m_fd==HAM_INVALID_FD)
-            return (true);
-
-        ham_status_t st=os_get_filesize(m_fd, &size);
-        if (st)
-		    return (st ? false : true); /* TODO throw */
-        if (size && size!=sizeof(Log::Header))
-            return (false);
-
+      if (m_fd == HAM_INVALID_FD)
         return (true);
+
+      ham_status_t st = os_get_filesize(m_fd, &size);
+      if (st)
+        return (st ? false : true); /* TODO throw */
+      if (size && size != sizeof(Log::Header))
+        return (false);
+
+      return (true);
     }
 
     /** adds an AFTER-image of a page */
     ham_status_t append_page(Page *page, ham_u64_t lsn, ham_size_t page_count);
 
     /** retrieves the current lsn */
-    ham_u64_t get_lsn(void) {
-        ScopedLock lock(m_mutex);
-        return (m_lsn);
+    ham_u64_t get_lsn() {
+      return (m_lsn);
     }
 
     /** retrieves the file handle (for unittests) */
-    ham_fd_t get_fd(void) {
-        ScopedLock lock(m_mutex);
-        return (m_fd);
+    ham_fd_t get_fd() {
+      return (m_fd);
     }
 
-    /** 
-     * clears the logfile 
+    /**
+     * clears the logfile
      *
-     * invoked after every checkpoint (which is immediately after each 
-     * txn_commit or txn_abort) 
+     * invoked after every checkpoint (which is immediately after each
+     * txn_commit or txn_abort)
      */
     ham_status_t clear() {
-        ScopedLock lock(m_mutex);
-        return (clear_nolock());
+      ham_status_t st = os_truncate(m_fd, sizeof(Log::Header));
+      if (st)
+        return (st);
+
+      /* after truncate, the file pointer is far beyond the new end of file;
+       * reset the file pointer, or the next write will resize the file to
+       * the original size */
+      return (os_seek(m_fd, sizeof(Log::Header), HAM_OS_SEEK_SET));
     }
 
     /** flush the logfile to disk */
     ham_status_t flush() {
-        ScopedLock lock(m_mutex);
-        return (os_flush(m_fd));
+      return (os_flush(m_fd));
     }
 
-    /** 
-     * closes the log, frees all allocated resources. 
+    /**
+     * closes the log, frees all allocated resources.
      *
-     * if @a noclear is true then the log will not be clear()ed. This is 
+     * if @a noclear is true then the log will not be clear()ed. This is
      * useful for debugging.
      */
-    ham_status_t close(ham_bool_t noclear=false) {
-        ScopedLock lock(m_mutex);
-        return (close_nolock(noclear));
-    }
+    ham_status_t close(bool noclear = false);
 
     /** do the recovery */
     ham_status_t recover();
 
   private:
-    friend class LogTest;
-    friend class LogHighLevelTest;
+	friend class LogTest;
+	friend class LogHighLevelTest;
 
     /**
      * returns the next log entry
      *
      * iter must be initialized with zeroes for the first call
      *
-     * 'data' returns the data of the entry, or NULL if there is no data. 
+     * 'data' returns the data of the entry, or NULL if there is no data.
      * The memory has to be freed by the caller.
      *
      * returns SUCCESS and an empty entry (lsn is zero) after the last element.
      */
     ham_status_t get_entry(Log::Iterator *iter, Log::Entry *entry,
-                ham_u8_t **data);
-
-    /** closes the log (w/o mutex) */
-    ham_status_t close_nolock(ham_bool_t noclear=false);
-
-    /** clears the logfile (w/o mutex) */
-    ham_status_t clear_nolock() {
-        ham_status_t st=os_truncate(m_fd, sizeof(Log::Header));
-        if (st)
-            return (st);
-
-        /* after truncate, the file pointer is far beyond the new end of file;
-         * reset the file pointer, or the next write will resize the file to
-         * the original size */
-        return (os_seek(m_fd, sizeof(Log::Header), HAM_OS_SEEK_SET));
-    }
+                         ham_u8_t **data);
 
     /**
      * append a log entry for a page modification
      *
-     * @note invoked by @ref Log::append_page() to save the new 
+     * @note invoked by @ref Log::append_page() to save the new
      * content of the specified page.
      *
      * @sa Log::append_page
      */
-    ham_status_t append_write(ham_u64_t lsn, ham_u32_t flags, 
-                    ham_offset_t offset, ham_u8_t *data, ham_size_t size);
+    ham_status_t append_write(ham_u64_t lsn, ham_u32_t flags,
+                    ham_u64_t offset, ham_u8_t *data, ham_size_t size);
 
     /** returns the path of the log file */
     std::string get_path();
 
     /** writes a byte buffer to the logfile */
     ham_status_t append_entry(Log::Entry *entry, ham_size_t size);
-
-    /** a mutex to protect the log */
-    Mutex m_mutex;
 
     /** references the Environment this log file is for */
     Environment *m_env;
@@ -229,7 +215,7 @@ class Log
     ham_fd_t m_fd;
 };
 
-#include "packstop.h"
 
+} // namespace hamsterdb
 
 #endif /* HAM_LOG_H__ */
