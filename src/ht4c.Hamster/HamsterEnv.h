@@ -68,6 +68,11 @@ namespace ht4c { namespace Hamster {
 			inline hamsterdb::db* getSysDb( ) const {
 				return sysdb;
 			}
+			inline void flush( ) const {
+				if( env ) {
+					env->flush();
+				}
+			}
 			uint16_t createTable( );
 			hamsterdb::db* openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs );
 			void disposeTable( uint16_t id, Db::Table* table );

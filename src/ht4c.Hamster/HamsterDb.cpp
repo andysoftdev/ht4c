@@ -719,6 +719,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 	}
 
 	void Mutator::flush( ) {
+		if( table ) {
+			HamsterEnv* env = table->getEnv();
+				if( env ) {
+					env->flush();
+				}
+		}
 	}
 
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
