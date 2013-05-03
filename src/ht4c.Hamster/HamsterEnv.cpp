@@ -191,6 +191,12 @@ namespace ht4c { namespace Hamster {
 		return HamsterClient::create( new Db::Client(this) );
 	}
 
+	void HamsterEnv::flush( ) const {
+		if( env ) {
+			env->flush();
+		}
+	}
+
 	uint16_t HamsterEnv::createTable( ) {
 		std::vector<ham_u16_t> names = env->get_database_names();
 		std::set<uint16_t> ids( names.begin(), names.end() );
