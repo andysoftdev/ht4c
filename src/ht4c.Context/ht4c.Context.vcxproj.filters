@@ -16,6 +16,9 @@
     <ClInclude Include="Logging.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="LoggingSink.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

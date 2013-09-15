@@ -25,35 +25,9 @@
 #pragma managed( push, off )
 #endif
 
-#include <string>
+#include "LoggingSink.h"
 
 namespace ht4c {
-
-	/// <summary>
-	/// Abstract class represents a callback for log events.
-	/// </summary>
-	class LoggingSink {
-
-		public:
-
-			/// <summary>
-			/// Destroys the LoggingSink instance.
-			/// </summary>
-			virtual ~LoggingSink( ) { }
-
-			/// <summary>
-			/// Gets called if a log event occurs.
-			/// </summary>
-			/// <param name="priority">Log event priority</param>
-			/// <param name="message">Log event message</param>
-			virtual void logEvent( int priority, const std::string& message ) = 0;
-
-			/// <summary>
-			/// Gets called if a log event occurs.
-			/// </summary>
-			/// <param name="message">Log event message</param>
-			virtual void logMessage( const std::string& message ) = 0;
-	};
 
 	/// <summary>
 	/// Logging utility, redirects log events to a file and/or log callbacks.

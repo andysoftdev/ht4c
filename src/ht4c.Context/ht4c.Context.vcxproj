@@ -183,6 +183,7 @@
   <ItemGroup>
     <ClInclude Include="Context.h" />
     <ClInclude Include="Logging.h" />
+    <ClInclude Include="LoggingSink.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
