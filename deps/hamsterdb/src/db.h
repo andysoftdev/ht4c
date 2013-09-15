@@ -19,8 +19,6 @@
 
 #include "internal_fwd_decl.h"
 
-#include "statistics.h"
-
 #include "endianswap.h"
 #include "error.h"
 #include "util.h"
@@ -74,8 +72,8 @@ namespace hamsterdb {
 #define PAGE_IGNORE_FREELIST          8
 #define PAGE_CLEAR_WITH_ZERO         16
 
-
 class BtreeIndex;
+class ReducedFreelist;
 
 /**
  * An abstract base class for a Database; is overwritten for local and
@@ -285,6 +283,9 @@ class Database
      *         successful key comparison (0 if both keys match, -1 when
      *         LHS < RHS key, +1 when LHS > RHS key).
      */
+#if __GNUC__
+    __attribute__((hot))
+#endif
     int compare_keys(ham_key_t *lhs, ham_key_t *rhs) {
       int cmp = HAM_PREFIX_REQUEST_FULLKEY;
       ham_compare_func_t foo = get_compare_func();
@@ -294,8 +295,8 @@ class Database
 
       /* need prefix compare? if no key is extended we can just call the
        * normal compare function */
-      if (!(lhs->_flags & BtreeKey::KEY_IS_EXTENDED)
-              && !(rhs->_flags & BtreeKey::KEY_IS_EXTENDED)) {
+      if (!(lhs->_flags & PBtreeKey::KEY_IS_EXTENDED)
+              && !(rhs->_flags & PBtreeKey::KEY_IS_EXTENDED)) {
         return (foo((::ham_db_t *)this, (ham_u8_t *)lhs->data, lhs->size,
                           (ham_u8_t *)rhs->data, rhs->size));
       }
@@ -303,11 +304,11 @@ class Database
       /* yes! - run prefix comparison */
       if (prefoo) {
         ham_size_t lhsprefixlen, rhsprefixlen;
-        if (lhs->_flags & BtreeKey::KEY_IS_EXTENDED)
+        if (lhs->_flags & PBtreeKey::KEY_IS_EXTENDED)
           lhsprefixlen = get_keysize() - sizeof(ham_u64_t);
         else
           lhsprefixlen = lhs->size;
-        if (rhs->_flags & BtreeKey::KEY_IS_EXTENDED)
+        if (rhs->_flags & PBtreeKey::KEY_IS_EXTENDED)
           rhsprefixlen = get_keysize() - sizeof(ham_u64_t);
         else
           rhsprefixlen = rhs->size;
@@ -321,25 +322,25 @@ class Database
 
       if (cmp == HAM_PREFIX_REQUEST_FULLKEY) {
         /* 1. load the first key, if needed */
-        if (lhs->_flags & BtreeKey::KEY_IS_EXTENDED) {
+        if (lhs->_flags & PBtreeKey::KEY_IS_EXTENDED) {
           ham_status_t st = get_extended_key((ham_u8_t *)lhs->data,
                     lhs->size, lhs->_flags, lhs);
           if (st)
             return st;
-          lhs->_flags &= ~BtreeKey::KEY_IS_EXTENDED;
+          lhs->_flags &= ~PBtreeKey::KEY_IS_EXTENDED;
         }
 
         /* 2. load the second key, if needed */
-        if (rhs->_flags & BtreeKey::KEY_IS_EXTENDED) {
+        if (rhs->_flags & PBtreeKey::KEY_IS_EXTENDED) {
           ham_status_t st = get_extended_key((ham_u8_t *)rhs->data,
                     rhs->size, rhs->_flags, rhs);
           if (st)
             return st;
-          rhs->_flags &= ~BtreeKey::KEY_IS_EXTENDED;
+          rhs->_flags &= ~PBtreeKey::KEY_IS_EXTENDED;
         }
 
         /* 3. run the comparison function */
-        cmp=foo((::ham_db_t *)this, (ham_u8_t *)lhs->data, lhs->size,
+        cmp = foo((::ham_db_t *)this, (ham_u8_t *)lhs->data, lhs->size,
                         (ham_u8_t *)rhs->data, rhs->size);
       }
       return (cmp);
@@ -362,7 +363,7 @@ class Database
      */
     ham_status_t copy_key(const ham_key_t *source, ham_key_t *dest) {
       /* extended key: copy the whole key */
-      if (source->_flags & BtreeKey::KEY_IS_EXTENDED) {
+      if (source->_flags & PBtreeKey::KEY_IS_EXTENDED) {
         ham_status_t st = get_extended_key((ham_u8_t *)source->data,
                     source->size, source->_flags, dest);
         if (st)
@@ -371,15 +372,13 @@ class Database
         /* dest->size is set by db->get_extended_key() */
         ham_assert(dest->size == source->size);
         /* the extended flag is set later, when this key is inserted */
-        dest->_flags = source->_flags & (~BtreeKey::KEY_IS_EXTENDED);
+        dest->_flags = source->_flags & (~PBtreeKey::KEY_IS_EXTENDED);
       }
       else if (source->size) {
         if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
           if (!dest->data || dest->size < source->size) {
-            if (dest->data)
-              get_env()->get_allocator()->free(dest->data);
-            dest->data = (ham_u8_t *)
-                      get_env()->get_allocator()->alloc(source->size);
+            Memory::release(dest->data);
+            dest->data = Memory::allocate<ham_u8_t>(source->size);
             if (!dest->data)
               return (HAM_OUT_OF_MEMORY);
           }
@@ -391,8 +390,7 @@ class Database
       else {
         /* key.size is 0 */
         if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
-          if (dest->data)
-            get_env()->get_allocator()->free(dest->data);
+          Memory::release(dest->data);
           dest->data = 0;
         }
         dest->size = 0;
@@ -411,6 +409,9 @@ class Database
      * @return values less than -1 are @ref ham_status_t error codes and
      *    indicate a failed comparison execution
      */
+#if __GNUC__
+    __attribute__((hot))
+#endif
     static int HAM_CALLCONV default_compare(ham_db_t *db,
                 const ham_u8_t *lhs, ham_size_t lhs_length,
                 const ham_u8_t *rhs, ham_size_t rhs_length);
@@ -425,6 +426,9 @@ class Database
      * @return values less than -1 are @ref ham_status_t error codes and
      *    indicate a failed comparison execution
      */
+#if __GNUC__
+    __attribute__((hot))
+#endif
     static int HAM_CALLCONV default_recno_compare(ham_db_t *db,
                 const ham_u8_t *lhs, ham_size_t lhs_length,
                 const ham_u8_t *rhs, ham_size_t rhs_length);
@@ -439,6 +443,9 @@ class Database
      * @return values less than -1 are @ref ham_status_t error codes and
      *    indicate a failed comparison execution
      */
+#if __GNUC__
+    __attribute__((hot))
+#endif
     static int HAM_CALLCONV default_prefix_compare(ham_db_t *db,
                 const ham_u8_t *lhs, ham_size_t lhs_length,
                 ham_size_t lhs_real_length,

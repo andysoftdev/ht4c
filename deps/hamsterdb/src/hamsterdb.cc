@@ -26,7 +26,7 @@
 #  include "protocol/protocol.h"
 #endif
 
-#include "blob.h"
+#include "blob_manager.h"
 #include "btree.h"
 #include "btree_cursor.h"
 #include "cache.h"
@@ -36,7 +36,6 @@
 #include "env.h"
 #include "error.h"
 #include "extkeys.h"
-#include "freelist.h"
 #include "log.h"
 #include "mem.h"
 #include "os.h"
@@ -46,6 +45,7 @@
 #include "txn.h"
 #include "util.h"
 #include "version.h"
+#include "freelist.h"
 
 using namespace hamsterdb;
 
@@ -232,10 +232,10 @@ ham_strerror(ham_status_t result)
  * This function checks whether the @ref ham_key_t structure has been
  * properly initialized by the user and resets all internal used elements.
  *
- * @return HAM_TRUE when the @a key structure has been initialized correctly
+ * @return true when the @a key structure has been initialized correctly
  * before.
  *
- * @return HAM_FALSE when the @a key structure has @e not been initialized
+ * @return false when the @a key structure has @e not been initialized
  * correctly before.
  */
 static inline bool
@@ -259,10 +259,10 @@ __prepare_key(ham_key_t *key)
  * This function checks whether the @ref ham_record_t structure has been
  * properly initialized by the user and resets all internal used elements.
  *
- * @return HAM_TRUE when the @a record structure has been initialized
+ * @return true when the @a record structure has been initialized
  * correctly before.
  *
- * @return HAM_FALSE when the @a record structure has @e not been
+ * @return false when the @a record structure has @e not been
  * initialized correctly before.
  */
 static inline bool
@@ -270,7 +270,7 @@ __prepare_record(ham_record_t *record)
 {
   if (record->size && !record->data) {
     ham_trace(("record->size != 0, but record->data is NULL"));
-    return HAM_FALSE;
+    return false;
   }
   if (record->flags & HAM_DIRECT_ACCESS)
     record->flags &= ~HAM_DIRECT_ACCESS;
@@ -427,10 +427,10 @@ ham_env_create(ham_env_t **henv, const char *filename,
    * leave at least 128 bytes for the freelist and the other header data
    */
   {
-    ham_size_t l = pagesize - sizeof(env_header_t)
-        - db_get_freelist_header_size() - 128;
+    ham_size_t l = pagesize - sizeof(PEnvHeader)
+        - freel_get_bitmap_offset() - 128;
 
-    l /= sizeof(BtreeDescriptor);
+    l /= sizeof(PBtreeDescriptor);
     if (maxdbs > l) {
       ham_trace(("parameter HAM_PARAM_MAX_DATABASES too high for "
             "this pagesize; the maximum allowed is %u",
@@ -452,9 +452,9 @@ ham_env_create(ham_env_t **henv, const char *filename,
   else {
 #ifndef HAM_ENABLE_REMOTE
     return (HAM_NOT_IMPLEMENTED);
-#else
+#else // HAM_ENABLE_REMOTE
     env = new RemoteEnvironment();
-#endif // HAM_ENABLE_REMOTE
+#endif
   }
 
 #ifdef HAM_ENABLE_REMOTE
@@ -670,9 +670,9 @@ ham_env_open(ham_env_t **henv, const char *filename, ham_u32_t flags,
   else {
 #ifndef HAM_ENABLE_REMOTE
     return (HAM_NOT_IMPLEMENTED);
-#else
+#else // HAM_ENABLE_REMOTE
     env = new RemoteEnvironment();
-#endif // HAM_ENABLE_REMOTE
+#endif
   }
 
 #ifdef HAM_ENABLE_REMOTE
@@ -1012,8 +1012,8 @@ ham_db_find(ham_db_t *hdb, ham_txn_t *htxn, ham_key_t *key,
 int HAM_CALLCONV
 ham_key_get_approximate_match_type(ham_key_t *key)
 {
-  if (key && (ham_key_get_intflags(key) & BtreeKey::KEY_IS_APPROXIMATE)) {
-    int rv = (ham_key_get_intflags(key) & BtreeKey::KEY_IS_LT) ? -1 : +1;
+  if (key && (ham_key_get_intflags(key) & PBtreeKey::KEY_IS_APPROXIMATE)) {
+    int rv = (ham_key_get_intflags(key) & PBtreeKey::KEY_IS_LT) ? -1 : +1;
     return (rv);
   }
 
@@ -1784,49 +1784,37 @@ ham_db_get_key_count(ham_db_t *hdb, ham_txn_t *htxn, ham_u32_t flags,
   return (db->set_error(db->get_key_count(txn, flags, keycount)));
 }
 
+void HAM_CALLCONV
+ham_set_errhandler(ham_errhandler_fun f)
+{
+  if (f)
+    hamsterdb::g_handler = f;
+  else
+    hamsterdb::g_handler = hamsterdb::default_errhandler;
+}
+
 ham_status_t HAM_CALLCONV
-ham_env_set_device(ham_env_t *henv, ham_device_t *hdevice)
+ham_env_get_metrics(ham_env_t *henv, ham_env_metrics_t *metrics)
 {
   Environment *env = (Environment *)henv;
   if (!env) {
     ham_trace(("parameter 'env' must not be NULL"));
     return (HAM_INV_PARAMETER);
   }
-  if (!hdevice) {
-    ham_trace(("parameter 'device' must not be NULL"));
+  if (!metrics) {
+    ham_trace(("parameter 'metrics' must not be NULL"));
     return (HAM_INV_PARAMETER);
   }
 
+  memset(metrics, 0, sizeof(ham_env_metrics_t));
+  metrics->version = HAM_METRICS_VERSION;
+
   ScopedLock lock(env->get_mutex());
+  // fill in memory metrics
+  Memory::get_global_metrics(metrics);
+  // ... and everything else
+  env->get_metrics(metrics);
 
-  if (env->get_device()) {
-    ham_trace(("Environment already has a device object attached"));
-    return (HAM_ALREADY_INITIALIZED);
-  }
-
-  env->set_device((Device *)hdevice);
   return (0);
 }
 
-ham_device_t * HAM_CALLCONV
-ham_env_get_device(ham_env_t *henv)
-{
-  Environment *env = (Environment *)henv;
-  if (!env)
-    return (0);
-
-  ScopedLock lock(env->get_mutex());
-  return ((ham_device_t *)env->get_device());
-}
-
-ham_status_t HAM_CALLCONV
-ham_env_set_allocator(ham_env_t *henv, void *alloc)
-{
-  Environment *env = (Environment *)henv;
-  if (!env || !alloc)
-    return (HAM_INV_PARAMETER);
-
-  ScopedLock lock(env->get_mutex());
-  env->set_allocator((Allocator *)alloc);
-  return (0);
-}

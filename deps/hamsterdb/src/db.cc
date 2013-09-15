@@ -16,18 +16,18 @@
 #include <math.h>
 #include <float.h>
 
-#include "blob.h"
+#include "blob_manager.h"
 #include "btree.h"
 #include "cache.h"
 #include "cursor.h"
 #include "device.h"
+#include "page_manager.h"
 #include "btree_cursor.h"
 #include "db.h"
 #include "device.h"
 #include "env.h"
 #include "error.h"
 #include "extkeys.h"
-#include "freelist.h"
 #include "log.h"
 #include "journal.h"
 #include "mem.h"
@@ -57,51 +57,50 @@ typedef struct
 static ham_status_t
 __calc_keys_cb(int event, void *param1, void *param2, void *context)
 {
-  BtreeKey *key;
-  calckeys_context_t *c;
-  ham_size_t count;
-
-  c=(calckeys_context_t *)context;
+  PBtreeKey *key;
+  calckeys_context_t *c = (calckeys_context_t *)context;
+  ham_size_t count = 0;
+  ham_status_t st = 0;
 
   switch (event) {
-  case HAM_ENUM_EVENT_DESCEND:
-    break;
+    case HAM_ENUM_EVENT_DESCEND:
+      break;
 
-  case HAM_ENUM_EVENT_PAGE_START:
-    c->is_leaf=*(bool *)param2;
-    break;
+    case HAM_ENUM_EVENT_PAGE_START:
+      c->is_leaf = *(bool *)param2;
+      break;
 
-  case HAM_ENUM_EVENT_PAGE_STOP:
-    break;
+    case HAM_ENUM_EVENT_PAGE_STOP:
+      break;
 
-  case HAM_ENUM_EVENT_ITEM:
-    key = (BtreeKey *)param1;
-    count = *(ham_size_t *)param2;
+    case HAM_ENUM_EVENT_ITEM:
+      key = (PBtreeKey *)param1;
+      count = *(ham_size_t *)param2;
 
-    if (c->is_leaf) {
-      ham_size_t dupcount = 1;
+      if (c->is_leaf) {
+        ham_size_t dupcount = 1;
 
-      if (c->flags & HAM_SKIP_DUPLICATES
-          || (c->db->get_rt_flags() & HAM_ENABLE_DUPLICATES) == 0) {
-        c->total_count+=count;
-        return (HAM_ENUM_DO_NOT_DESCEND);
+        if (c->flags & HAM_SKIP_DUPLICATES
+            || (c->db->get_rt_flags() & HAM_ENABLE_DUPLICATES) == 0) {
+          c->total_count += count;
+          return (HAM_ENUM_DO_NOT_DESCEND);
+        }
+        if (key->get_flags() & PBtreeKey::KEY_HAS_DUPLICATES) {
+          st = c->db->get_env()->get_duplicate_manager()->get_count(
+                key->get_ptr(), &dupcount, 0);
+          if (st)
+            return (st);
+          c->total_count += dupcount;
+        }
+        else {
+          c->total_count++;
+        }
       }
-      if (key->get_flags() & BtreeKey::KEY_HAS_DUPLICATES) {
-        ham_status_t st = c->db->get_env()->get_duplicate_manager()->get_count(
-              key->get_ptr(), &dupcount, 0);
-        if (st)
-          return (st);
-        c->total_count+=dupcount;
-      }
-      else {
-        c->total_count++;
-      }
-    }
-    break;
+      break;
 
-  default:
-    ham_assert(!"unknown callback event");
-    break;
+    default:
+      ham_assert(!"unknown callback event");
+      break;
   }
 
   return (HAM_ENUM_CONTINUE);
@@ -121,7 +120,7 @@ ham_status_t
 __free_inmemory_blobs_cb(int event, void *param1, void *param2, void *context)
 {
   ham_status_t st;
-  BtreeKey *key;
+  PBtreeKey *key;
   free_cb_context_t *c;
 
   c = (free_cb_context_t *)context;
@@ -139,9 +138,9 @@ __free_inmemory_blobs_cb(int event, void *param1, void *param2, void *context)
     break;
 
   case HAM_ENUM_EVENT_ITEM:
-    key = (BtreeKey *)param1;
+    key = (PBtreeKey *)param1;
 
-    if (key->get_flags()&BtreeKey::KEY_IS_EXTENDED) {
+    if (key->get_flags()&PBtreeKey::KEY_IS_EXTENDED) {
       ham_u64_t blobid = key->get_extended_rid(c->db);
       /* delete the extended key */
       st = c->db->remove_extkey(blobid);
@@ -149,9 +148,9 @@ __free_inmemory_blobs_cb(int event, void *param1, void *param2, void *context)
         return (st);
     }
 
-    if (key->get_flags() & (BtreeKey::KEY_BLOB_SIZE_TINY
-              | BtreeKey::KEY_BLOB_SIZE_SMALL
-              | BtreeKey::KEY_BLOB_SIZE_EMPTY))
+    if (key->get_flags() & (PBtreeKey::KEY_BLOB_SIZE_TINY
+              | PBtreeKey::KEY_BLOB_SIZE_SMALL
+              | PBtreeKey::KEY_BLOB_SIZE_EMPTY))
       break;
 
     /* if we're in the leaf page, delete the blob */
@@ -175,8 +174,6 @@ Database::Database(Environment *env, ham_u16_t name, ham_u32_t flags)
     m_cursors(0), m_prefix_func(0), m_cmp_func(0), m_rt_flags(flags),
     m_extkey_cache(0), m_optree(this)
 {
-  m_key_arena.set_allocator(env->get_allocator());
-  m_record_arena.set_allocator(env->get_allocator());
 }
 
 ham_status_t
@@ -311,9 +308,8 @@ Database::get_extended_key(ham_u8_t *key_data, ham_size_t key_length,
   ham_size_t temp;
   ham_record_t record;
   ham_u8_t *ptr;
-  Allocator *alloc = m_env->get_allocator();
 
-  ham_assert(key_flags & BtreeKey::KEY_IS_EXTENDED);
+  ham_assert(key_flags & PBtreeKey::KEY_IS_EXTENDED);
 
   /*
    * make sure that we have an extended key-cache
@@ -339,7 +335,7 @@ Database::get_extended_key(ham_u8_t *key_data, ham_size_t key_length,
       ham_assert(temp == key_length);
 
       if (!(ext_key->flags & HAM_KEY_USER_ALLOC)) {
-        ext_key->data = (ham_u8_t *)alloc->alloc(key_length);
+        ext_key->data = Memory::allocate<ham_u8_t>(key_length);
         if (!ext_key->data)
           return (HAM_OUT_OF_MEMORY);
       }
@@ -367,7 +363,7 @@ Database::get_extended_key(ham_u8_t *key_data, ham_size_t key_length,
    * memory space for the faked record-based blob_read() below.
    */
   if (!(ext_key->flags & HAM_KEY_USER_ALLOC)) {
-    ext_key->data = (ham_u8_t *)alloc->alloc(key_length);
+    ext_key->data = Memory::allocate<ham_u8_t>(key_length);
     if (!ext_key->data)
       return (HAM_OUT_OF_MEMORY);
   }
@@ -381,7 +377,7 @@ Database::get_extended_key(ham_u8_t *key_data, ham_size_t key_length,
   record.size = key_length - (get_keysize() - sizeof(ham_u64_t));
   record.flags = HAM_RECORD_USER_ALLOC;
 
-  st = m_env->get_blob_manager()->read(this, 0, blobid, &record, 0);
+  st = m_env->get_blob_manager()->read(this, blobid, &record, 0, 0);
   if (st)
     return (st);
 
@@ -399,7 +395,7 @@ ham_status_t
 Database::alloc_page(Page **page, ham_u32_t type, ham_u32_t flags)
 {
   ham_status_t st;
-  st = m_env->alloc_page(page, this, type, flags);
+  st = m_env->get_page_manager()->alloc_page(page, this, type, flags);
   if (st)
     return (st);
 
@@ -414,7 +410,8 @@ Database::alloc_page(Page **page, ham_u32_t type, ham_u32_t flags)
 ham_status_t
 Database::fetch_page(Page **page, ham_u64_t address, bool only_from_cache)
 {
-  return (m_env->fetch_page(page, this, address, only_from_cache));
+  return (m_env->get_page_manager()->fetch_page(page, this, address,
+              only_from_cache));
 }
 
 Cursor *
@@ -1021,7 +1018,7 @@ db_find_txn(Database *db, Transaction *txn,
             : &txn->get_key_arena();
 
   ham_key_set_intflags(key,
-        (ham_key_get_intflags(key) & (~BtreeKey::KEY_IS_APPROXIMATE)));
+        (ham_key_get_intflags(key) & (~PBtreeKey::KEY_IS_APPROXIMATE)));
 
   /* get the node for this key (but don't create a new one if it does
    * not yet exist) */
@@ -1056,19 +1053,19 @@ retry:
        */
       else if (op->get_flags() & TransactionOperation::TXN_OP_ERASE) {
         if (first_loop
-            && !(ham_key_get_intflags(key) & BtreeKey::KEY_IS_APPROXIMATE))
+            && !(ham_key_get_intflags(key) & PBtreeKey::KEY_IS_APPROXIMATE))
           exact_is_erased = true;
         first_loop = false;
         if (flags & HAM_FIND_LT_MATCH) {
           node = node->get_previous_sibling();
           ham_key_set_intflags(key,
-              (ham_key_get_intflags(key) | BtreeKey::KEY_IS_APPROXIMATE));
+              (ham_key_get_intflags(key) | PBtreeKey::KEY_IS_APPROXIMATE));
           goto retry;
         }
         else if (flags & HAM_FIND_GT_MATCH) {
           node = node->get_next_sibling();
           ham_key_set_intflags(key,
-              (ham_key_get_intflags(key) | BtreeKey::KEY_IS_APPROXIMATE));
+              (ham_key_get_intflags(key) | PBtreeKey::KEY_IS_APPROXIMATE));
           goto retry;
         }
         return (HAM_KEY_NOT_FOUND);
@@ -1083,7 +1080,7 @@ retry:
           || (op->get_flags() & TransactionOperation::TXN_OP_INSERT_DUP)) {
         // approx match? leave the loop and continue
         // with the btree
-        if (ham_key_get_intflags(key) & BtreeKey::KEY_IS_APPROXIMATE)
+        if (ham_key_get_intflags(key) & PBtreeKey::KEY_IS_APPROXIMATE)
           break;
         // otherwise copy the record and return
         return (copy_record(db, txn, op, record));
@@ -1105,12 +1102,12 @@ retry:
    * if there was an approximate match: check if the btree provides
    * a better match
    */
-  if (op && ham_key_get_intflags(key) & BtreeKey::KEY_IS_APPROXIMATE) {
+  if (op && ham_key_get_intflags(key) & PBtreeKey::KEY_IS_APPROXIMATE) {
     ham_key_t txnkey = {0};
     ham_key_t *k = op->get_node()->get_key();
     txnkey.size = k->size;
-    txnkey._flags = BtreeKey::KEY_IS_APPROXIMATE;
-    txnkey.data = db->get_env()->get_allocator()->alloc(txnkey.size);
+    txnkey._flags = PBtreeKey::KEY_IS_APPROXIMATE;
+    txnkey.data = Memory::allocate<ham_u8_t>(txnkey.size);
     memcpy(txnkey.data, k->data, txnkey.size);
 
     ham_key_set_intflags(key, 0);
@@ -1128,7 +1125,7 @@ retry:
       }
       if (txnkey.data) {
         memcpy(key->data, txnkey.data, txnkey.size);
-        db->get_env()->get_allocator()->free(txnkey.data);
+        Memory::release(txnkey.data);
       }
       key->size = txnkey.size;
       key->_flags = txnkey._flags;
@@ -1138,10 +1135,9 @@ retry:
     else if (st)
       return (st);
     // the btree key is a direct match? then return it
-    if ((!(ham_key_get_intflags(key) & BtreeKey::KEY_IS_APPROXIMATE))
+    if ((!(ham_key_get_intflags(key) & PBtreeKey::KEY_IS_APPROXIMATE))
         && (flags & HAM_FIND_EXACT_MATCH)) {
-      if (txnkey.data)
-        db->get_env()->get_allocator()->free(txnkey.data);
+      Memory::release(txnkey.data);
       return (0);
     }
     // if there's an approx match in the btree: compare both keys and
@@ -1161,15 +1157,14 @@ retry:
       ham_assert(!"shouldn't be here");
 
     if (use_btree) {
-      if (txnkey.data)
-        db->get_env()->get_allocator()->free(txnkey.data);
+      Memory::release(txnkey.data);
       // lookup again, with the same flags and the btree key.
       // this will check if the key was erased or overwritten
       // in a transaction
       st=db_find_txn(db, txn, key, record, flags | HAM_FIND_EXACT_MATCH);
       if (st == 0)
         ham_key_set_intflags(key,
-          (ham_key_get_intflags(key) | BtreeKey::KEY_IS_APPROXIMATE));
+          (ham_key_get_intflags(key) | PBtreeKey::KEY_IS_APPROXIMATE));
       return (st);
     }
     else { // use txn
@@ -1179,7 +1174,7 @@ retry:
       }
       if (txnkey.data) {
         memcpy(key->data, txnkey.data, txnkey.size);
-        db->get_env()->get_allocator()->free(txnkey.data);
+        Memory::release(txnkey.data);
       }
       key->size = txnkey.size;
       key->_flags = txnkey._flags;
@@ -1352,14 +1347,14 @@ LocalDatabase::check_integrity(Transaction *txn)
   ham_status_t st;
 
   /* check the cache integrity */
-  if (!(get_rt_flags()&HAM_IN_MEMORY)) {
-    st = m_env->get_cache()->check_integrity();
+  if (!(get_rt_flags() & HAM_IN_MEMORY)) {
+    st = m_env->get_page_manager()->check_integrity();
     if (st)
       return (st);
   }
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -1376,7 +1371,7 @@ LocalDatabase::get_key_count(Transaction *txn, ham_u32_t flags,
 {
   ham_status_t st;
 
-  calckeys_context_t ctx = {this, flags, 0, HAM_FALSE};
+  calckeys_context_t ctx = { this, flags, 0, false };
 
   if (flags & ~(HAM_SKIP_DUPLICATES)) {
     ham_trace(("parameter 'flag' contains unsupported flag bits: %08x",
@@ -1385,7 +1380,7 @@ LocalDatabase::get_key_count(Transaction *txn, ham_u32_t flags,
   }
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -1437,7 +1432,7 @@ LocalDatabase::insert(Transaction *txn, ham_key_t *key,
   }
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -1596,7 +1591,7 @@ LocalDatabase::find(Transaction *txn, ham_key_t *key,
   ham_u64_t recno = 0;
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -1739,7 +1734,7 @@ LocalDatabase::cursor_insert(Cursor *cursor, ham_key_t *key,
   }
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -1912,7 +1907,7 @@ LocalDatabase::cursor_find(Cursor *cursor, ham_key_t *key,
   }
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -2068,7 +2063,7 @@ LocalDatabase::cursor_get_duplicate_count(Cursor *cursor,
   TransactionCursor *txnc = cursor->get_txn_cursor();
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -2123,7 +2118,7 @@ LocalDatabase::cursor_get_record_size(Cursor *cursor, ham_u64_t *size)
   TransactionCursor *txnc = cursor->get_txn_cursor();
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -2179,7 +2174,7 @@ LocalDatabase::cursor_overwrite(Cursor *cursor,
   Transaction *local_txn = 0;
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -2229,7 +2224,7 @@ LocalDatabase::cursor_move(Cursor *cursor, ham_key_t *key,
   Transaction *local_txn = 0;
 
   /* purge cache if necessary */
-  st = get_env()->purge_cache();
+  st = get_env()->get_page_manager()->purge_cache();
   if (st)
     return (st);
 
@@ -2316,41 +2311,6 @@ LocalDatabase::cursor_close_impl(Cursor *cursor)
   cursor->close();
 }
 
-static bool
-db_close_callback(Page *page, Database *db, ham_u32_t flags)
-{
-  Environment *env = page->get_device()->get_env();
-
-  if (page->get_db() == db && page != env->get_header_page()) {
-    (void)page->flush();
-    (void)page->uncouple_all_cursors();
-
-    /*
-     * if this page has a header, and it's either a B-Tree root page or
-     * a B-Tree index page: remove all extended keys from the cache,
-     * and/or free their blobs
-     *
-     * TODO move to btree
-     */
-    if (page->get_pers() &&
-        (!(page->get_flags() & Page::NPERS_NO_HEADER)) &&
-          (page->get_type() == Page::TYPE_B_ROOT ||
-            page->get_type() == Page::TYPE_B_INDEX)) {
-      ham_assert(page->get_db());
-      BtreeIndex *be = page->get_db()->get_btree();
-      if (be)
-        (void)be->free_page_extkeys(page, flags);
-    }
-
-    /* free the page */
-    (void)page->free();
-
-    return (true);
-  }
-
-  return (false);
-}
-
 ham_status_t
 LocalDatabase::close_impl(ham_u32_t flags)
 {
@@ -2398,8 +2358,7 @@ LocalDatabase::close_impl(ham_u32_t flags)
    * flush all pages of this database (but not the header page,
    * it's still required and will be flushed below)
    */
-  if (m_env->get_cache())
-    (void)m_env->get_cache()->visit(db_close_callback, this, 0);
+  m_env->get_page_manager()->close_database(this);
 
   /* clean up the transaction tree */
   get_optree()->close();

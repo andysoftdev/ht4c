@@ -9,62 +9,115 @@
  * See files COPYING.* for License information.
  */
 
-/**
- * @brief memory management routines
- *
- */
-
 #ifndef HAM_MEM_H__
 #define HAM_MEM_H__
 
-#include <string.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#  include <malloc.h>
+#endif
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+#  include <google/tcmalloc.h>
+#endif
+
+struct ham_env_metrics_t;
 
 namespace hamsterdb {
 
-#if defined(_MSC_VER) && defined(_CRTDBG_MAP_ALLOC)
-#  undef alloc
-#  undef free
-#  undef realloc
-#  undef calloc
-#endif
-
-
-/**
- * a memory allocator
+/*
+ * The static Memory class provides memory management functions in a common
+ * c++ namespace. The functions can allocate, reallocate and free memory
+ * while tracking usage statistics.
+ *
+ * If tcmalloc is used then additional metrics will be available.
+ *
+ * This class only has static members and methods. It does not have a
+ * constructor.
  */
-class Allocator
-{
+class Memory {
   public:
-    /** a constructor */
-    Allocator() {
+    // allocates a byte array of |size| elements, casted into type |T *|;
+    // returns null if out of memory.
+    // usage:
+    //
+    //     char *p = Memory::allocate<char>(1024);
+    //
+    template<typename T>
+    static T *allocate(size_t size) {
+      ms_total_allocations++;
+      ms_current_allocations++;
+
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+      return ((T *)::tc_malloc(size));
+#else
+      return ((T *)::malloc(size));
+#endif
     }
 
-    /** a virtual destructor */
-    virtual ~Allocator() {
+    // allocation function; returns null if out of memory. initializes
+    // the allocated memory with zeroes.
+    // usage:
+    //
+    //     const char *p = Memory::callocate<const char>(50);
+    //
+    template<typename T>
+    static T *callocate(size_t size) {
+      ms_total_allocations++;
+      ms_current_allocations++;
+
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+      return ((T *)::tc_calloc(1, size));
+#else
+      return ((T *)::calloc(1, size));
+#endif
     }
 
-    /** allocate a chunk of memory */
-    virtual void *alloc(ham_size_t size) = 0;
-
-    /** release a chunk of memory */
-    virtual void free(const void *ptr) = 0;
-
-    /** re-allocate a chunk of memory */
-    virtual void *realloc(const void *ptr, ham_size_t size) = 0;
-
-    /** a calloc function */
-    void *calloc(ham_size_t size) {
-      void *p = alloc(size);
-      if (p)
-        memset(p, 0, size);
-      return (p);
+    // re-allocation function; returns null if out of memory.
+    // |ptr| can be null on first use.
+    // usage:
+    //
+    //     p = Memory::reallocate_bytes<char>(p, 100);
+    //
+    template<typename T>
+    static T *reallocate(T *ptr, size_t size) {
+      if (ptr == 0) {
+        ms_total_allocations++;
+        ms_current_allocations++;
+      }
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+      return ((T *)::tc_realloc(ptr, size));
+#else
+      return ((T *)::realloc(ptr, size));
+#endif
     }
 
-    /**
-     * a factory for creating the standard allocator (based on libc malloc
-     * and free)
-     */
-    static Allocator *create();
+    // releases a memory block; can deal with NULL pointers.
+    static void release(void *ptr) {
+      if (ptr) {
+        ms_current_allocations--;
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+        ::tc_free(ptr);
+#else
+        ::free(ptr);
+#endif
+      }
+    }
+
+    // updates and returns the collected metrics
+    static void get_global_metrics(ham_env_metrics_t *metrics);
+
+    // releases unused memory back to the operating system
+    static void release_to_system();
+
+  private:
+    // peak memory usage
+    static ham_u64_t ms_peak_memory;
+
+    // total memory allocations
+    static ham_u64_t ms_total_allocations;
+
+    // currently active allocations
+    static ham_u64_t ms_current_allocations;
 };
 
 } // namespace hamsterdb

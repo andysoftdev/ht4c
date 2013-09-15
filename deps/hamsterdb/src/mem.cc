@@ -11,137 +11,56 @@
  */
 
 #include "config.h"
-
-#include <string.h>
-#include <stack>
+#include "ham/hamsterdb_int.h"
 
 #ifdef HAVE_MALLOC_H
 #  include <malloc.h>
 #else
 #  include <stdlib.h>
 #endif
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+#  include <google/malloc_extension.h>
+#endif
 
-#include "db.h"
-#include "error.h"
 #include "mem.h"
-#include "txn.h"
+#include "os.h"
 
 namespace hamsterdb {
 
-class DefaultAllocator : public Allocator
+ham_u64_t Memory::ms_peak_memory;
+ham_u64_t Memory::ms_total_allocations;
+ham_u64_t Memory::ms_current_allocations;
+
+
+void
+Memory::get_global_metrics(ham_env_metrics_t *metrics)
 {
-    struct Lookasides
-    {
-      typedef std::stack<void *> LookasideList;
-
-      Lookasides()
-      : max_sizes(2) {
-        sizes[0] = sizeof(TransactionOperation);
-        sizes[1] = sizeof(TransactionNode);
-      }
-
-      LookasideList lists[2];
-      ham_u32_t sizes[2];
-      int max_sizes;
-    };
-
-  public:
-    /** a constructor */
-    DefaultAllocator() {
-    }
-
-    /** a virtual destructor */
-    virtual ~DefaultAllocator() {
-      for (int i = 0; i < m_ls.max_sizes; i++) {
-        while (!m_ls.lists[i].empty()) {
-          void *p = (char *)m_ls.lists[i].top();
-          m_ls.lists[i].pop();
-#if defined(_CRTDBG_MAP_ALLOC)
-          ::_free_dbg((void *)p, _NORMAL_BLOCK);
-#else
-          ::free((void *)p);
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty(
+                  "generic.current_allocated_bytes", &value);
+  metrics->mem_current_usage = value;
+  if (ms_peak_memory < value)
+    ms_peak_memory = metrics->mem_peak_usage = value;
+  MallocExtension::instance()->GetNumericProperty(
+                  "generic.heap_size", &value);
+  metrics->mem_heap_size = value;
 #endif
-        }
-      }
-    }
 
-    /** allocate a chunk of memory */
-    virtual void *alloc(ham_size_t size) {
-      void *p = 0;
+  metrics->mem_total_allocations = ms_total_allocations;
+  metrics->mem_current_allocations = ms_current_allocations;
+}
 
-      for (int i = 0; i < m_ls.max_sizes; i++) {
-        if (size == m_ls.sizes[i] && !m_ls.lists[i].empty()) {
-          p = m_ls.lists[i].top();
-          m_ls.lists[i].pop();
-          break;
-        }
-      }
-
-      if (p)
-        return ((char *)p + sizeof(ham_u32_t));
-
-#if defined(_CRTDBG_MAP_ALLOC)
-      p = ::_malloc_dbg(size + sizeof(ham_u32_t), _NORMAL_BLOCK,
-                  __FILE__, __LINE__);
-#else
-      p = ::malloc(size+sizeof(ham_u32_t));
-#endif
-      if (p) {
-        *(ham_u32_t *)p = size;
-        return ((char *)p + sizeof(ham_u32_t));
-      }
-      return (0);
-    }
-
-    /** release a chunk of memory */
-    void free(const void *ptr) {
-      ham_u32_t size;
-      void *p = 0;
-
-      ham_assert(ptr);
-
-      p = (char *)ptr - sizeof(ham_u32_t);
-      size = *(ham_u32_t *)p;
-
-      for (int i = 0; i < m_ls.max_sizes; i++) {
-        if (size == m_ls.sizes[i] && m_ls.lists[i].size() < 10) {
-          m_ls.lists[i].push(p);
-          return;
-        }
-      }
-
-#if defined(_CRTDBG_MAP_ALLOC)
-      ::_free_dbg((void *)p, _NORMAL_BLOCK);
-#else
-      ::free((void *)p);
-#endif
-    }
-
-    /** re-allocate a chunk of memory */
-    virtual void *realloc(const void *ptr, ham_size_t size) {
-      void *p = ptr ? (char *)ptr - sizeof(ham_u32_t) : 0;
-
-#if defined(_CRTDBG_MAP_ALLOC)
-      ptr = ::_realloc_dbg((void *)p, size + sizeof(ham_u32_t),
-            _NORMAL_BLOCK, __FILE__, __LINE__);
-#else
-      ptr = ::realloc((void *)p, size + sizeof(ham_u32_t));
-#endif
-      if (ptr) {
-        *(ham_u32_t *)ptr = size;
-        return ((char *)ptr + sizeof(ham_u32_t));
-      }
-      return (0);
-    }
-
-  private:
-    Lookasides m_ls;
-};
-
-Allocator *
-Allocator::create()
+void 
+Memory::release_to_system()
 {
-  return (new DefaultAllocator());
+#ifdef HAVE_GOOGLE_TCMALLOC_H
+  MallocExtension::instance()->ReleaseFreeMemory();
+#else
+#  ifndef WIN32
+  ::malloc_trim(os_get_granularity());
+#  endif
+#endif
 }
 
 } // namespace hamsterdb

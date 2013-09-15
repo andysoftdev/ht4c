@@ -26,7 +26,6 @@
 #include "db.h"
 #include "util.h"
 #include "btree_stats.h"
-#include "statistics.h"
 
 namespace hamsterdb {
 
@@ -35,10 +34,10 @@ namespace hamsterdb {
 /**
  * the persistent btree index descriptor
  */
-HAM_PACK_0 class HAM_PACK_1 BtreeDescriptor
+HAM_PACK_0 class HAM_PACK_1 PBtreeDescriptor
 {
   public:
-    BtreeDescriptor() {
+    PBtreeDescriptor() {
       memset(this, 0, sizeof(*this));
     }
 
@@ -159,7 +158,7 @@ class BtreeIndex
     /** constructor; creates and initializes a new Backend */
     BtreeIndex(LocalDatabase *db, ham_u32_t descriptor, ham_u32_t flags = 0);
 
-    /** destructor; flushes the BtreeDescriptor */
+    /** destructor; flushes the PBtreeDescriptor */
     ~BtreeIndex();
 
     /**
@@ -195,7 +194,7 @@ class BtreeIndex
      * insert (or update) a key in the index
      *
      * the btree is responsible for inserting or updating the
-     * record. (see blob.h for blob management functions)
+     * record. (see blob_manager.h for blob management functions)
      */
     ham_status_t insert(Transaction *txn, ham_key_t *key,
             ham_record_t *record, ham_u32_t flags);
@@ -329,7 +328,7 @@ class BtreeIndex
       return &m_statistics;
     }
 
-    // get index of BtreeDescriptor
+    // get index of PBtreeDescriptor
     ham_u32_t get_descriptor_index() const {
       return m_descriptor_index;
     }
@@ -340,13 +339,13 @@ class BtreeIndex
     friend class BtreeEraseAction;
     friend class BtreeInsertAction;
     friend class BtreeCursor;
-    friend class MiscTest;
-    friend class KeyTest;
+    friend struct MiscFixture;
+    friend struct BtreeKeyFixture;
 
     /** calculate the "maxkeys" values - the limit of keys per page */
     ham_size_t calc_maxkeys(ham_size_t pagesize, ham_u16_t keysize);
 
-    /** flushes the BtreeDescriptor to the Environment's header page */
+    /** flushes the PBtreeDescriptor to the Environment's header page */
     void flush_descriptor();
 
     /**
@@ -390,7 +389,7 @@ class BtreeIndex
     int compare_keys(Page *page, ham_key_t *lhs, ham_u16_t rhs);
 
     /**
-     * create a preliminary copy of an @ref BtreeKey key to a @ref ham_key_t
+     * create a preliminary copy of an @ref PBtreeKey key to a @ref ham_key_t
      * in such a way that @ref db->compare_keys can use the data and optionally
      * call @ref db->get_extended_key on this key to obtain all key data, when
      * this is an extended key.
@@ -399,14 +398,14 @@ class BtreeIndex
      * to store the pointer in the btree. The pointers are kept to avoid
      * permanent re-allocations (improves performance)
      */
-    ham_status_t prepare_key_for_compare(int which, BtreeKey *src,
+    ham_status_t prepare_key_for_compare(int which, PBtreeKey *src,
                     ham_key_t *dest);
 
     /**
      * copies an internal key;
      * allocates memory unless HAM_KEY_USER_ALLOC is set
      */
-    ham_status_t copy_key(const BtreeKey *source, ham_key_t *dest);
+    ham_status_t copy_key(const PBtreeKey *source, ham_key_t *dest);
 
     /**
      * read a key
@@ -422,7 +421,7 @@ class BtreeIndex
      * This routine can cope with HAM_KEY_USER_ALLOC-ated 'dest'-inations.
     // TODO use arena; get rid of txn parameter
      */
-    ham_status_t read_key(Transaction *txn, BtreeKey *source,
+    ham_status_t read_key(Transaction *txn, PBtreeKey *source,
                     ham_key_t *dest);
 
     /**
@@ -445,7 +444,7 @@ class BtreeIndex
     /** the keysize of this btree index */
     ham_u16_t m_keysize;
 
-    /** the index of the BtreeDescriptor */
+    /** the index of the PBtreeDescriptor */
     ham_u32_t m_descriptor_index;
 
     /** the persistent flags of this btree index */

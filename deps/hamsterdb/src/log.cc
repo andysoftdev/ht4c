@@ -26,13 +26,14 @@
 #include "os.h"
 #include "txn.h"
 #include "util.h"
+#include "page_manager.h"
 
 namespace hamsterdb {
 
 ham_status_t
 Log::create()
 {
-  Log::Header header;
+  Log::PHeader header;
   ham_status_t st;
   std::string path = get_path();
 
@@ -56,7 +57,7 @@ Log::create()
 ham_status_t
 Log::open()
 {
-  Log::Header header;
+  Log::PHeader header;
   std::string path = get_path();
   ham_status_t st;
 
@@ -86,7 +87,7 @@ Log::open()
 }
 
 ham_status_t
-Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
+Log::get_entry(Log::Iterator *iter, Log::PEntry *entry, ham_u8_t **data)
 {
   ham_status_t st;
 
@@ -101,14 +102,14 @@ Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
   }
 
   /* if the current file is empty: no need to continue */
-  if (*iter <= sizeof(Log::Header)) {
+  if (*iter <= sizeof(Log::PHeader)) {
     entry->lsn = 0;
     return (0);
   }
 
-  /* otherwise read the Log::Entry header (without extended data)
+  /* otherwise read the Log::PEntry header (without extended data)
    * from the file */
-  *iter -= sizeof(Log::Entry);
+  *iter -= sizeof(Log::PEntry);
 
   st = os_pread(m_fd, *iter, entry, sizeof(*entry));
   if (st)
@@ -116,17 +117,16 @@ Log::get_entry(Log::Iterator *iter, Log::Entry *entry, ham_u8_t **data)
 
   /* now read the extended data, if it's available */
   if (entry->data_size) {
-    ham_u64_t pos = (*iter)-entry->data_size;
+    ham_u64_t pos = (*iter) - entry->data_size;
     pos -= (pos % 8);
 
-    *data = (ham_u8_t *)m_env->get_allocator()->alloc(
-                (ham_size_t)entry->data_size);
+    *data = Memory::allocate<ham_u8_t>((ham_size_t)entry->data_size);
     if (!*data)
       return (HAM_OUT_OF_MEMORY);
 
     st = os_pread(m_fd, pos, *data, (ham_size_t)entry->data_size);
     if (st) {
-      m_env->get_allocator()->free(*data);
+      Memory::release(*data);
       *data = 0;
       return (st);
     }
@@ -143,7 +143,7 @@ ham_status_t
 Log::close(bool noclear)
 {
   ham_status_t st = 0;
-  Log::Header header;
+  Log::PHeader header;
 
   if (m_fd == HAM_INVALID_FD)
     return (0);
@@ -178,7 +178,7 @@ Log::append_page(Page *page, ham_u64_t lsn, ham_size_t page_count)
             page->get_self(), p, size);
 
   if (p != page->get_raw_payload())
-    m_env->get_allocator()->free(p);
+    Memory::release(p);
 
   return (st);
 }
@@ -189,7 +189,7 @@ Log::recover()
   ham_status_t st;
   Page *page;
   Device *device = m_env->get_device();
-  Log::Entry entry;
+  Log::PEntry entry;
   Iterator it = 0;
   ham_u8_t *data = 0;
   ham_u64_t filesize;
@@ -208,7 +208,7 @@ Log::recover()
   while (1) {
     /* clean up memory of the previous loop */
     if (data) {
-      m_env->get_allocator()->free(data);
+      Memory::release(data);
       data = 0;
     }
 
@@ -265,7 +265,7 @@ Log::recover()
 
     /* flush the modified page to disk */
     page->set_dirty(true);
-    st = page->flush();
+    st = m_env->get_page_manager()->flush_page(page);
     if (st)
       goto bail;
     page->free();
@@ -290,10 +290,8 @@ bail:
   m_env->set_flags(m_env->get_flags() | HAM_ENABLE_RECOVERY);
 
   /* clean up memory */
-  if (data) {
-    m_env->get_allocator()->free(data);
-    data = 0;
-  }
+  Memory::release(data);
+  data = 0;
 
   return (st);
 }
@@ -302,7 +300,7 @@ ham_status_t
 Log::append_write(ham_u64_t lsn, ham_u32_t flags, ham_u64_t offset,
                 ham_u8_t *data, ham_size_t size)
 {
-  Log::Entry entry;
+  Log::PEntry entry;
 
   /* store the lsn - it will be needed later when the log file is closed */
   if (lsn)

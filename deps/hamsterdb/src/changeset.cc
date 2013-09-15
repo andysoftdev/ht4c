@@ -16,8 +16,9 @@
 #include "device.h"
 #include "db.h"
 #include "errorinducer.h"
+#include "page_manager.h"
 
-#define induce(id)                                                  \
+#define INDUCE(id)                                                  \
   while (m_inducer) {                                               \
     ham_status_t st = m_inducer->induce(id);                        \
     if (st)                                                         \
@@ -38,7 +39,7 @@ Changeset::add_page(Page *page)
 
   ham_assert(0 == page->get_next(Page::LIST_CHANGESET));
   ham_assert(0 == page->get_previous(Page::LIST_CHANGESET));
-  ham_assert(page->get_device()->get_env()->get_flags() & HAM_ENABLE_RECOVERY);
+  ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
   page->set_next(Page::LIST_CHANGESET, m_head);
   if (m_head)
@@ -52,8 +53,7 @@ Changeset::get_page(ham_u64_t pageid)
   Page *page = m_head;
 
   while (page) {
-    ham_assert(page->get_device()->get_env()->get_flags()
-        & HAM_ENABLE_RECOVERY);
+    ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
     if (page->get_self() == pageid)
       return (page);
@@ -83,10 +83,9 @@ Changeset::log_bucket(Page **bucket, ham_size_t bucket_size,
   for (ham_size_t i = 0; i < bucket_size; i++) {
     ham_assert(bucket[i]->is_dirty());
 
-    Environment *env = bucket[i]->get_device()->get_env();
-    Log *log = env->get_log();
+    Log *log = m_env->get_log();
 
-    induce(ErrorInducer::CHANGESET_FLUSH);
+    INDUCE(ErrorInducer::kChangesetFlush);
 
     ham_assert(page_count > 0);
 
@@ -114,7 +113,7 @@ Changeset::flush(ham_u64_t lsn)
   if (!p)
     return (0);
 
-  induce(ErrorInducer::CHANGESET_FLUSH);
+  INDUCE(ErrorInducer::kChangesetFlush);
 
   m_blobs_size = 0;
   m_freelists_size = 0;
@@ -157,16 +156,16 @@ Changeset::flush(ham_u64_t lsn)
     page_count++;
     p = n;
 
-    induce(ErrorInducer::CHANGESET_FLUSH);
+    INDUCE(ErrorInducer::kChangesetFlush);
   }
 
   if (page_count == 0) {
-    induce(ErrorInducer::CHANGESET_FLUSH);
+    INDUCE(ErrorInducer::kChangesetFlush);
     clear();
     return (0);
   }
 
-  induce(ErrorInducer::CHANGESET_FLUSH);
+  INDUCE(ErrorInducer::kChangesetFlush);
 
   bool log_written = false;
 
@@ -192,18 +191,17 @@ Changeset::flush(ham_u64_t lsn)
 
   p = m_head;
 
-  Environment *env = p->get_device()->get_env();
-  Log *log = env->get_log();
+  Log *log = m_env->get_log();
 
   /* flush the file handles (if required) */
-  if (env->get_flags() & HAM_ENABLE_FSYNC && log_written)
-    env->get_log()->flush();
+  if (m_env->get_flags() & HAM_ENABLE_FSYNC && log_written)
+    m_env->get_log()->flush();
 
-  induce(ErrorInducer::CHANGESET_FLUSH);
+  INDUCE(ErrorInducer::kChangesetFlush);
 
   // now flush all modified pages to disk
   ham_assert(log != 0);
-  ham_assert(env->get_flags() & HAM_ENABLE_RECOVERY);
+  ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
   /* execute a post-log hook; this hook is set by the unittest framework
    * and can be used to make a backup copy of the logfile */
@@ -212,18 +210,19 @@ Changeset::flush(ham_u64_t lsn)
 
   /* now write all the pages to the file; if any of these writes fail,
    * we can still recover from the log */
+  PageManager *pm = m_env->get_page_manager();
   while (p) {
-    st = p->flush();
+    st = pm->flush_page(p);
     if (st)
       return (st);
     p = p->get_next(Page::LIST_CHANGESET);
 
-    induce(ErrorInducer::CHANGESET_FLUSH);
+    INDUCE(ErrorInducer::kChangesetFlush);
   }
 
   /* flush the file handle (if required) */
-  if (env->get_flags() & HAM_ENABLE_FSYNC)
-    env->get_device()->flush();
+  if (m_env->get_flags() & HAM_ENABLE_FSYNC)
+    m_env->get_device()->flush();
 
   /* done - we can now clear the changeset and the log */
   clear();

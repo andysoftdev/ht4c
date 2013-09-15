@@ -17,35 +17,53 @@
 #ifndef HAM_UTIL_H__
 #define HAM_UTIL_H__
 
-
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
+
+#include "ham/hamsterdb.h"
 
 #include "mem.h"
 
 namespace hamsterdb {
 
+/*
+ * The ByteArray class is a dynamic, resizable array. The internal memory
+ * is released when the ByteArray instance is destructed.
+ */
 class ByteArray
 {
   public:
-    ByteArray(Allocator *alloc = 0, ham_size_t size = 0)
-      : m_alloc(alloc), m_ptr(0), m_size(0) {
+    ByteArray(ham_size_t size = 0)
+      : m_ptr(0), m_size(0), m_own(true) {
       resize(size);
     }
 
-    ~ByteArray() {
-      clear();
+    ByteArray(ham_size_t size, ham_u8_t fill_byte)
+      : m_ptr(0), m_size(0), m_own(true) {
+      resize(size);
+      if (m_ptr)
+        ::memset(m_ptr, fill_byte, m_size);
     }
 
-    void resize(ham_size_t size) {
+    ~ByteArray() {
+      if (m_own)
+        clear();
+    }
+
+    void *resize(ham_size_t size) {
       if (size > m_size) {
-        m_ptr = m_alloc->realloc(m_ptr, size);
+        m_ptr = Memory::reallocate<void>(m_ptr, size);
         m_size = size;
       }
+      return (m_ptr);
     }
 
-    void set_allocator(Allocator *alloc) {
-      m_alloc = alloc;
+    void *resize(ham_size_t size, ham_u8_t fill_byte) {
+      resize(size);
+      if (m_ptr)
+        memset(m_ptr, fill_byte, size);
+      return (m_ptr);
     }
 
     ham_size_t get_size() {
@@ -63,35 +81,38 @@ class ByteArray
     }
 
     void clear() {
-      if (m_ptr)
-        m_alloc->free(m_ptr);
+      Memory::release(m_ptr);
       m_ptr = 0;
       m_size = 0;
     }
 
+    void disown() {
+      m_own = false;
+    }
+
   private:
-    Allocator *m_alloc;
     void *m_ptr;
     ham_size_t m_size;
+    bool m_own;
 };
 
-/**
- * vsnprintf replacement/wrapper
- *
- * uses sprintf on platforms which do not define snprintf
- */
+//
+// vsnprintf replacement/wrapper
+//
+// uses vsprintf on platforms which do not define vsnprintf
+//
 extern int
 util_vsnprintf(char *str, size_t size, const char *format, va_list ap);
 
-/**
- * snprintf replacement/wrapper
- *
- * uses sprintf on platforms which do not define snprintf
- */
+//
+// snprintf replacement/wrapper
+//
+// uses sprintf on platforms which do not define snprintf
+//
 #ifndef HAM_OS_POSIX
-#define util_snprintf _snprintf
+#  define util_snprintf _snprintf
 #else
-#define util_snprintf snprintf
+#  define util_snprintf snprintf
 #endif
 
 } // namespace hamsterdb

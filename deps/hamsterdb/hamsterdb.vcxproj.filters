@@ -10,9 +10,6 @@
     <ClInclude Include="src\backend.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\blob.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\btree.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -40,9 +37,6 @@
     <ClInclude Include="src\db.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\device.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\endianswap.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -56,9 +50,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\freelist.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\freelist_statistics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\hash-table.h">
@@ -121,11 +112,38 @@
     <ClInclude Include="src\statistics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\blob_manager.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\blob_manager_disk.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\blob_manager_factory.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\blob_manager_inmem.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\device_disk.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\device_factory.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\device_inmem.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\freelist_stats.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mutex.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\page_manager.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\blob.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\btree.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -165,9 +183,6 @@
     <ClCompile Include="src\db.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\device.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\env.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -175,9 +190,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\freelist.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\freelist_statistics.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\hamsterdb.cc">
@@ -198,9 +210,6 @@
     <ClCompile Include="src\page.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\remote.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\txn.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -211,6 +220,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\duplicates.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\blob_manager_disk.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\blob_manager_inmem.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\freelist_stats.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\page_manager.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

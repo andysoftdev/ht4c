@@ -29,6 +29,7 @@
 #include "txn.h"
 #include "cursor.h"
 #include "btree_node.h"
+#include "page_manager.h"
 
 namespace hamsterdb {
 
@@ -37,8 +38,7 @@ namespace hamsterdb {
 
 BtreeIndex::BtreeIndex(LocalDatabase *db, ham_u32_t descriptor, ham_u32_t flags)
   : m_db(db), m_keysize(0), m_descriptor_index(descriptor), m_flags(flags),
-    m_rootpage(0), m_maxkeys(0), m_keydata1(db->get_env()->get_allocator()),
-    m_keydata2(db->get_env()->get_allocator()), m_statistics(db)
+    m_rootpage(0), m_maxkeys(0), m_keydata1(), m_keydata2(), m_statistics(db)
 {
 }
 
@@ -51,7 +51,7 @@ ham_status_t
 BtreeIndex::get_slot(Page *page, ham_key_t *key, ham_s32_t *slot, int *pcmp)
 {
   int cmp = -1;
-  BtreeNode *node = BtreeNode::from_page(page);
+  PBtreeNode *node = PBtreeNode::from_page(page);
   ham_s32_t r = node->get_count() - 1;
   ham_s32_t l = 1;
   ham_s32_t i;
@@ -153,13 +153,13 @@ BtreeIndex::create(ham_u16_t keysize)
   }
 
   /* allocate a new root page */
-  Page *root;
-  ham_status_t st;
-  st = m_db->alloc_page(&root, Page::TYPE_B_ROOT, PAGE_IGNORE_FREELIST);
+  Page *root = 0;
+  ham_status_t st = m_db->alloc_page(&root, Page::TYPE_B_ROOT,
+          PageManager::kIgnoreFreelist);
   if (st)
     return (st);
 
-  memset(root->get_raw_payload(), 0, sizeof(BtreeNode) + sizeof(PageData));
+  memset(root->get_raw_payload(), 0, sizeof(PBtreeNode) + sizeof(PageData));
   root->set_type(Page::TYPE_B_ROOT);
   root->set_dirty(true);
 
@@ -183,7 +183,7 @@ BtreeIndex::open()
   ham_u16_t maxkeys;
   ham_u16_t keysize;
   ham_u32_t flags;
-  BtreeDescriptor *desc = m_db->get_env()->get_descriptor(m_descriptor_index);
+  PBtreeDescriptor *desc = m_db->get_env()->get_descriptor(m_descriptor_index);
 
   /*
    * load root address and maxkeys (first two bytes are the
@@ -212,7 +212,7 @@ BtreeIndex::flush_descriptor()
   if (m_db->get_rt_flags() & HAM_READ_ONLY)
     return;
 
-  BtreeDescriptor *desc = m_db->get_env()->get_descriptor(m_descriptor_index);
+  PBtreeDescriptor *desc = m_db->get_env()->get_descriptor(m_descriptor_index);
 
   desc->set_dbname(m_db->get_name());
   desc->set_max_keys(get_maxkeys());
@@ -244,11 +244,11 @@ BtreeIndex::free_page_extkeys(Page *page, ham_u32_t flags)
       && (page->get_type() == Page::TYPE_B_ROOT
         || page->get_type() == Page::TYPE_B_INDEX)) {
     ExtKeyCache *c = m_db->get_extkey_cache();
-    BtreeNode *node = BtreeNode::from_page(page);
+    PBtreeNode *node = PBtreeNode::from_page(page);
 
     for (ham_size_t i = 0; i < node->get_count(); i++) {
-      BtreeKey *bte = node->get_key(m_db, i);
-      if (bte->get_flags() & BtreeKey::KEY_IS_EXTENDED) {
+      PBtreeKey *bte = node->get_key(m_db, i);
+      if (bte->get_flags() & PBtreeKey::KEY_IS_EXTENDED) {
         ham_u64_t blobid = bte->get_extended_rid(m_db);
         if (m_db->get_env()->get_flags() & HAM_IN_MEMORY) {
           /* delete the blobid to prevent that it's freed twice */
@@ -268,7 +268,7 @@ ham_status_t
 BtreeIndex::find_internal(Page *page, ham_key_t *key, Page **page_ref,
                 ham_s32_t *idxptr)
 {
-  BtreeNode *node = BtreeNode::from_page(page);
+  PBtreeNode *node = PBtreeNode::from_page(page);
 
   /*
    * make sure that we're not in a leaf page, and that the
@@ -290,9 +290,9 @@ BtreeIndex::find_internal(Page *page, ham_key_t *key, Page **page_ref,
   if (slot == -1)
     return (m_db->fetch_page(page_ref, node->get_ptr_left()));
   else {
-    BtreeKey *bte = node->get_key(m_db, slot);
+    PBtreeKey *bte = node->get_key(m_db, slot);
     ham_assert(bte->get_flags() == 0
-                || bte->get_flags() == BtreeKey::KEY_IS_EXTENDED);
+                || bte->get_flags() == PBtreeKey::KEY_IS_EXTENDED);
     return (m_db->fetch_page(page_ref, bte->get_ptr()));
   }
 }
@@ -301,11 +301,11 @@ ham_s32_t
 BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
 {
   int cmp;
-  BtreeNode *node=BtreeNode::from_page(page);
+  PBtreeNode *node=PBtreeNode::from_page(page);
 
   /* ensure the approx flag is NOT set by anyone yet */
   ham_key_set_intflags(key, ham_key_get_intflags(key)
-            & ~BtreeKey::KEY_IS_APPROXIMATE);
+            & ~PBtreeKey::KEY_IS_APPROXIMATE);
 
   if (node->get_count() == 0)
     return (-1);
@@ -488,13 +488,13 @@ BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
         if (slot > 0) {
           slot--;
           ham_key_set_intflags(key, ham_key_get_intflags(key)
-                  | BtreeKey::KEY_IS_LT);
+                  | PBtreeKey::KEY_IS_LT);
           cmp = 0;
         }
         else if (flags & HAM_FIND_GT_MATCH) {
           ham_assert(slot == 0);
           ham_key_set_intflags(key, ham_key_get_intflags(key)
-                  | BtreeKey::KEY_IS_GT);
+                  | PBtreeKey::KEY_IS_GT);
           cmp = 0;
         }
       }
@@ -502,7 +502,7 @@ BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
         /* key @ slot is SMALLER than the key we search for */
         ham_assert(cmp > 0);
         ham_key_set_intflags(key, ham_key_get_intflags(key)
-                  | BtreeKey::KEY_IS_LT);
+                  | PBtreeKey::KEY_IS_LT);
         cmp = 0;
       }
     }
@@ -513,7 +513,7 @@ BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
       if (cmp < 0) {
         /* key @ slot is LARGER than the key we search for ... */
         ham_key_set_intflags(key, ham_key_get_intflags(key)
-                  | BtreeKey::KEY_IS_GT);
+                  | PBtreeKey::KEY_IS_GT);
         cmp = 0;
       }
       else
@@ -523,7 +523,7 @@ BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
         if (slot < node->get_count() - 1) {
           slot++;
           ham_key_set_intflags(key, ham_key_get_intflags(key)
-                  | BtreeKey::KEY_IS_GT);
+                  | PBtreeKey::KEY_IS_GT);
           cmp = 0;
         }
       }
@@ -538,12 +538,12 @@ BtreeIndex::find_leaf(Page *page, ham_key_t *key, ham_u32_t flags)
 }
 
 ham_status_t
-BtreeIndex::prepare_key_for_compare(int which, BtreeKey *src,
+BtreeIndex::prepare_key_for_compare(int which, PBtreeKey *src,
                 ham_key_t *dest)
 {
   ByteArray *arena;
 
-  if (!(src->get_flags() & BtreeKey::KEY_IS_EXTENDED)) {
+  if (!(src->get_flags() & PBtreeKey::KEY_IS_EXTENDED)) {
     dest->size = src->get_size();
     dest->data = src->get_key();
     dest->flags = HAM_KEY_USER_ALLOC;
@@ -562,7 +562,7 @@ BtreeIndex::prepare_key_for_compare(int which, BtreeKey *src,
 
   memcpy(arena->get_ptr(), src->get_key(), get_keysize());
   dest->data    = arena->get_ptr();
-  dest->_flags |= BtreeKey::KEY_IS_EXTENDED;
+  dest->_flags |= PBtreeKey::KEY_IS_EXTENDED;
   dest->flags  |= HAM_KEY_USER_ALLOC;
 
   return (0);
@@ -571,19 +571,19 @@ BtreeIndex::prepare_key_for_compare(int which, BtreeKey *src,
 int
 BtreeIndex::compare_keys(Page *page, ham_key_t *lhs, ham_u16_t rhs_int)
 {
-  BtreeNode *node = BtreeNode::from_page(page);
+  PBtreeNode *node = PBtreeNode::from_page(page);
   ham_key_t rhs = {0};
 
   ham_assert(m_db == page->get_db());
 
-  BtreeKey *r = node->get_key(m_db, rhs_int);
+  PBtreeKey *r = node->get_key(m_db, rhs_int);
 
   /* for performance reasons, we follow two branches:
    * if the key is not extended, then immediately compare it.
    * otherwise (if it's extended) use prepare_key_for_compare()
    * to allocate the extended key and compare it.
    */
-  if (!(r->get_flags() & BtreeKey::KEY_IS_EXTENDED)) {
+  if (!(r->get_flags() & PBtreeKey::KEY_IS_EXTENDED)) {
     rhs.size = r->get_size();
     rhs.data = r->get_key();
     rhs.flags = HAM_KEY_USER_ALLOC;
@@ -600,10 +600,8 @@ BtreeIndex::compare_keys(Page *page, ham_key_t *lhs, ham_u16_t rhs_int)
 }
 
 ham_status_t
-BtreeIndex::read_key(Transaction *txn, BtreeKey *source, ham_key_t *dest)
+BtreeIndex::read_key(Transaction *txn, PBtreeKey *source, ham_key_t *dest)
 {
-  Allocator *alloc = m_db->get_env()->get_allocator();
-
   ByteArray *arena = (txn == 0 || (txn->get_flags() & HAM_TXN_TEMPORARY))
             ? &m_db->get_key_arena()
             : &txn->get_key_arena();
@@ -612,7 +610,7 @@ BtreeIndex::read_key(Transaction *txn, BtreeKey *source, ham_key_t *dest)
    * extended key: copy the whole key, not just the
    * overflow region!
    */
-  if (source->get_flags() & BtreeKey::KEY_IS_EXTENDED) {
+  if (source->get_flags() & PBtreeKey::KEY_IS_EXTENDED) {
     ham_u16_t keysize = source->get_size();
     ham_status_t st = m_db->get_extended_key(source->get_key(),
                   keysize, source->get_flags(), dest);
@@ -622,7 +620,7 @@ BtreeIndex::read_key(Transaction *txn, BtreeKey *source, ham_key_t *dest)
        */
       if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
         if (dest->data && arena->get_ptr() != dest->data)
-           alloc->free(dest->data);
+           Memory::release(dest->data);
         dest->data = 0;
       }
       return (st);
@@ -680,13 +678,13 @@ BtreeIndex::read_record(Transaction *txn, ham_record_t *record,
   bool noblob = false;
   ham_size_t blobsize;
 
-  ByteArray *arena= (txn == 0 || (txn->get_flags() & HAM_TXN_TEMPORARY))
+  ByteArray *arena = (txn == 0 || (txn->get_flags() & HAM_TXN_TEMPORARY))
             ? &m_db->get_record_arena()
             : &txn->get_record_arena();
 
   /* if this key has duplicates: fetch the duplicate entry */
-  if (record->_intflags & BtreeKey::KEY_HAS_DUPLICATES) {
-    dupe_entry_t entry;
+  if (record->_intflags & PBtreeKey::KEY_HAS_DUPLICATES) {
+    PDupeEntry entry;
     ham_status_t st = m_db->get_env()->get_duplicate_manager()->get(
                     record->_rid, 0, &entry);
     if (st)
@@ -702,18 +700,18 @@ BtreeIndex::read_record(Transaction *txn, ham_record_t *record,
    * no blob available, but the data is stored compressed in the record's
    * offset.
    */
-  if (record->_intflags & BtreeKey::KEY_BLOB_SIZE_TINY) {
+  if (record->_intflags & PBtreeKey::KEY_BLOB_SIZE_TINY) {
     /* the highest byte of the record id is the size of the blob */
     char *p = (char *)ridptr;
     blobsize = p[sizeof(ham_u64_t) - 1];
     noblob = true;
   }
-  else if (record->_intflags & BtreeKey::KEY_BLOB_SIZE_SMALL) {
+  else if (record->_intflags & PBtreeKey::KEY_BLOB_SIZE_SMALL) {
     /* record size is sizeof(ham_u64_t) */
     blobsize = sizeof(ham_u64_t);
     noblob = true;
   }
-  else if (record->_intflags & BtreeKey::KEY_BLOB_SIZE_EMPTY) {
+  else if (record->_intflags & PBtreeKey::KEY_BLOB_SIZE_EMPTY) {
     /* record size is 0 */
     blobsize = 0;
     noblob = true;
@@ -748,20 +746,22 @@ BtreeIndex::read_record(Transaction *txn, ham_record_t *record,
     }
   }
   else if (!noblob && blobsize != 0) {
-    return (m_db->get_env()->get_blob_manager()->read(m_db, txn,
-                record->_rid, record, flags));
+    ByteArray *arena = (txn == 0 || (txn->get_flags() & HAM_TXN_TEMPORARY))
+                            ? &m_db->get_record_arena()
+                            : &txn->get_record_arena();
+
+    return (m_db->get_env()->get_blob_manager()->read(m_db,
+                record->_rid, record, flags, arena));
   }
 
   return (HAM_SUCCESS);
 }
 
 ham_status_t
-BtreeIndex::copy_key(const BtreeKey *source, ham_key_t *dest)
+BtreeIndex::copy_key(const PBtreeKey *source, ham_key_t *dest)
 {
-  Allocator *alloc = m_db->get_env()->get_allocator();
-
   /* extended key: copy the whole key */
-  if (source->get_flags() & BtreeKey::KEY_IS_EXTENDED) {
+  if (source->get_flags() & PBtreeKey::KEY_IS_EXTENDED) {
     ham_status_t st = m_db->get_extended_key((ham_u8_t *)source->get_key(),
           source->get_size(), source->get_flags(), dest);
     if (st)
@@ -773,9 +773,8 @@ BtreeIndex::copy_key(const BtreeKey *source, ham_key_t *dest)
   else if (source->get_size()) {
     if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
       if (!dest->data || dest->size < source->get_size()) {
-        if (dest->data)
-          alloc->free(dest->data);
-        dest->data = (ham_u8_t *)alloc->alloc(source->get_size());
+        Memory::release(dest->data);
+        dest->data = Memory::allocate<ham_u8_t>(source->get_size());
         if (!dest->data)
           return (HAM_OUT_OF_MEMORY);
       }
@@ -787,8 +786,7 @@ BtreeIndex::copy_key(const BtreeKey *source, ham_key_t *dest)
   else {
     /* key.size is 0 */
     if (!(dest->flags & HAM_KEY_USER_ALLOC)) {
-      if (dest->data)
-        alloc->free(dest->data);
+      Memory::release(dest->data);
       dest->data = 0;
     }
     dest->size = 0;
@@ -804,9 +802,9 @@ ham_size_t
 BtreeIndex::calc_maxkeys(ham_size_t pagesize, ham_u16_t keysize)
 {
   /* adjust page size and key size by adding the overhead */
-  pagesize -= OFFSETOF(BtreeNode, _entries);
+  pagesize -= OFFSETOF(PBtreeNode, _entries);
   pagesize -= Page::sizeof_persistent_header;
-  keysize += (ham_u16_t)BtreeKey::ms_sizeof_overhead;
+  keysize += (ham_u16_t)PBtreeKey::ms_sizeof_overhead;
 
   /* and return an even number */
   ham_size_t max = pagesize / keysize;

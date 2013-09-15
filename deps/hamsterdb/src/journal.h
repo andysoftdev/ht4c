@@ -57,8 +57,8 @@ class Journal
     /**
      * the header structure of a journal file
      */
-    HAM_PACK_0 struct HAM_PACK_1 Header {
-      Header() : magic(0), _reserved(0), lsn(0) { }
+    HAM_PACK_0 struct HAM_PACK_1 PHeader {
+      PHeader() : magic(0), _reserved(0), lsn(0) { }
 
       /** the magic */
       ham_u32_t magic;
@@ -115,7 +115,7 @@ class Journal
         ham_status_t st = os_get_filesize(m_fd[i], &size);
         if (st)
           return (false); /* TODO throw exception */
-        if (size && size != sizeof(Header))
+        if (size && size != sizeof(PHeader))
           return (false);
       }
 
@@ -168,17 +168,17 @@ class Journal
       return (m_lsn++);
     }
 
-  private:
-    friend class JournalTest;
-
-    /** switches the log file if necessary; sets the new log descriptor in the
-     * transaction */
-    ham_status_t switch_files_maybe(Transaction *txn);
-
     /** gets the lsn; only required for unittests */
     ham_u64_t get_lsn() {
       return (m_lsn);
     }
+
+  private:
+    friend struct JournalFixture;
+
+    /** switches the log file if necessary; sets the new log descriptor in the
+     * transaction */
+    ham_status_t switch_files_maybe(Transaction *txn);
 
     /** returns the path of the journal file */
     std::string get_path(int i);
@@ -196,7 +196,7 @@ class Journal
      *
      * returns SUCCESS and an empty entry (lsn is zero) after the last element.
      */
-    ham_status_t get_entry(Iterator *iter, JournalEntry *entry, void **aux);
+    ham_status_t get_entry(Iterator *iter, PJournalEntry *entry, void **aux);
 
     /** appends an entry to the journal */
     ham_status_t append_entry(int fdidx,
@@ -212,16 +212,6 @@ class Journal
 
     /** clears a single file */
     ham_status_t clear_file(int idx);
-
-    /** helper function for the allocator */
-    void *allocate(ham_size_t size) {
-      return (m_env->get_allocator()->alloc(size));
-    }
-
-    /** helper function for the allocator */
-    void alloc_free(void *ptr) {
-      return (m_env->get_allocator()->free(ptr));
-    }
 
     /** references the Environment this journal file is for */
     Environment *m_env;

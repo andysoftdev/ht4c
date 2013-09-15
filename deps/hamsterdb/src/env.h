@@ -24,15 +24,19 @@
 
 #include <ham/hamsterdb.h>
 
-#include "statistics.h"
+#ifdef HAM_ENABLE_REMOTE
+#  include "protocol/protocol.h"
+#endif
+
 #include "endianswap.h"
 #include "error.h"
 #include "page.h"
 #include "changeset.h"
-#include "blob.h"
+#include "blob_manager.h"
 #include "duplicates.h"
+#include "mutex.h"
 #ifdef HAM_ENABLE_REMOTE
-#include "protocol/protocol.h"
+#  include "protocol/protocol.h"
 #endif
 
 /**
@@ -46,28 +50,8 @@ struct ham_env_t {
 
 namespace hamsterdb {
 
-/**
- * This is the minimum chunk size; all chunks (pages and blobs) are aligned
- * to this size.
- *
- * WARNING: pages (and 'aligned' huge blobs) are aligned to
- * a DB_PAGESIZE_MIN_REQD_ALIGNMENT boundary, that is, any 'aligned=true'
- * freelist allocations will produce blocks which are aligned to a
- * 8*32 == 256 bytes boundary.
- */
-#define DB_CHUNKSIZE                        32
-
 /** An internal database flag - env handle is remote */
 #define DB_IS_REMOTE                        0x00200000
-
-/**
- * The minimum required database page alignment: since the freelist scanner
- * works on a byte-boundary basis for aligned storage, all aligned storage
- * must/align to an 8-bits times 1 DB_CHUNKSIZE-per-bit boundary. Which for a
- * 32 bytes chunksize means your pagesize minimum required alignment/size
- * is 8*32 = 256 bytes.
- */
-#define DB_PAGESIZE_MIN_REQD_ALIGNMENT      (8 * DB_CHUNKSIZE)
 
 #include "packstart.h"
 
@@ -79,7 +63,7 @@ typedef HAM_PACK_0 struct HAM_PACK_1
   /** magic cookie - always "ham\0" */
   ham_u8_t  _magic[4];
 
-  /** version information - major, minor, rev, reserved */
+  /** version information - major, minor, rev, file */
   ham_u8_t  _version[4];
 
   /** serial number */
@@ -98,23 +82,18 @@ typedef HAM_PACK_0 struct HAM_PACK_1
    * following here:
    *
    * 1. the private data of the index btree(s)
-   *      -> see env_get_descriptor()
+   *      -> see get_descriptor()
    *
    * 2. the freelist data
-   *      -> see env_get_freelist()
+   *      -> see get_freelist_payload()
    */
-} HAM_PACK_2 env_header_t;
+} HAM_PACK_2 PEnvHeader;
 
 #include "packstop.h"
 
-#define envheader_get_version(hdr, i)  ((hdr))->_version[i]
-
-
-#define SIZEOF_FULL_HEADER(env)                                             \
-    (sizeof(env_header_t)+                                                  \
-     (env)->get_max_databases()*sizeof(BtreeDescriptor))
-
-class BtreeDescriptor;
+class PBtreeDescriptor;
+class PageManager;
+struct PFreelistPayload;
 
 /**
  * the Environment structure
@@ -220,35 +199,8 @@ class Environment
     }
 
     /** get the device */
-    // TODO move to LocalEnvironment
     Device *get_device() {
       return (m_device);
-    }
-
-    /** set the device */
-    void set_device(Device *device) {
-      m_device = device;
-    }
-
-    /** get the cache pointer */
-    // TODO move to LocalEnvironment
-    Cache *get_cache() {
-      return (m_cache);
-    }
-
-    /** set the cache pointer */
-    void set_cache(Cache *cache) {
-      m_cache = cache;
-    }
-
-    /** get the allocator */
-    Allocator *get_allocator() {
-      return (m_alloc);
-    }
-
-    /** set the allocator */
-    void set_allocator(Allocator *alloc) {
-      m_alloc = alloc;
     }
 
     /** get the header page */
@@ -263,8 +215,8 @@ class Environment
 
     /** get a pointer to the header data */
     // TODO move to LocalEnvironment
-    env_header_t *get_header() {
-      return ((env_header_t *)(get_header_page()->get_payload()));
+    PEnvHeader *get_header() {
+      return ((PEnvHeader *)(get_header_page()->get_payload()));
     }
 
     /** get the oldest transaction */
@@ -309,16 +261,6 @@ class Environment
       m_journal = j;
     }
 
-    /** get the freelist */
-    Freelist *get_freelist() {
-      return (m_freelist);
-    }
-
-    /** set the freelist */
-    void set_freelist(Freelist *f) {
-      m_freelist = f;
-    }
-
     /** get the flags */
     ham_u32_t get_flags() const {
       return (m_flags);
@@ -349,15 +291,9 @@ class Environment
       m_pagesize = ps;
     }
 
-    /** get the cachesize as specified in ham_env_create/ham_env_open */
-    ham_u64_t get_cachesize() const {
-      return (m_cachesize);
-    }
-
-    /** set the cachesize as specified in ham_env_create/ham_env_open */
-    void set_cachesize(ham_u64_t cs) {
-      m_cachesize = cs;
-    }
+    /** Returns the size of the occupied portion in the header structure;
+     * the remaining data is the size of the freelist */
+    ham_size_t sizeof_full_header();
 
     /**
      * get the maximum number of databases for this file (cached, not read
@@ -391,11 +327,11 @@ class Environment
      * Get the private data of the specified database stored at index @a i;
      * interpretation of the data is up to the btree.
      */
-    BtreeDescriptor *get_descriptor(int i);
+    PBtreeDescriptor *get_descriptor(int i);
 
     /** get the maximum number of databases for this file */
     ham_u16_t get_max_databases() {
-      env_header_t *hdr = (env_header_t*)(get_header_page()->get_payload());
+      PEnvHeader *hdr = (PEnvHeader*)(get_header_page()->get_payload());
       return (ham_db2h16(hdr->_max_databases));
     }
 
@@ -416,11 +352,6 @@ class Environment
       get_header()->_pagesize=ham_h2db32(ps);
     }
 
-    /** get a reference to the DB FILE (global) statistics */
-    EnvironmentStatistics *get_global_perf_data() {
-      return (&m_perf_data);
-    }
-
     /** set the 'magic' field of a file header */
     void set_magic(ham_u8_t m1, ham_u8_t m2, ham_u8_t m3, ham_u8_t m4) {
       get_header()->_magic[0] = m1;
@@ -430,7 +361,7 @@ class Environment
     }
 
     /** returns true if the magic matches */
-    bool compare_magic(ham_u8_t m1, ham_u8_t m2, ham_u8_t m3, ham_u8_t m4) {
+    bool verify_magic(ham_u8_t m1, ham_u8_t m2, ham_u8_t m3, ham_u8_t m4) {
       if (get_header()->_magic[0] != m1)
         return (false);
       if (get_header()->_magic[1] != m2)
@@ -444,8 +375,8 @@ class Environment
 
     /** get byte @a i of the 'version'-header */
     ham_u8_t get_version(ham_size_t idx) {
-      env_header_t *hdr = (env_header_t *)(get_header_page()->get_payload());
-      return (envheader_get_version(hdr, idx));
+      PEnvHeader *hdr = (PEnvHeader *)(get_header_page()->get_payload());
+      return (hdr->_version[idx]);
     }
 
     /** set the version of a file header */
@@ -458,18 +389,18 @@ class Environment
 
     /** get the serial number */
     ham_u32_t get_serialno() {
-      env_header_t *hdr = (env_header_t*)(get_header_page()->get_payload());
+      PEnvHeader *hdr = (PEnvHeader*)(get_header_page()->get_payload());
       return (ham_db2h32(hdr->_serialno));
     }
 
     /** set the serial number */
     void set_serialno(ham_u32_t n) {
-      env_header_t *hdr = (env_header_t *)(get_header_page()->get_payload());
-      hdr->_serialno=ham_h2db32(n);
+      PEnvHeader *hdr = (PEnvHeader *)(get_header_page()->get_payload());
+      hdr->_serialno = ham_h2db32(n);
     }
 
     /** get the freelist object of the database */
-    FreelistPayload *get_freelist_payload();
+    PFreelistPayload *get_freelist_payload();
 
     /** set the logfile directory */
     void set_log_directory(const std::string &dir) {
@@ -483,7 +414,7 @@ class Environment
 
     /** get the blob manager */
     BlobManager *get_blob_manager() {
-      return (&m_blob_manager);
+      return (m_blob_manager);
     }
 
     /** get the duplicate manager */
@@ -521,19 +452,25 @@ class Environment
     // TODO move to LocalEnvironment
     ham_status_t get_incremented_lsn(ham_u64_t *lsn);
 
-    /* purge the cache if the limits are exceeded */
-    // TODO move to LocalEnvironment
-    ham_status_t purge_cache();
+    /** Retrieve the PageManager instance */
+    PageManager *get_page_manager() {
+      return (m_page_manager);
+    }
 
-    /** allocate a new page */
-    // TODO move to LocalEnvironment
-    ham_status_t alloc_page(Page **page_ref, Database *db, ham_u32_t type,
-            ham_u32_t flags);
+    // Fills in the current metrics
+    void get_metrics(ham_env_metrics_t *metrics) const;
 
-    /** fetch an existing page */
+  protected:
+    /** the BlobManager */
     // TODO move to LocalEnvironment
-    ham_status_t fetch_page(Page **page_ref, Database *db,
-            ham_u64_t address, bool only_from_cache = false);
+    BlobManager *m_blob_manager;
+
+    /** The PageManager instance */
+    // TODO move to LocalEnvironment
+    PageManager *m_page_manager;
+
+    /** the device (either a file or an in-memory-db) */
+    Device *m_device;
 
   private:
     /** Flushes a single, committed transaction to disk */
@@ -559,17 +496,6 @@ class Environment
     /** a map of all opened Databases */
     DatabaseMap m_database_map;
 
-    /** the device (either a file or an in-memory-db) */
-    // TODO move to LocalEnvironment
-    Device *m_device;
-
-    /** the cache */
-    // TODO move to LocalEnvironment
-    Cache *m_cache;
-
-    /** the memory allocator */
-    Allocator *m_alloc;
-
     /** the file header page */
     // TODO move to LocalEnvironment
     Page *m_hdrpage;
@@ -580,7 +506,7 @@ class Environment
     /** the tail of the transaction list (the youngest/newest transaction) */
     Transaction *m_newest_txn;
 
-    /** the physical log */
+    /** the physical write-ahead log */
     // TODO move to LocalEnvironment
     Log *m_log;
 
@@ -588,39 +514,24 @@ class Environment
     // TODO move to LocalEnvironment
     Journal *m_journal;
 
-    /** the Freelist manages the free space in the file */
-    // TODO move to LocalEnvironment
-    Freelist *m_freelist;
-
     /** the Environment flags - a combination of the persistent flags
      * and runtime flags */
     ham_u32_t m_flags;
 
     /** the changeset - a list of all pages that were modified during
-     * one database operation */
+     * the current database operation */
     // TODO move to LocalEnvironment
     Changeset m_changeset;
 
     /** the pagesize which was specified when the env was created */
     ham_size_t m_pagesize;
 
-    /** the cachesize which was specified when the env was created/opened */
-    ham_u64_t m_cachesize;
-
     /** the max. number of databases which was specified when the env
      * was created */
     ham_u16_t m_max_databases_cached;
 
-    /** some freelist algorithm specific run-time data */
-    // TODO move to LocalEnvironment
-    EnvironmentStatistics m_perf_data;
-
     /** the directory of the log file and journal files */
     std::string m_log_directory;
-
-    /** the BlobManager */
-    // TODO move to LocalEnvironment
-    BlobManager m_blob_manager;
 
     /** the DuplicateManager */
     // TODO move to LocalEnvironment
@@ -683,13 +594,6 @@ class LocalEnvironment : public Environment
   private:
     /** runs the recovery process */
     ham_status_t recover(ham_u32_t flags);
-
-    /**
-     * Flush all pages, and clear the cache.
-     * @param nodelete Set to true if you do NOT want the cache to be cleared
-     */
-    ham_status_t flush_all_pages(bool nodelete = false);
-
 };
 
 /**

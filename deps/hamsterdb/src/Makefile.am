@@ -7,14 +7,18 @@ endif # ENABLE_SERVER
 endif # ENABLE_REMOTE
 
 AM_CPPFLAGS = -I../include -I$(top_srcdir)/include $(BOOST_CPPFLAGS)
-AM_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 
 lib_LTLIBRARIES = libhamsterdb.la
 
 EXTRA_DIST = os_win32.cc
 
-libhamsterdb_la_SOURCES = blob.cc \
-	blob.h \
+libhamsterdb_la_SOURCES = \
+	blob_manager.h \
+	blob_manager_inmem.h \
+	blob_manager_inmem.cc \
+	blob_manager_disk.h \
+	blob_manager_disk.cc \
+	blob_manager_factory.h \
 	btree.cc \
 	btree_check.cc \
 	btree_cursor.cc \
@@ -38,8 +42,10 @@ libhamsterdb_la_SOURCES = blob.cc \
 	cursor.h \
 	db.cc \
 	db.h \
-	device.cc \
 	device.h \
+	device_disk.h \
+	device_inmem.h \
+	device_factory.h \
 	duplicates.cc \
 	duplicates.h \
 	endianswap.h \
@@ -51,8 +57,8 @@ libhamsterdb_la_SOURCES = blob.cc \
 	extkeys.h \
 	freelist.cc \
 	freelist.h \
-	freelist_statistics.cc \
-	freelist_statistics.h \
+	freelist_stats.cc \
+	freelist_stats.h \
 	hamsterdb.cc \
 	hash-table.h \
 	internal_fwd_decl.h \
@@ -63,16 +69,18 @@ libhamsterdb_la_SOURCES = blob.cc \
 	log.h \
 	mem.cc \
 	mem.h \
+	mutex.h \
 	os.h \
 	os_posix.cc \
 	packstart.h \
 	packstop.h \
 	page.cc \
 	page.h \
+	page_manager.cc \
+	page_manager.h \
 	rb.h \
 	remote.cc \
 	serial.h \
-	statistics.h \
 	txn.cc \
 	txn_cursor.cc \
 	txn_cursor.h \
@@ -81,12 +89,11 @@ libhamsterdb_la_SOURCES = blob.cc \
 	util.h \
 	version.h
 
-libhamsterdb_la_LDFLAGS = -version-info 4:0:0 -lboost_thread -lpthread
+libhamsterdb_la_LDFLAGS = -version-info 4:0:0 
 
 if ENABLE_REMOTE
 libhamsterdb_la_LDFLAGS += -lcurl
 libhamsterdb_la_LDFLAGS += $(top_builddir)/src/protocol/libprotocol.la
 AM_CPPFLAGS += -DHAM_ENABLE_REMOTE
 endif
-LIBS = $(BOOST_THREAD_LIBS)
 

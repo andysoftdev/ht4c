@@ -109,52 +109,6 @@ HAM_EXPORT void * HAM_CALLCONV
 ham_get_context_data(ham_db_t *db, ham_bool_t dont_lock);
 
 /**
- * Install a custom device object
- *
- * Custom device objects can be used to overwrite the functions which
- * open, create, read, write etc. to/from the file.
- *
- * The device structure is defined in src/device.h. The default device
- * objects (for file-based access and for in-memory access) are implemented
- * in src/device.c.
- *
- * This function has to be called after the Environment handle has been
- * allocated (with @a ham_env_new) and before the Environment is created
- * or opened (with @a ham_env_create[_ex] or @a ham_env_open[_ex]).
- *
- * @param env A valid Environment handle
- * @param device A pointer to a ham_device_t structure
- *
- * @return @a HAM_SUCCESS upon success
- * @return @a HAM_INV_PARAMETER if @a db or @a device is NULL
- * @return @a HAM_ALREADY_INITIALIZED if this function was already called
- *            for this Environment
- */
-struct ham_device_t;
-typedef struct ham_device_t ham_device_t;
-
-HAM_EXPORT ham_status_t HAM_CALLCONV
-ham_env_set_device(ham_env_t *env, ham_device_t *device);
-
-/**
- * Retrieves the current device object
- *
- * Custom device objects can be used to overwrite the functions which
- * open, create, read, write etc. to/from the file.
- *
- * The device structure is defined in src/device.h. The default device
- * objects (for file-based access and for in-memory access) are implemented
- * in src/device.c.
- *
- * @param env A valid Environment handle
- *
- * @return A pointer to a ham_device_t structure, or NULL if the device was
- *            not yet initialized
- */
-HAM_EXPORT ham_device_t * HAM_CALLCONV
-ham_env_get_device(ham_env_t *env);
-
-/**
  * Retrieves the Database handle of a Cursor
  *
  * @param cursor A valid Cursor handle
@@ -165,18 +119,86 @@ HAM_EXPORT ham_db_t * HAM_CALLCONV
 ham_cursor_get_database(ham_cursor_t *cursor);
 
 /**
- * Set a custom memory allocator
+ * Retrieves collected metrics from the hamsterdb Environment. Used mainly
+ * for testing.
+ * See below for the structure with the currently available metrics.
+ * This structure will change a lot; the first field is a version indicator
+ * that applications can use to verify that the structure layout is compatible.
  *
- * The memory allocator is an abstract C++ class declared in src/mem.h.
- *
- * @param env A valid Environment handle
- * @param allocator A valid Allocator pointer
- *
- * @return @ref HAM_SUCCESS upon success
- * @return @ref HAM_INV_PARAMETER if one of the pointers is NULL
+ * These metrics are NOT persisted to disk.
+ */
+#define HAM_METRICS_VERSION         1
+
+typedef struct ham_env_metrics_t {
+  // the version indicator - must be HAM_METRICS_VERSION
+  ham_u16_t version;
+
+  // number of total allocations for the whole lifetime of the process
+  ham_u64_t mem_total_allocations;
+
+  // currently active allocations for the whole process
+  ham_u64_t mem_current_allocations;
+
+  // current amount of memory allocated and tracked by the process
+  // (excludes memory used by the kernel or not allocated with
+  // malloc/free)
+  ham_u64_t mem_current_usage;
+
+  // peak usage of memory (for the whole process)
+  ham_u64_t mem_peak_usage;
+
+  // the heap size of this process
+  ham_u64_t mem_heap_size;
+
+  // amount of pages fetched from disk
+  ham_u64_t page_count_fetched;
+
+  // amount of pages written to disk
+  ham_u64_t page_count_flushed;
+
+  // number of index pages in this Environment
+  ham_u64_t page_count_type_index;
+
+  // number of blob pages in this Environment
+  ham_u64_t page_count_type_blob;
+
+  // number of freelist pages in this Environment
+  ham_u64_t page_count_type_freelist;
+
+  // number of successful freelist hits
+  ham_u64_t freelist_hits;
+
+  // number of freelist misses
+  ham_u64_t freelist_misses;
+
+  // number of successful cache hits
+  ham_u64_t cache_hits;
+
+  // number of cache misses
+  ham_u64_t cache_misses;
+
+  // number of blobs allocated
+  ham_u64_t blob_total_allocated;
+
+  // number of blobs read
+  ham_u64_t blob_total_read;
+
+  // number of direct I/O bytes read (disk only)
+  ham_u64_t blob_direct_read;
+
+  // number of direct I/O bytes written (disk only)
+  ham_u64_t blob_direct_written;
+
+  // number of direct I/O bytes allocated (disk only)
+  ham_u64_t blob_direct_allocated;
+
+} ham_env_metrics_t;
+
+/**
+ * Retrieves the current metrics from an Environment
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
-ham_env_set_allocator(ham_env_t *env, void *alloc);
+ham_env_get_metrics(ham_env_t *env, ham_env_metrics_t *metrics);
 
 /**
  * @}

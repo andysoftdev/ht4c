@@ -13,7 +13,7 @@
  * @file hamsterdb.h
  * @brief Include file for hamsterdb Embedded Storage
  * @author Christoph Rupp, chris@crupp.de
- * @version 2.1.0
+ * @version 2.1.1
  *
  * @mainpage
  *
@@ -664,7 +664,7 @@ ham_env_get_parameters(ham_env_t *env, ham_parameter_t *param);
  * configured when the Environment is created (see @sa ham_env_create).
  *
  * Each Database in an Environment is identified by a positive 16bit
- * value (except 0 and values at or above 0xf000).
+ * value. 0 and values at or above 0xf000 are reserved.
  *
  * This function initializes the ham_db_t handle (the second parameter).
  * When the handle is no longer in use, it should be closed with
@@ -1079,7 +1079,7 @@ ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
 
 /* reserved: DB_IS_REMOTE   (not persistent)        0x00200000 */
 
-/* reserved: DB_DISABLE_AUTO_FLUSH (not persistent) 0x00400000 */
+/* reserved: DB_REDUCED_FREELIST (persistent)       0x00400000 */
 
 /**
  * Returns the last error code
@@ -1200,7 +1200,8 @@ ham_db_set_compare_func(ham_db_t *db, ham_compare_func_t foo);
  * <b>record->partial_size</b> bytes of the record data at offset
  * <b>record->partial_offset</b>. If necessary, the record data will
  * be limited to the original record size. The number of actually read
- * bytes is returned in <b>record->size</b>.
+ * bytes is returned in <b>record->partial_size</b>. The original size of
+ * the record is stored in <b>record->size</b>.
  *
  * @ref HAM_PARTIAL is not allowed if record->size is <= 8 or if Transactions
  * are enabled. In such a case, @ref HAM_INV_PARAMETER is returned.
@@ -1745,14 +1746,13 @@ ham_cursor_clone(ham_cursor_t *src, ham_cursor_t **dest);
  * HAM_DIRECT_ACCESS is only allowed in In-Memory Databases and not if
  * Transactions are enabled.
  *
- * You can write only portions of the record by specifying the flag
- * @ref HAM_PARTIAL. In this case, hamsterdb will write <b>partial_size</b>
- * bytes of the record data at offset <b>partial_offset</b>. The full record
- * size will always be given in <b>record->size</b>! If
- * partial_size+partial_offset exceed record->size then partial_size will
- * be limited. To shrink or grow the record, adjust record->size.
- * @ref HAM_PARTIAL automatically overwrites existing records.
- * Gaps will be filled with null-bytes if the record did not yet exist.
+ * You can read only portions of the record by specifying the flag
+ * @ref HAM_PARTIAL. In this case, hamsterdb will read
+ * <b>record->partial_size</b> bytes of the record data at offset
+ * <b>record->partial_offset</b>. If necessary, the record data will
+ * be limited to the original record size. The number of actually read
+ * bytes is returned in <b>record->partial_size</b>. The original size of
+ * the record is stored in <b>record->size</b>.
  *
  * @ref HAM_PARTIAL is not allowed if record->size is <= 8 or if Transactions
  * are enabled. In such a case, @ref HAM_INV_PARAMETER is returned.
@@ -1913,7 +1913,8 @@ ham_cursor_overwrite(ham_cursor_t *cursor, ham_record_t *record,
  * <b>record->partial_size</b> bytes of the record data at offset
  * <b>record->partial_offset</b>. If necessary, the record data will
  * be limited to the original record size. The number of actually read
- * bytes is returned in <b>record->size</b>.
+ * bytes is returned in <b>record->partial_size</b>. The original size of
+ * the record is stored in <b>record->size</b>.
  *
  * @ref HAM_PARTIAL is not allowed if record->size is <= 8 or if Transactions
  * are enabled. In such a case, @ref HAM_INV_PARAMETER is returned.

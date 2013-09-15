@@ -39,8 +39,6 @@ namespace hamsterdb {
 
 #define OFFSETOF(type, member) ((size_t) &((type *)0)->member)
 
-class Allocator;
-
 class Cursor;
 
 class Database;
@@ -59,22 +57,13 @@ class Log;
 
 class Journal;
 
-struct extkey_t;
-typedef struct extkey_t extkey_t;
-
 class ExtKeyCache;
 
 class Freelist;
 struct FreelistEntry;
 
-struct freelist_hints_t;
-typedef struct freelist_hints_t freelist_hints_t;
-
-struct runtime_statistics_pagedata_t;
-typedef struct runtime_statistics_pagedata_t runtime_statistics_pagedata_t;
-
-struct freelist_global_hints_t;
-typedef struct freelist_global_hints_t freelist_global_hints_t;
+struct RuntimePageStatistics;
+typedef struct RuntimePageStatistics RuntimePageStatistics;
 
 struct find_hints_t;
 typedef struct find_hints_t find_hints_t;
@@ -89,39 +78,18 @@ class TransactionCursor;
 
 #include "packstart.h"
 
-struct FreelistPayload;
+struct PFreelistPayload;
 
 #include "packstop.h"
 
 
 #include "packstart.h"
 
-struct BtreeKey;
+struct PBtreeKey;
 
 #include "packstop.h"
 
 } // namespace hamsterdb
-
-#include <boost/version.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/tss.hpp>
-#include <boost/thread/condition.hpp>
-
-typedef boost::mutex::scoped_lock ScopedLock;
-typedef boost::thread Thread;
-typedef boost::condition Condition;
-
-class Mutex : public boost::mutex {
-public:
-#if BOOST_VERSION < 103500
-  typedef boost::detail::thread::lock_ops<boost::mutex> Ops;
-
-  void lock() { Ops::lock(*this); }
-
-  void unlock() { Ops::unlock(*this); }
-#endif
-};
 
 #endif
 
