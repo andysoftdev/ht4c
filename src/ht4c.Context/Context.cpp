@@ -66,13 +66,15 @@ namespace ht4c {
 		const char* silent														= "silent";
 		const char* leaseInterval											= "Hyperspace.Lease.Interval";
 		const char* gracePeriod												= "Hyperspace.GracePeriod";
+		const char* sessionReconnect									= "Hyperspace.Session.Reconnect"; // after lost connect the reconnection will be initialted after Hyperspace.GracePeriod (default 1min)
 
 		const uint16_t defaultHyperspacePort					= 38040;
 		const uint16_t defaultThriftBrokerPort				= 38080;
 
 		const int32_t defaultConnectionTimeoutMsec		= 30000;
 		const int32_t defaultLeaseIntervalMsec				= 1000000;
-		const int32_t defaultGracePeriodMsec					= 300000;
+		const int32_t defaultGracePeriodMsec					= 60000;
+		const bool defaultSessionReconnect						= true;
 
 		template<typename SequenceT, typename Range1T, typename Range2T>
 		inline void replace_all_recursive( SequenceT& input, const Range1T& search, const Range2T& format ) {
@@ -187,6 +189,9 @@ namespace ht4c {
 				}
 				if( properties->defaulted(gracePeriod) ) {
 					properties->set( gracePeriod, defaultGracePeriodMsec );
+				}
+				if( properties->defaulted(sessionReconnect) ) {
+					properties->set( sessionReconnect, defaultSessionReconnect );
 				}
 
 				if( !properties->has(thriftBrokerTimeout) ) {
