@@ -1,9 +1,9 @@
 /** -*- C++ -*-
  * Copyright (C) 2010-2013 Thalmann Software & Consulting, http://www.softdev.ch
  *
- * This file is part of ht4n.
+ * This file is part of ht4c.
  *
- * ht4n is free software; you can redistribute it and/or
+ * ht4c is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 3
  * of the License, or any later version.
@@ -25,42 +25,28 @@
 #pragma managed( push, off )
 #endif
 
+#include "SessionState.h"
+
 namespace ht4c { namespace Common {
 
 	/// <summary>
-	/// Declares extended context features, apart from the regular features.
+	/// Abstract class represents a callback for Hypertable session state transition.
 	/// </summary>
-	enum ContextFeature {
+	class SessionStateSink {
 
-		/// <summary>
-		/// Unknown provider feature.
-		/// </summary>
-		CF_Unknown
+		public:
 
-		/// <summary>
-		/// Hypertable query language (HQL).
-		/// </summary>
-	, CF_HQL
+			/// <summary>
+			/// Destroys the SessionStateSink instance.
+			/// </summary>
+			virtual ~SessionStateSink( ) { }
 
-		/// <summary>
-		/// Asynchronous table mutator.
-		/// </summary>
-	, CF_AsyncTableMutator
-
-		/// <summary>
-		/// Periodic flush mutator.
-		/// </summary>
-	, CF_PeriodicFlushTableMutator
-
-		/// <summary>
-		/// Asynchronous table scanner.
-		/// </summary>
-	, CF_AsyncTableScanner
-
-		/// <summary>
-		/// Notify session state transition.
-		/// </summary>
-	, CF_NotifySessionStateChanged
+			/// <summary>
+			/// Gets called if a Hypertable session state transition occured.
+			/// </summary>
+			/// <param name="oldSessionState">The old session state</param>
+			/// <param name="newSessionState">The new session state</param>
+			virtual void stateTransition( SessionState oldSessionState, SessionState newSessionState ) = 0;
 	};
 
 } }

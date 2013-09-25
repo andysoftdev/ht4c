@@ -192,6 +192,7 @@
     <ClInclude Include="Cells.h" />
     <ClInclude Include="Client.h" />
     <ClInclude Include="Config.h" />
+    <ClInclude Include="SessionState.h" />
     <ClInclude Include="Context.h" />
     <ClInclude Include="ContextKind.h" />
     <ClInclude Include="Exception.h" />
@@ -201,6 +202,7 @@
     <ClInclude Include="Properties.h" />
     <ClInclude Include="ContextFeature.h" />
     <ClInclude Include="ScanSpec.h" />
+    <ClInclude Include="SessionStateSink.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Table.h" />
     <ClInclude Include="TableMutator.h" />

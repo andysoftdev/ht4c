@@ -91,6 +91,12 @@
     <ClInclude Include="ContextFeature.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="SessionState.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SessionStateSink.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

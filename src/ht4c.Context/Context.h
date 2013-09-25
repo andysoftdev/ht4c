@@ -26,6 +26,7 @@
 #endif
 
 #include "ht4c.Common/Context.h"
+#include "ht4c.Common/SessionState.h"
 
 namespace ht4c { namespace Common {
 	class Client;
@@ -33,6 +34,8 @@ namespace ht4c { namespace Common {
 } }
 
 namespace ht4c {
+
+	class SessionCallback;
 
 	/// <summary>
 	/// Represents a Hypertable context, handles connection to a Hypertable instance.
@@ -82,6 +85,8 @@ namespace ht4c {
 			virtual Common::Client* createClient( );
 			virtual void getProperties( Common::Properties& properties ) const;
 			virtual bool hasFeature( Common::ContextFeature contextFeature ) const;
+			virtual void addSessionStateSink( Common::SessionStateSink* SessionStateSink );
+			virtual void removeSessionStateSink( Common::SessionStateSink* SessionStateSink );
 
 			#pragma endregion
 
@@ -141,6 +146,8 @@ namespace ht4c {
 
 		private:
 
+			friend class SessionCallback;
+
 			Context( const Context& ) { }
 			Context& operator = ( const Context& ) { return *this; }
 
@@ -148,8 +155,17 @@ namespace ht4c {
 
 			typedef std::pair<Hypertable::ConnectionManagerPtr, uint32_t> connection_t;
 			typedef std::map<Hyperspace::SessionPtr, connection_t> sessions_t;
+			typedef std::set<Common::SessionStateSink*> sessionStateSinks_t;
+
+			struct stricmp_t {
+				bool operator () ( const std::string& a, const std::string& b ) const {
+					return stricmp( a.c_str(), b.c_str() ) < 0;
+				}
+			};
 
 			Context( Common::ContextKind contextKind, Hypertable::PropertiesPtr properties );
+
+			void fireSessionStateChanged( Common::SessionState oldSessionState, Common::SessionState newSessionState );
 
 			static Hyperspace::SessionPtr findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr );
 			static void registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr );
@@ -161,17 +177,14 @@ namespace ht4c {
 			static bool getPropValue( Hypertable::PropertiesPtr properties, const std::string& name, boost::any& value );
 			static Common::ContextKind getContextKind( Hypertable::PropertiesPtr properties );
 
+			Hypertable::Mutex ctxMutex;
 			Common::ContextKind contextKind;
 			Hypertable::PropertiesPtr properties;
 			Hypertable::ConnectionManagerPtr connMgr;
 			Hyperspace::SessionPtr session;
 			Hypertable::Thrift::ClientPtr thriftClient;
-
-			struct stricmp_t {
-				bool operator () ( const std::string& a, const std::string& b ) const {
-					return stricmp( a.c_str(), b.c_str() ) < 0;
-				}
-			};
+			sessionStateSinks_t sessionStateSinks;
+			SessionCallback* sessionCallback;
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -193,7 +206,7 @@ namespace ht4c {
 
 #endif
 
-			static Hypertable::RecMutex mutex;
+			static Hypertable::RecMutex envMutex;
 			static sessions_t sessions;
 
 			#endif

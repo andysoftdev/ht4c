@@ -30,6 +30,7 @@
 
 #include "ht4c.Common/Config.h"
 #include "ht4c.Common/Properties.h"
+#include "ht4c.Common/SessionStateSink.h"
 #include "ht4c.Common/Exception.h"
 #include "ht4c.Hyper/HyperClient.h"
 #include "ht4c.Thrift/ThriftFactory.h"
@@ -49,6 +50,57 @@ namespace ht4c {
 
 	using namespace Hypertable;
 	using namespace Hypertable::Config;
+
+	class SessionCallback : public Hyperspace::SessionCallback {
+
+		public:
+
+			SessionCallback( Context* _ctx )
+				: ctx( _ctx )
+				, oldSessionState( Common::SS_Jeopardy )
+			{
+			}
+
+		private:
+
+			virtual void safe() {
+				if( oldSessionState != Common::SS_Safe ) {
+					ctx->fireSessionStateChanged( oldSessionState, Common::SS_Safe );
+					oldSessionState = Common::SS_Safe;
+				}
+			}
+
+			virtual void expired() {
+				if( oldSessionState != Common::SS_Expired ) {
+					ctx->fireSessionStateChanged( oldSessionState, Common::SS_Expired );
+					oldSessionState = Common::SS_Expired;
+				}
+			}
+
+			virtual void jeopardy() {
+				if( oldSessionState != Common::SS_Jeopardy ) {
+					ctx->fireSessionStateChanged( oldSessionState, Common::SS_Jeopardy );
+					oldSessionState = Common::SS_Jeopardy;
+				}
+			}
+
+			virtual void disconnected() {
+				if( oldSessionState != Common::SS_Disconnected ) {
+					ctx->fireSessionStateChanged( oldSessionState, Common::SS_Disconnected );
+					oldSessionState = Common::SS_Disconnected;
+				}
+			}
+
+			virtual void reconnected() {
+				if( oldSessionState != Common::SS_Safe ) {
+					ctx->fireSessionStateChanged( oldSessionState, Common::SS_Safe );
+					oldSessionState = Common::SS_Safe;
+				}
+			}
+
+			Context* ctx;
+			Common::SessionState oldSessionState;
+	};
 
 	namespace {
 
@@ -73,7 +125,7 @@ namespace ht4c {
 
 		const int32_t defaultConnectionTimeoutMsec		= 30000;
 		const int32_t defaultLeaseIntervalMsec				= 1000000;
-		const int32_t defaultGracePeriodMsec					= 60000;
+		const int32_t defaultGracePeriodMsec					= 20000;
 		const bool defaultSessionReconnect						= true;
 
 		template<typename SequenceT, typename Range1T, typename Range2T>
@@ -330,7 +382,7 @@ namespace ht4c {
 
 	}
 
-	Hypertable::RecMutex Context::mutex;
+	Hypertable::RecMutex Context::envMutex;
 	Context::sessions_t Context::sessions;
 
 #ifdef SUPPORT_HAMSTERDB
@@ -358,7 +410,7 @@ namespace ht4c {
 		HT4C_TRY {
 			size_t remainingSessions;
 			{
-				ScopedRecLock lock( mutex );
+				ScopedRecLock lock( envMutex );
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -374,6 +426,7 @@ namespace ht4c {
 
 				remainingSessions = sessions.size();
 			}
+
 			if( !remainingSessions ) {
 				Comm::destroy();
 				Config::cleanup();
@@ -402,7 +455,7 @@ namespace ht4c {
 
 	Common::Client* Context::createClient( ) {
 		HT4C_TRY {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			switch( contextKind ) {
 				case Common::CK_Hyper:
 					return ht4c::Hyper::HyperClient::create( getConnectionManager(), getHyperspaceSession(), properties );
@@ -448,10 +501,37 @@ namespace ht4c {
 		case Common::CF_PeriodicFlushTableMutator:
 		case Common::CF_AsyncTableScanner:
 			return contextKind == Common::CK_Hyper || contextKind == Common::CK_Thrift;
+		case Common::CF_NotifySessionStateChanged:
+			return contextKind == Common::CK_Hyper;
 		default:
 			break;
 		}
 		return false;
+	}
+
+	void Context::addSessionStateSink( Common::SessionStateSink* SessionStateSink ) {
+		if(  SessionStateSink 
+			&& contextKind == Common::CK_Hyper ) {
+
+			ScopedLock lock( ctxMutex );
+
+			if( !sessionCallback ) {
+				sessionCallback = new SessionCallback( this );
+
+				if( session ) {
+					session->add_callback( sessionCallback );
+				}
+			}
+
+			sessionStateSinks.insert( SessionStateSink );
+		}
+	}
+
+	void Context::removeSessionStateSink( Common::SessionStateSink* SessionStateSink ) {
+		if( SessionStateSink ) {
+			ScopedLock lock( ctxMutex );
+			sessionStateSinks.erase( SessionStateSink );
+		}
 	}
 
 	Context::~Context( ) {
@@ -459,7 +539,7 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 		if( hamsterEnv ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			for( hamster_envs_t::iterator it = hamsterEnvs.begin(); it != hamsterEnvs.end(); ++it ) {
 				if( (*it).second.first == hamsterEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -476,7 +556,7 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 		if( sqliteEnv ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			for( sqlite_envs_t::iterator it = sqliteEnvs.begin(); it != sqliteEnvs.end(); ++it ) {
 				if( (*it).second.first == sqliteEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -489,6 +569,21 @@ namespace ht4c {
 		}
 
 #endif
+
+		{
+			ScopedLock lock( ctxMutex );
+
+			if( sessionCallback ) {
+				if( session ) {
+					session->remove_callback( sessionCallback );
+				}
+
+				delete sessionCallback;
+				sessionCallback = 0;
+			}
+
+			sessionStateSinks.clear();
+		}
 
 		thriftClient = 0;
 		if( session ) {
@@ -515,6 +610,10 @@ namespace ht4c {
 				if( !session ) {
 					HT_INFO_OUT << "Creating hyperspace session " << properties->get_str(hyperspace) << HT_END;
 					session = new Hyperspace::Session( getComm(), properties );
+
+					if( sessionCallback ) {
+						session->add_callback( sessionCallback );
+					}
 				}
 				registerSession( session, getConnectionManager() );
 			}
@@ -549,7 +648,7 @@ namespace ht4c {
 
 	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
 		if( !hamsterEnv ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::HamsterFilename );
 			hamster_envs_t::iterator it = hamsterEnvs.find( filename );
 			if( it == hamsterEnvs.end() ) {
@@ -579,7 +678,7 @@ namespace ht4c {
 
 	SQLite::SQLiteEnvPtr Context::getSQLiteEnv( ) {
 		if( !sqliteEnv ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::SQLiteFilename );
 			sqlite_envs_t::iterator it = sqliteEnvs.find( filename );
 			if( it == sqliteEnvs.end() ) {
@@ -610,12 +709,26 @@ namespace ht4c {
 	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
 	: contextKind( _contextKind )
 	, properties( _properties )
+	, sessionCallback( 0 )
 	{
+	}
+
+	void Context::fireSessionStateChanged( Common::SessionState oldSessionState, Common::SessionState newSessionState ) {
+		sessionStateSinks_t _sessionStateSinks;
+
+		{
+			ScopedLock lock( ctxMutex );
+			_sessionStateSinks = sessionStateSinks;
+		}
+
+		for each( Common::SessionStateSink* sink in _sessionStateSinks ) {
+			sink->stateTransition( oldSessionState, newSessionState );
+		}
 	}
 
 	Hyperspace::SessionPtr Context::findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr ) {
 		connMgr = 0;
-		ScopedRecLock lock( mutex );
+		ScopedRecLock lock( envMutex );
 		if( ReactorRunner::handler_map && sessions.size() ) {
 			Hypertable::Strings hosts = properties->get_strs( hyperspaceHost );
 			if( hosts.size() && hosts.front().size() ) {
@@ -633,7 +746,7 @@ namespace ht4c {
 
 	void Context::registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr ) {
 		if( session ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			std::pair<sessions_t::iterator, bool> r = sessions.insert( sessions_t::value_type(session, std::make_pair(connMgr, 1)) );
 			if( !r.second ) {
 				++(*r.first).second.second;
@@ -643,7 +756,7 @@ namespace ht4c {
 
 	void Context::unregisterSession( Hyperspace::SessionPtr session ) {
 		if( session ) {
-			ScopedRecLock lock( mutex );
+			ScopedRecLock lock( envMutex );
 			sessions_t::iterator it = sessions.find( session );
 			if( it != sessions.end() ) {
 				if( --(*it).second.second == 0 ) {

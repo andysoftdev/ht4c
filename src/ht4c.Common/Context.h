@@ -31,6 +31,7 @@
 namespace ht4c { namespace Common {
 	class Client;
 	class Properties;
+	class SessionStateSink;
 
 	/// <summary>
 	/// Abstract class represents a Hypertable context, handles connection to a Hypertable instance.
@@ -65,6 +66,18 @@ namespace ht4c { namespace Common {
 			/// <returns>true if the actual provider supports the feature specified, otherwise false.</returns>
 			/// <seealso cref="ht4c::Common::ContextFeature"/>
 			virtual bool hasFeature( ContextFeature contextFeature ) const = 0;
+
+			/// <summary>
+			/// Adds a session state transition callback.
+			/// </summary>
+			/// <param name="SessionStateSink">Log event callback to add</param>
+			virtual void addSessionStateSink( SessionStateSink* SessionStateSink ) = 0;
+
+			/// <summary>
+			/// Removes a session state transition callback.
+			/// </summary>
+			/// <param name="SessionStateSink">Log event callback to remove</param>
+			virtual void removeSessionStateSink( SessionStateSink* SessionStateSink ) = 0;
 	};
 
 } }

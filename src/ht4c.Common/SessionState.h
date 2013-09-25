@@ -28,39 +28,13 @@
 namespace ht4c { namespace Common {
 
 	/// <summary>
-	/// Declares extended context features, apart from the regular features.
+	/// Specifies possible Hypertable session states.
 	/// </summary>
-	enum ContextFeature {
-
-		/// <summary>
-		/// Unknown provider feature.
-		/// </summary>
-		CF_Unknown
-
-		/// <summary>
-		/// Hypertable query language (HQL).
-		/// </summary>
-	, CF_HQL
-
-		/// <summary>
-		/// Asynchronous table mutator.
-		/// </summary>
-	, CF_AsyncTableMutator
-
-		/// <summary>
-		/// Periodic flush mutator.
-		/// </summary>
-	, CF_PeriodicFlushTableMutator
-
-		/// <summary>
-		/// Asynchronous table scanner.
-		/// </summary>
-	, CF_AsyncTableScanner
-
-		/// <summary>
-		/// Notify session state transition.
-		/// </summary>
-	, CF_NotifySessionStateChanged
+	enum SessionState {
+		  SS_Expired			= 0
+		, SS_Jeopardy			= 1
+		, SS_Safe					= 2
+		, SS_Disconnected	= 3
 	};
 
 } }
