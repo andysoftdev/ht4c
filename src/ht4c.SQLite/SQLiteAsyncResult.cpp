@@ -199,7 +199,8 @@ namespace ht4c { namespace SQLite {
 			if( asyncScannerId ) {
 				{
 					SQLiteEnvLock sync( env.get() );
-					HT4C_SQLITE_RETRY( env->async_scanner_cancel(asyncScannerId) );
+					env->async_scanner_cancel( asyncScannerId );
+					env->async_scanner_close( asyncScannerId );
 				}
 				Hypertable::ScopedRecLock lock( mutex );
 				asyncTableScanners.erase( asyncScannerId );
@@ -213,7 +214,7 @@ namespace ht4c { namespace SQLite {
 		/*HT4C_TRY {
 			if( asyncMutatorId ) {
 				SQLiteEnvLock sync( env.get() );
-				HT4C_SQLITE_RETRY( env->async_mutator_cancel(asyncMutatorId) );
+				env->async_mutator_cancel( asyncMutatorId );
 			}
 		}
 		HT4C_RETHROW*/

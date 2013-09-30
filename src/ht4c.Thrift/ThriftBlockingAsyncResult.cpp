@@ -117,7 +117,8 @@ namespace ht4c { namespace Thrift {
 			if( asyncScannerId ) {
 				{
 					ThriftClientLock sync( client.get() );
-					HT4C_THRIFT_RETRY( client->async_scanner_cancel(asyncScannerId) );
+					client->async_scanner_cancel( asyncScannerId );
+					client->async_scanner_close( asyncScannerId );
 				}
 				Hypertable::ScopedRecLock lock( mutex );
 				asyncTableScanners.erase( asyncScannerId );
@@ -130,7 +131,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			if( asyncMutatorId ) {
 				ThriftClientLock sync( client.get() );
-				HT4C_THRIFT_RETRY( client->async_mutator_cancel(asyncMutatorId) );
+				client->async_mutator_cancel( asyncMutatorId );
 			}
 		}
 		HT4C_RETHROW
