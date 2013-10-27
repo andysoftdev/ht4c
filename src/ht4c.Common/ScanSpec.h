@@ -113,14 +113,14 @@ namespace ht4c { namespace Common {
 			void scanAndFilter( bool scanAndFilter );
 
 			/// <summary>
-			/// Sets the start time of time interval for the scan.
+			/// Sets the start time of time interval for the scan. Cells with timestamp newer or equal will be returned.
 			/// </summary>
 			/// <param name="start">Start time of time interval</param>
 			/// <remarks>Time values represent number of nanoseconds from 1970-01-00 00:00:00.0 UTC</remarks>
 			void startTimestamp( uint64_t start );
 
 			/// <summary>
-			/// Sets the end time of time interval for the scan.
+			/// Sets the end time of time interval for the scan. Cells with timestamp older or equal will be returned.
 			/// </summary>
 			/// <param name="end">End time of time interval</param>
 			/// <remarks>Time values represent number of nanoseconds from 1970-01-00 00:00:00.0 UTC</remarks>

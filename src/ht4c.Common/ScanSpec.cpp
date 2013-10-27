@@ -82,7 +82,7 @@ namespace ht4c { namespace Common {
 	}
 
 	void ScanSpec::endTimestamp( uint64_t end ) {
-		scanSpecBuilder.set_end_time( end );
+		scanSpecBuilder.set_end_time( end + 1 );
 	}
 
 	void ScanSpec::rowRegex( const char* regex ) {
