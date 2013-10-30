@@ -4,7 +4,6 @@
 	<!-- Master files to make -->
 	<PropertyGroup>
 		<Version>0.9.7.12</Version>
-	</PropertyGroup>
 
 	<!-- Check for MSBuildCommunityTasks -->
 	<PropertyGroup>
@@ -22,6 +21,13 @@
 		<Is64Bit>False</Is64Bit>
 		<Is64Bit
 			Condition="'$(MachineProcessorArchitecture)' == 'AMD64'">true</Is64Bit>
+	</PropertyGroup>
+
+	<!-- Platform toolset -->
+	<PropertyGroup>
+		<PlatformToolset Condition="'$(VisualStudioVersion)' == '10.0'">v100</PlatformToolset>
+		<PlatformToolset Condition="'$(VisualStudioVersion)' == '11.0'">v110</PlatformToolset>
+		<PlatformToolset Condition="'$(VisualStudioVersion)' == '12.0'">v120</PlatformToolset>
 	</PropertyGroup>
 
 	<!-- Configuration group -->
@@ -58,7 +64,7 @@
 		<MSBuild
 			Projects="ht4c.sln"
 			Targets="Build"
-			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform)"
+			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform);PlatformToolset=$(PlatformToolset)"
 			ContinueOnError="false" />
 	</Target>
 
@@ -73,7 +79,7 @@
 		<MSBuild
 			Projects="ht4c.sln"
 			Targets="Clean"
-			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform)"
+			Properties="Configuration=%(MakeConfiguration.Configuration);Platform=%(MakeConfiguration.Platform);PlatformToolset=$(PlatformToolset)"
 			ContinueOnError="false" />
 	</Target>
 
