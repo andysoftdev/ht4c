@@ -94,7 +94,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
-      <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <EnablePREfast>false</EnablePREfast>
@@ -116,7 +116,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
-      <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <EnablePREfast>false</EnablePREfast>
@@ -141,7 +141,7 @@
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
-      <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
@@ -167,7 +167,7 @@
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
-      <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
