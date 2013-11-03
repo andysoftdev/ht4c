@@ -190,7 +190,6 @@ namespace ht4c { namespace Common {
 		return false;
 	}
 
-
 	ScanContext::ScanContext( const Hypertable::ScanSpec& _scanSpec, Hypertable::SchemaPtr _schema )
 	: schema( _schema )
 	, scanSpec( _scanSpec )

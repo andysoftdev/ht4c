@@ -73,6 +73,10 @@ namespace ht4c { namespace Common {
 		scanSpecBuilder.set_keys_only( keysOnly );
 	}
 
+	void ScanSpec::notUseQueryCache( bool notUseQueryCache ) {
+		scanSpecBuilder.set_do_not_cache( notUseQueryCache );
+	}
+
 	void ScanSpec::scanAndFilter( bool scanAndFilter ) {
 		scanSpecBuilder.set_scan_and_filter_rows( scanAndFilter );
 	}

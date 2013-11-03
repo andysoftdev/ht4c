@@ -199,6 +199,9 @@ namespace ht4c { namespace Thrift {
 		tss.keys_only = hss.keys_only;
 		tss.__isset.keys_only = true;
 
+		tss.do_not_cache = hss.do_not_cache;
+		tss.__isset.do_not_cache = true;
+
 		tss.scan_and_filter_rows = hss.scan_and_filter_rows;
 		tss.__isset.scan_and_filter_rows = true;
 

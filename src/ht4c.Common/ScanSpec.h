@@ -107,6 +107,12 @@ namespace ht4c { namespace Common {
 			void keysOnly( bool keysOnly );
 
 			/// <summary>
+			/// If set the query result won't be added to the query cache.
+			/// </summary>
+			/// <param name="keysOnly">If true scans return onlt keys</param>
+			void notUseQueryCache( bool keysOnly );
+
+			/// <summary>
 			/// If set scans use scan and filter rows to get many individual rows.
 			/// </summary>
 			/// <param name="scanAndFilter">Use scan and filter rows</param>
