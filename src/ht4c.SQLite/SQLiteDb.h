@@ -311,6 +311,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 					ScanContext( const Hypertable::ScanSpec& scanSpec, Hypertable::SchemaPtr schema );
 
 					std::string predicate;
+					std::string cfPredicate;
+					std::string qPredicate;
 					std::string columns;
 
 			protected:

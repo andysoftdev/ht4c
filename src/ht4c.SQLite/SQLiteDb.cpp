@@ -945,8 +945,17 @@ namespace ht4c { namespace SQLite { namespace Db {
 			}
 		}
 
+		if( !cfPredicate.empty() ) {
+			predicate =   qPredicate.empty()
+									? Hypertable::format( "cf IN (%s)", cfPredicate.c_str() )
+									: Hypertable::format( "cf IN (%s) OR %s", cfPredicate.c_str(), qPredicate.c_str() );
+		}
+		else {
+			predicate = qPredicate;
+		}
+
 		if( !predicateTimestamp.empty() ) {
-			predicate = predicate.empty() ? predicateTimestamp : Hypertable::format("%s AND (%s)", predicateTimestamp.c_str(), predicate.c_str() );
+			predicate = predicate.empty() ? predicateTimestamp : Hypertable::format( "%s AND (%s)", predicateTimestamp.c_str(), predicate.c_str() );
 		}
 
 		columns = "r, cf, cq, ts";
@@ -957,10 +966,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Scanner::ScanContext::initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) {
 		if( !hasQualifier || isRegexp ) {
-			predicate += Hypertable::format("%scf=%d", predicate.empty() ? "" : " OR ", cf->id ); //FIXME use cf IN ('A', 'B')
+			cfPredicate += Hypertable::format( "%s'%d'", cfPredicate.empty() ? "" : ",", cf->id );
 		}
 		else {
-			predicate += Hypertable::format("%s(cf=%d AND cq='%s')", predicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() ); //FIXME use cf IN ('A', 'B')
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq='%s')", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
 		}
 	}
 
