@@ -59,6 +59,7 @@ extern "C" {
  */
 #if defined(HAM_OS_WIN32)
 #  define WIN32_MEAN_AND_LEAN
+#  include <winsock2.h>
 #  include <windows.h>
 #endif
 
@@ -149,6 +150,7 @@ typedef unsigned char      ham_u8_t;
  */
 #ifdef HAM_OS_POSIX
 typedef int                ham_fd_t;
+typedef int	               ham_socket_t;
 #  define HAM_INVALID_FD  (-1)
 #endif
 
@@ -158,8 +160,10 @@ typedef int                ham_fd_t;
 #ifdef HAM_OS_WIN32
 #  ifdef CYGWIN
 typedef int                ham_fd_t;
+typedef int	               ham_socket_t;
 #  else
 typedef HANDLE             ham_fd_t;
+typedef SOCKET             ham_socket_t;
 #  endif
 #  define HAM_INVALID_FD   (0)
 #endif
@@ -177,18 +181,10 @@ typedef int                ham_bool_t;
 typedef int                ham_status_t;
 
 /**
- * typedef for sizes, which limits data blobs to 32 bits
- *
- * @remark If you change this datatype, you also have to change
- * the endian-macros in src/endian.h (ham_db2h_size/ham_h2db_size)
- */
-typedef ham_u32_t          ham_size_t;
-
-/**
  * maximum values which can be stored in the related ham_[type]_t type:
  */
 #define HAM_MAX_U32         (~(ham_u32_t)0)
-#define HAM_MAX_SIZE_T      (~(ham_size_t)0)
+#define HAM_MAX_SIZE_T      (~(ham_u32_t)0)
 
 
 #ifdef __cplusplus

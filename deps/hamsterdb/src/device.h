@@ -16,26 +16,27 @@
  *
  */
  
-
 #ifndef HAM_DEVICE_H__
 #define HAM_DEVICE_H__
 
 #include <ham/hamsterdb.h>
 
+#include "config.h"
+
 namespace hamsterdb {
 
 class Page;
-class Environment;
+class LocalEnvironment;
 
 class Device {
   public:
     // Constructor
     //
-    // initialize the pagesize with a default value - this will be
-    // overwritten i.e. by ham_env_open, ham_env_create when the pagesize
+    // initialize the page_size with a default value - this will be
+    // overwritten i.e. by ham_env_open, ham_env_create when the page_size
     // of the file is known
-    Device(Environment *env, ham_u32_t flags)
-      : m_env(env), m_flags(flags), m_pagesize(HAM_DEFAULT_PAGESIZE) {
+    Device(LocalEnvironment *env, ham_u32_t flags)
+      : m_env(env), m_flags(flags), m_page_size(HAM_DEFAULT_PAGESIZE) {
     }
 
     // virtual destructor
@@ -43,58 +44,58 @@ class Device {
     }
 
     // Create a new device - called in ham_env_create
-    virtual ham_status_t create(const char *filename, ham_u32_t flags,
+    virtual void create(const char *filename, ham_u32_t flags,
                 ham_u32_t mode) = 0;
 
     // opens an existing device - called in ham_env_open
-    virtual ham_status_t open(const char *filename, ham_u32_t flags) = 0;
+    virtual void open(const char *filename, ham_u32_t flags) = 0;
 
     // closes the device - called in ham_env_close
-    virtual ham_status_t close() = 0;
+    virtual void close() = 0;
 
     // flushes the device - called in ham_env_flush
-    virtual ham_status_t flush() = 0;
+    virtual void flush() = 0;
 
     // truncate/resize the device
-    virtual ham_status_t truncate(ham_u64_t newsize) = 0;
+    virtual void truncate(ham_u64_t newsize) = 0;
 
     // returns true if the device is open
     virtual bool is_open() = 0;
 
     // get the current file/storage size
-    virtual ham_status_t get_filesize(ham_u64_t *length) = 0;
+    virtual ham_u64_t get_filesize() = 0;
 
     // seek position in a file
-    virtual ham_status_t seek(ham_u64_t offset, int whence) = 0;
+    virtual void seek(ham_u64_t offset, int whence) = 0;
 
     // tell the position in a file
-    virtual ham_status_t tell(ham_u64_t *offset) = 0;
+    virtual ham_u64_t tell() = 0;
 
     // reads from the device; this function does not use mmap
-    virtual ham_status_t read(ham_u64_t offset, void *buffer,
+    virtual void read(ham_u64_t offset, void *buffer,
                 ham_u64_t size) = 0;
 
     // writes to the device; this function does not use mmap
-    virtual ham_status_t write(ham_u64_t offset, void *buffer,
+    virtual void write(ham_u64_t offset, void *buffer,
                 ham_u64_t size) = 0;
 
     // writes to the device; this function does not use mmap
-    virtual ham_status_t writev(ham_u64_t offset, void *buffer1,
+    virtual void writev(ham_u64_t offset, void *buffer1,
                 ham_u64_t size1, void *buffer2, ham_u64_t size2) = 0;
 
     // reads a page from the device; this function CAN use mmap
-    virtual ham_status_t read_page(Page *page) = 0;
+    virtual void read_page(Page *page) = 0;
 
     // writes a page to the device
-    virtual ham_status_t write_page(Page *page) = 0;
+    virtual void write_page(Page *page) = 0;
 
     // allocate storage from this device; this function
     // will *NOT* use mmap.
-    virtual ham_status_t alloc(ham_size_t size, ham_u64_t *address) = 0;
+    virtual ham_u64_t alloc(ham_u32_t size) = 0;
 
     // allocate storage for a page from this device; this function
     // can use mmap if available
-    virtual ham_status_t alloc_page(Page *page) = 0;
+    virtual void alloc_page(Page *page) = 0;
 
     // frees a page on the device
     //
@@ -105,13 +106,13 @@ class Device {
     // get the Environment
     //
     // TODO get rid of this function. It's only used in the PageManager.
-    Environment *get_env() {
+    LocalEnvironment *get_env() {
       return (m_env);
     }
 
-    // set the pagesize for this device 
-    void set_pagesize(ham_size_t pagesize) {
-      m_pagesize = pagesize;
+    // set the page_size for this device 
+    void set_page_size(ham_u32_t page_size) {
+      m_page_size = page_size;
     }
 
     // disable memory mapped I/O - used for testing
@@ -121,13 +122,13 @@ class Device {
 
   protected:
     // the environment which employs this device 
-    Environment *m_env;
+    LocalEnvironment *m_env;
 
     // the device flags 
     ham_u32_t m_flags;
 
     // the page size 
-    ham_size_t m_pagesize;
+    ham_u32_t m_page_size;
 
     friend class DeviceTest;
     friend class InMemoryDeviceTest;

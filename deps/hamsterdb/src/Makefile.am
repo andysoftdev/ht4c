@@ -1,36 +1,34 @@
 
 if ENABLE_REMOTE
-SUBDIRS = protocol
-if ENABLE_SERVER
-SUBDIRS += server
-endif # ENABLE_SERVER
+SUBDIRS = protocol server
 endif # ENABLE_REMOTE
-
-AM_CPPFLAGS = -I../include -I$(top_srcdir)/include $(BOOST_CPPFLAGS)
 
 lib_LTLIBRARIES = libhamsterdb.la
 
-EXTRA_DIST = os_win32.cc
-
 libhamsterdb_la_SOURCES = \
+	abi.h \
+	aes.h \
 	blob_manager.h \
 	blob_manager_inmem.h \
 	blob_manager_inmem.cc \
 	blob_manager_disk.h \
 	blob_manager_disk.cc \
 	blob_manager_factory.h \
-	btree.cc \
 	btree_check.cc \
 	btree_cursor.cc \
 	btree_cursor.h \
 	btree_enum.cc \
 	btree_erase.cc \
 	btree_find.cc \
-	btree.h \
+	btree_flags.h \
+	btree_impl_default.h \
+	btree_impl_pax.h \
+	btree_index.cc \
+	btree_index.h \
+	btree_index_factory.h \
 	btree_insert.cc \
-	btree_key.cc \
-	btree_key.h \
 	btree_node.h \
+	btree_node_proxy.h \
 	btree_stats.cc \
 	btree_stats.h \
 	cache.cc \
@@ -42,26 +40,30 @@ libhamsterdb_la_SOURCES = \
 	cursor.h \
 	db.cc \
 	db.h \
+	db_local.cc \
+	db_local.h \
+	db_remote.cc \
+	db_remote.h \
 	device.h \
 	device_disk.h \
 	device_inmem.h \
 	device_factory.h \
-	duplicates.cc \
-	duplicates.h \
 	endianswap.h \
-	env.cc \
 	env.h \
+	env.cc \
+	env_header.h \
+	env_local.h \
+	env_local.cc \
+	env_remote.h \
+	env_remote.cc \
 	error.cc \
 	error.h \
 	errorinducer.h \
-	extkeys.h \
 	freelist.cc \
 	freelist.h \
 	freelist_stats.cc \
 	freelist_stats.h \
 	hamsterdb.cc \
-	hash-table.h \
-	internal_fwd_decl.h \
 	journal.cc \
 	journal_entries.h \
 	journal.h \
@@ -79,7 +81,6 @@ libhamsterdb_la_SOURCES = \
 	page_manager.cc \
 	page_manager.h \
 	rb.h \
-	remote.cc \
 	serial.h \
 	txn.cc \
 	txn_cursor.cc \
@@ -89,11 +90,18 @@ libhamsterdb_la_SOURCES = \
 	util.h \
 	version.h
 
-libhamsterdb_la_LDFLAGS = -version-info 4:0:0 
+EXTRA_DIST = os_win32.cc
+
+AM_CPPFLAGS = -I../include -I$(top_srcdir)/include $(BOOST_CPPFLAGS)
+libhamsterdb_la_LDFLAGS = -version-info 5:1:0 $(BOOST_SYSTEM_LDFLAGS)
+libhamsterdb_la_LIBADD  = $(BOOST_SYSTEM_LIBS)
+
+if ENABLE_ENCRYPTION
+AM_CPPFLAGS += -DHAM_ENABLE_ENCRYPTION
+endif
 
 if ENABLE_REMOTE
-libhamsterdb_la_LDFLAGS += -lcurl
-libhamsterdb_la_LDFLAGS += $(top_builddir)/src/protocol/libprotocol.la
 AM_CPPFLAGS += -DHAM_ENABLE_REMOTE
+libhamsterdb_la_LIBADD += $(top_builddir)/src/protocol/libprotocol.la
 endif
 

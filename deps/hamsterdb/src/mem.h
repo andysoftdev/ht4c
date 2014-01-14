@@ -12,13 +12,20 @@
 #ifndef HAM_MEM_H__
 #define HAM_MEM_H__
 
+
+#include "config.h"
+
+#include <new>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
 #  include <malloc.h>
 #endif
-#ifdef HAVE_GOOGLE_TCMALLOC_H
+#ifdef HAM_USE_TCMALLOC
 #  include <google/tcmalloc.h>
 #endif
+
+#include "ham/hamsterdb.h"
+#include "error.h"
 
 struct ham_env_metrics_t;
 
@@ -47,11 +54,14 @@ class Memory {
       ms_total_allocations++;
       ms_current_allocations++;
 
-#ifdef HAVE_GOOGLE_TCMALLOC_H
-      return ((T *)::tc_malloc(size));
+#ifdef HAM_USE_TCMALLOC
+      T *t = (T *)::tc_malloc(size);
 #else
-      return ((T *)::malloc(size));
+      T *t = (T *)::malloc(size);
 #endif
+      if (!t)
+        throw Exception(HAM_OUT_OF_MEMORY);
+      return (t);
     }
 
     // allocation function; returns null if out of memory. initializes
@@ -65,11 +75,14 @@ class Memory {
       ms_total_allocations++;
       ms_current_allocations++;
 
-#ifdef HAVE_GOOGLE_TCMALLOC_H
-      return ((T *)::tc_calloc(1, size));
+#ifdef HAM_USE_TCMALLOC
+      T *t = (T *)::tc_calloc(1, size);
 #else
-      return ((T *)::calloc(1, size));
+      T *t = (T *)::calloc(1, size);
 #endif
+      if (!t)
+        throw Exception(HAM_OUT_OF_MEMORY);
+      return (t);
     }
 
     // re-allocation function; returns null if out of memory.
@@ -84,18 +97,21 @@ class Memory {
         ms_total_allocations++;
         ms_current_allocations++;
       }
-#ifdef HAVE_GOOGLE_TCMALLOC_H
-      return ((T *)::tc_realloc(ptr, size));
+#ifdef HAM_USE_TCMALLOC
+      T *t = (T *)::tc_realloc(ptr, size);
 #else
-      return ((T *)::realloc(ptr, size));
+      T *t = (T *)::realloc(ptr, size);
 #endif
+      if (!t)
+        throw Exception(HAM_OUT_OF_MEMORY);
+      return (t);
     }
 
     // releases a memory block; can deal with NULL pointers.
     static void release(void *ptr) {
       if (ptr) {
         ms_current_allocations--;
-#ifdef HAVE_GOOGLE_TCMALLOC_H
+#ifdef HAM_USE_TCMALLOC
         ::tc_free(ptr);
 #else
         ::free(ptr);

@@ -24,11 +24,16 @@
  * The file version describes the version of the binary database format.
  * hamsterdb is neither backwards- nor forwards-compatible regarding file
  * format changes. 
+ *
+ * History of file versions:
+ *   2.1.0: introduced the file version; version is 0
+ *   2.1.3: new btree format, file format cleanups; version is 1
+ *   2.1.4: new btree format for duplicate keys/var. length keys; version is 2
  */
 #define HAM_VERSION_MAJ     2
 #define HAM_VERSION_MIN     1
-#define HAM_VERSION_REV     1
-#define HAM_FILE_VERSION    0
-#define HAM_VERSION_STR     "2.1.1"
+#define HAM_VERSION_REV     4
+#define HAM_FILE_VERSION    2
+#define HAM_VERSION_STR     "2.1.4"
 
 #endif /* HAM_VERSION_H__ */

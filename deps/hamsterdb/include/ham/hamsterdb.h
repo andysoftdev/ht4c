@@ -13,7 +13,7 @@
  * @file hamsterdb.h
  * @brief Include file for hamsterdb Embedded Storage
  * @author Christoph Rupp, chris@crupp.de
- * @version 2.1.1
+ * @version 2.1.4
  *
  * @mainpage
  *
@@ -77,7 +77,7 @@
  * <tr><td>@ref ham_txn_abort</td><td>Aborts the current Transaction</td></tr>
  * </table>
  *
- * hamsterdb supports remote Databases via http. The server can be embedded
+ * hamsterdb supports remote Databases. The server can be embedded
  * into your application or run standalone (see tools/hamzilla for a Unix
  * daemon or Win32 service which hosts Databases). If you want to embed the
  * server then the following functions have to be used:
@@ -254,9 +254,9 @@ typedef struct {
  * element of { 0, NULL}, e.g.
  *
  * <pre>
- *   ham_parameter_t parameters[]={
- *    { HAM_PARAM_CACHESIZE, 2*1024*1024 }, // set cache size to 2 mb
- *    { HAM_PARAM_PAGESIZE, 4096 }, // set pagesize to 4 kb
+ *   ham_parameter_t parameters[] = {
+ *    { HAM_PARAM_CACHE_SIZE, 2 * 1024 * 1024 }, // set cache size to 2 mb
+ *    { HAM_PARAM_PAGE_SIZE, 4096 }, // set page size to 4 kb
  *    { 0, NULL }
  *   };
  * </pre>
@@ -272,16 +272,49 @@ typedef struct {
 
 
 /**
+ * @defgroup ham_key_types hamsterdb Key Types
+ * @{
+ */
+
+/** A binary blob without type; sorted by memcmp */
+#define HAM_TYPE_BINARY                      0
+/** A binary blob without type; sorted by callback function */
+#define HAM_TYPE_CUSTOM                      1
+/** An unsigned 8-bit integer */
+#define HAM_TYPE_UINT8                       3
+/** An unsigned 16-bit integer */
+#define HAM_TYPE_UINT16                      5
+/** An unsigned 32-bit integer */
+#define HAM_TYPE_UINT32                      7
+/** An unsigned 64-bit integer */
+#define HAM_TYPE_UINT64                      9
+/** An 32-bit float */
+#define HAM_TYPE_REAL32                     11
+/** An 64-bit double */
+#define HAM_TYPE_REAL64                     12
+
+/**
+ * @}
+ */
+
+
+/**
  * @defgroup ham_status_codes hamsterdb Status Codes
  * @{
  */
 
 /** Operation completed successfully */
 #define HAM_SUCCESS                     (  0)
+/** Invalid record size */
+#define HAM_INV_RECORD_SIZE             ( -2)
 /** Invalid key size */
-#define HAM_INV_KEYSIZE                 ( -3)
+#define HAM_INV_KEY_SIZE                ( -3)
+/* deprecated */
+#define HAM_INV_KEYSIZE                 HAM_INV_KEY_SIZE
 /** Invalid page size (must be 1024 or a multiple of 2048) */
-#define HAM_INV_PAGESIZE                ( -4)
+#define HAM_INV_PAGE_SIZE               ( -4)
+/* deprecated */
+#define HAM_INV_PAGESIZE                HAM_INV_PAGE_SIZE
 /** Memory allocation failed - out of memory */
 #define HAM_OUT_OF_MEMORY               ( -6)
 /** Invalid function parameter */
@@ -302,8 +335,6 @@ typedef struct {
 #define HAM_WRITE_PROTECTED             (-15)
 /** Database record not found */
 #define HAM_BLOB_NOT_FOUND              (-16)
-/** Prefix comparison function needs more data */
-#define HAM_PREFIX_REQUEST_FULLKEY      (-17)
 /** Generic file I/O error */
 #define HAM_IO_ERROR                    (-18)
 /** Database cache is full */
@@ -456,10 +487,21 @@ ham_get_license(const char **licensee, const char **product);
  * Databases in an Environment can be created with @ref ham_env_create_db
  * or opened with @ref ham_env_open_db.
  *
+ * Specify a URL instead of a filename (i.e.
+ * "ham://localhost:8080/customers.db") to access a remote hamsterdb Server.
+ *
+ * Starting with version 2.1.2, hamsterdb can transparently encrypt the
+ * generated file using 128bit AES in CBC mode. The write-ahead log used
+ * for recovery is also encrypted (with exception of some metadata), but the 
+ * transactional journal is not. Encryption can be enabled by specifying
+ * @ref HAM_PARAM_ENCRYPTION_KEY (see below). The identical key has to be
+ * provided in @ref ham_env_open as well. Ignored for remote Environments.
+ *
  * @param env A pointer to an Environment handle
  * @param filename The filename of the Environment file. If the file already
  *      exists, it is overwritten. Can be NULL for an In-Memory
- *      Environment.
+ *      Environment. Can be a URL ("ham://<hostname>:<port>/<environment>")
+ *      for remote access.
  * @param flags Optional flags for opening the Environment, combined with
  *      bitwise OR. Possible flags are:
  *    <ul>
@@ -473,14 +515,14 @@ ham_get_license(const char **licensee, const char **product);
  *      file will be created, and the Database contents are lost after
  *      the Environment is closed. The @a filename parameter can
  *      be NULL. Do <b>NOT</b> use in combination with
- *      @ref HAM_CACHE_STRICT and do <b>NOT</b> specify @a cachesize
+ *      @ref HAM_CACHE_STRICT and do <b>NOT</b> specify @a cache_size
  *      other than 0.
  *     <li>@ref HAM_DISABLE_MMAP</li> Do not use memory mapped files for I/O.
  *      By default, hamsterdb checks if it can use mmap,
  *      since mmap is faster than read/write. For performance
  *      reasons, this flag should not be used.
  *     <li>@ref HAM_CACHE_STRICT</li> Do not allow the cache to grow larger
- *      than @a cachesize. If a Database operation needs to resize the
+ *      than @a cache_size. If a Database operation needs to resize the
  *      cache, it will return @ref HAM_CACHE_FULL.
  *      If the flag is not set, the cache is allowed to allocate
  *      more pages than the maximum cache size, but only if it's
@@ -500,10 +542,10 @@ ham_get_license(const char **licensee, const char **product);
  * @param param An array of ham_parameter_t structures. The following
  *      parameters are available:
  *    <ul>
- *    <li>@ref HAM_PARAM_CACHESIZE</li> The size of the Database cache,
+ *    <li>@ref HAM_PARAM_CACHE_SIZE</li> The size of the Database cache,
  *      in bytes. The default size is defined in src/config.h
- *      as @a HAM_DEFAULT_CACHESIZE - usually 2MB
- *    <li>@ref HAM_PARAM_PAGESIZE</li> The size of a file page, in
+ *      as @a HAM_DEFAULT_CACHE_SIZE - usually 2MB
+ *    <li>@ref HAM_PARAM_PAGE_SIZE</li> The size of a file page, in
  *      bytes. It is recommended not to change the default size. The
  *      default size depends on hardware and operating system.
  *      Page sizes must be 1024 or a multiple of 2048.
@@ -511,7 +553,12 @@ ham_get_license(const char **licensee, const char **product);
  *      Databases in this Environment; default value: 16.
  *    <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
  *      and the journal files; default is the same path as the database
- *      file
+ *      file. Ignored for remote Environments.
+ *    <li>@ref HAM_PARAM_ENCRYPTION_KEY</li> The 16 byte long AES encryption
+ *      key; enables AES encryption for the Environment file. Not allowed
+ *      for In-Memory Environments. Ignored for remote Environments.
+ *    <li>@ref HAM_PARAM_NETWORK_TIMEOUT_SEC</li> Timeout (in seconds) when
+ *      waiting for data from a remote server. By default, no timeout is set.
  *    </ul>
  *
  * @return @ref HAM_SUCCESS upon success
@@ -525,9 +572,9 @@ ham_get_license(const char **licensee, const char **product);
  * @return @ref HAM_INV_FILE_VERSION if the Environment version is not
  *        compatible with the library version
  * @return @ref HAM_OUT_OF_MEMORY if memory could not be allocated
- * @return @ref HAM_INV_PAGESIZE if @a pagesize is not 1024 or
+ * @return @ref HAM_INV_PAGE_SIZE if @a page_size is not 1024 or
  *        a multiple of 2048
- * @return @ref HAM_INV_KEYSIZE if @a keysize is too large (at least 4
+ * @return @ref HAM_INV_KEY_SIZE if @a key_size is too large (at least 4
  *        keys must fit in a page)
  * @return @ref HAM_WOULD_BLOCK if another process has locked the file
  * @return @ref HAM_ENVIRONMENT_ALREADY_OPEN if @a env is already in use
@@ -556,7 +603,7 @@ ham_env_create(ham_env_t **env, const char *filename,
  * or opened with @ref ham_env_open_db.
  *
  * Specify a URL instead of a filename (i.e.
- * "http://localhost:8080/customers.db") to access a remote hamsterdb Server.
+ * "ham://localhost:8080/customers.db") to access a remote hamsterdb Server.
  *
  * @param env A valid Environment handle
  * @param filename The filename of the Environment file, or URL of a hamsterdb
@@ -578,7 +625,7 @@ ham_env_create(ham_env_t **env, const char *filename,
  *      since mmap is faster than read/write. For performance
  *      reasons, this flag should not be used.
  *     <li>@ref HAM_CACHE_STRICT </li> Do not allow the cache to grow larger
- *      than @a cachesize. If a Database operation needs to resize the
+ *      than @a cache_size. If a Database operation needs to resize the
  *      cache, it will return @ref HAM_CACHE_FULL.
  *      If the flag is not set, the cache is allowed to allocate
  *      more pages than the maximum cache size, but only if it's
@@ -599,12 +646,17 @@ ham_env_create(ham_env_t **env, const char *filename,
  * @param param An array of ham_parameter_t structures. The following
  *      parameters are available:
  *    <ul>
- *    <li>@ref HAM_PARAM_CACHESIZE </li> The size of the Database cache,
+ *    <li>@ref HAM_PARAM_CACHE_SIZE </li> The size of the Database cache,
  *      in bytes. The default size is defined in src/config.h
- *      as @a HAM_DEFAULT_CACHESIZE - usually 2MB
+ *      as @a HAM_DEFAULT_CACHE_SIZE - usually 2MB
  *    <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
  *      and the journal files; default is the same path as the database
- *      file
+ *      file. Ignored for remote Environments.
+ *    <li>@ref HAM_PARAM_ENCRYPTION_KEY</li> The 16 byte long AES encryption
+ *      key; enables AES encryption for the Environment file. Ignored for
+ *      remote Environmens.
+ *    <li>@ref HAM_PARAM_NETWORK_TIMEOUT_SEC</li> Timeout (in seconds) when
+ *      waiting for data from a remote server. By default, no timeout is set.
  *    </ul>
  *
  * @return @ref HAM_SUCCESS upon success.
@@ -632,8 +684,8 @@ ham_env_open(ham_env_t **env, const char *filename,
  *
  * The following parameters are supported:
  *    <ul>
- *    <li>HAM_PARAM_CACHESIZE</li> returns the cache size
- *    <li>HAM_PARAM_PAGESIZE</li> returns the page size
+ *    <li>HAM_PARAM_CACHE_SIZE</li> returns the cache size
+ *    <li>HAM_PARAM_PAGE_SIZE</li> returns the page size
  *    <li>HAM_PARAM_MAX_DATABASES</li> returns the max. number of
  *        Databases of this Database's Environment
  *    <li>HAM_PARAM_FLAGS</li> returns the flags which were used to
@@ -644,7 +696,7 @@ ham_env_open(ham_env_t **env, const char *filename,
  *        of this parameter is a const char * pointer casted to a
  *        ham_u64_t variable)
  *    <li>@ref HAM_PARAM_LOG_DIRECTORY</li> The path of the log file
- *        and the journal files
+ *        and the journal files. Ignored for remote Environments.
  *    </ul>
  *
  * @param env A valid Environment handle
@@ -660,7 +712,7 @@ ham_env_get_parameters(ham_env_t *env, ham_parameter_t *param);
 /**
  * Creates a new Database in a Database Environment
  *
- * An Environment can handle up to 16 Databases, unless higher values are
+ * An Environment can contain up to 16 Databases, unless higher values are
  * configured when the Environment is created (see @sa ham_env_create).
  *
  * Each Database in an Environment is identified by a positive 16bit
@@ -672,6 +724,58 @@ ham_env_get_parameters(ham_env_t *env, ham_parameter_t *param);
  * automatically if @ref ham_env_close is called with the flag
  * @ref HAM_AUTO_CLEANUP.
  *
+ * A Database can be configured and optimized for the data that is inserted.
+ * The data is described through flags and parameters. hamsterdb
+ * differentiates between several data characteristics, and offers predefined
+ * "types" to describe the keys. Numeric key types are stored in host endian
+ * format and are NOT endian converted! In general, the default key type
+ * (@ref HAM_TYPE_BINARY) is slower than the other types, and
+ * fixed-length binary keys (@ref HAM_TYPE_BINARY in combination with
+ * @ref HAM_PARAM_KEY_SIZE) is faster than variable-length binary
+ * keys. It is therefore recommended to set the key size and record size,
+ * although it is not required.
+ * See the Wiki documentation for <a href=
+   "https://github.com/cruppstahl/hamsterdb/wiki/Evaluating-and-Benchmarking">
+ * Evaluating and Benchmarking</a> on how to test different configurations and
+ * optimize for performance.
+ *
+ * The key type is set with @ref HAM_PARAM_KEY_TYPE and can have either
+ * of the following values:
+ *
+ * <ul>
+ *   <li>HAM_TYPE_BINARY</li> This is the default key type: a binary blob.
+ *   Internally, hamsterdb uses memcmp(3) for the sort order. Key size depends
+ *   on @ref HAM_PARAM_KEY_SIZE and is unlimited (@ref HAM_KEY_SIZE_UNLIMITED)
+ *   by default.
+ *   <li>HAM_TYPE_CUSTOM</li> Similar to @ref HAM_TYPE_BINARY, but
+ *   uses a callback function for the sort order. This function is supplied
+ *   by the application with @sa ham_db_set_compare_func.
+ *   <li>HAM_TYPE_UINT8</li> Key is a 8bit (1 byte) unsigned integer
+ *   <li>HAM_TYPE_UINT16</li> Key is a 16bit (2 byte) unsigned integer
+ *   <li>HAM_TYPE_UINT32</li> Key is a 32bit (4 byte) unsigned integer
+ *   <li>HAM_TYPE_UINT64</li> Key is a 64bit (8 byte) unsigned integer
+ *   <li>HAM_TYPE_REAL32</li> Key is a 32bit (4 byte) float
+ *   <li>HAM_TYPE_REAL64</li> Key is a 64bit (8 byte) doubles
+ * </ul>
+ *
+ * If the key type is ommitted then @ref HAM_TYPE_BINARY is the default.
+ *
+ * If binary/custom keys are so big that they cannot be stored in the Btree,
+ * then the full key will be stored in an overflow area, which has
+ * performance implications when accessing such keys.
+ *
+ * In addition to the flags above, you can specify @a HAM_ENABLE_DUPLICATE_KEYS
+ * to insert duplicate keys, i.e. to model 1:n or n:m relationships.
+ *
+ * If the size of the records is always constant, then
+ * @ref HAM_PARAM_RECORD_SIZE should be used to specify this size. This allows
+ * hamsterdb to optimize the record storage, and small records will
+ * automatically be stored in the Btree's leaf nodes instead of a separately
+ * allocated blob, allowing faster access.
+ * A record size of 0 is valid and suited for boolean values ("key exists"
+ * vs "key doesn't exist"). The default record size is
+ * @ref HAM_RECORD_SIZE_UNLIMITED.
+ *
  * @param env A valid Environment handle.
  * @param db A valid Database handle, which will point to the created
  *      Database. To close the handle, use @ref ham_db_close.
@@ -682,13 +786,8 @@ ham_env_get_parameters(ham_env_t *env, ham_parameter_t *param);
  * @param flags Optional flags for creating the Database, combined with
  *    bitwise OR. Possible flags are:
  *    <ul>
- *     <li>@ref HAM_DISABLE_VAR_KEYLEN </li> Do not allow the use of variable
- *      length keys. Inserting a key, which is larger than the
- *      B+Tree index key size, returns @ref HAM_INV_KEYSIZE.
- *     <li>@ref HAM_ENABLE_DUPLICATES </li> Enable duplicate keys for this
+ *     <li>@ref HAM_ENABLE_DUPLICATE_KEYS </li> Enable duplicate keys for this
  *      Database. By default, duplicate keys are disabled.
- *     <li>@ref HAM_ENABLE_EXTENDED_KEYS</li> Enable extended keys for this
- *      Database. By default, extended keys are disabled.
  *     <li>@ref HAM_RECORD_NUMBER </li> Creates an "auto-increment" Database.
  *      Keys in Record Number Databases are automatically assigned an
  *      incrementing 64bit value. If key->data is not NULL
@@ -702,8 +801,15 @@ ham_env_get_parameters(ham_env_t *env, ham_parameter_t *param);
  * @param params An array of ham_parameter_t structures. The following
  *    parameters are available:
  *    <ul>
- *    <li>@ref HAM_PARAM_KEYSIZE </li> The size of the keys in the B+Tree
- *      index. The default size is 21 bytes.
+ *    <li>@ref HAM_PARAM_KEY_TYPE </li> The type of the keys in the B+Tree
+ *      index. The default is @ref HAM_TYPE_BINARY. See above for more
+ *      information.
+ *    <li>@ref HAM_PARAM_KEY_SIZE </li> The (fixed) size of the keys in
+ *      the B+Tree index; or @ref HAM_KEY_SIZE_UNLIMITED for unlimited and
+ *      variable keys (this is the default).
+ *    <li>@ref HAM_PARAM_RECORD_SIZE </li> The (fixed) size of the records;
+ *      or @ref HAM_RECORD_SIZE_UNLIMITED if there was no fixed record size
+ *      specified (this is the default).
  *    </ul>
  *
  * @return @ref HAM_SUCCESS upon success
@@ -741,9 +847,6 @@ ham_env_create_db(ham_env_t *env, ham_db_t **db,
  * @param flags Optional flags for opening the Database, combined with
  *    bitwise OR. Possible flags are:
  *   <ul>
- *     <li>@ref HAM_DISABLE_VAR_KEYLEN </li> Do not allow the use of variable
- *      length keys. Inserting a key, which is larger than the
- *      B+Tree index key size, returns @ref HAM_INV_KEYSIZE.
  *     <li>@ref HAM_READ_ONLY </li> Opens the Database for reading only.
  *      Operations that need write access (i.e. @ref ham_db_insert) will
  *      return @ref HAM_WRITE_PROTECTED.
@@ -858,13 +961,14 @@ ham_env_flush(ham_env_t *env, ham_u32_t flags);
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_env_get_database_names(ham_env_t *env, ham_u16_t *names,
-            ham_size_t *count);
+            ham_u32_t *count);
 
 /**
  * Closes the Database Environment
  *
  * This function closes the Database Environment. It also frees the
- * memory resources allocated in the @a env handle.
+ * memory resources allocated in the @a env handle, and tries to truncate
+ * the file (see below).
  *
  * If the flag @ref HAM_AUTO_CLEANUP is specified, hamsterdb automatically
  * calls @ref ham_db_close with flag @ref HAM_AUTO_CLEANUP on all open
@@ -877,6 +981,10 @@ ham_env_get_database_names(ham_env_t *env, ham_u16_t *names,
  * This function also aborts all Transactions which were not yet committed,
  * and therefore renders all Transaction handles invalid. If the flag
  * @ref HAM_TXN_AUTO_COMMIT is specified, all Transactions will be committed.
+ *
+ * This function also tries to truncate the file and "cut off" unused space
+ * at the end of the file to reduce the file size. This feature is disabled
+ * on Win32 if memory mapped I/O is used (see @ref HAM_DISABLE_MMAP).
  *
  * @param env A valid Environment handle
  * @param flags Optional flags for closing the handle. Possible flags are:
@@ -1002,9 +1110,6 @@ ham_txn_commit(ham_txn_t *txn, ham_u32_t flags);
 HAM_EXPORT ham_status_t
 ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
 
-/* note: ham_txn_abort flag 0x0001 is reserved for internal use:
- * DO_NOT_NUKE_PAGE_STATS */
-
 /**
  * @}
  */
@@ -1015,7 +1120,7 @@ ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
  * @{
  */
 
-/** Flag for @ref @ref ham_env_open, @ @ref ham_env_create.
+/** Flag for @ref ham_env_open, @ref ham_env_create.
  * This flag is non persistent. */
 #define HAM_ENABLE_FSYNC                            0x00000001
 
@@ -1031,9 +1136,7 @@ ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
 
 /* reserved                                         0x00000020 */
 
-/** Flag for @ref ham_env_create_db.
- * This flag is non persistent. */
-#define HAM_DISABLE_VAR_KEYLEN                      0x00000040
+/* unused                                           0x00000040 */
 
 /** Flag for @ref ham_env_create.
  * This flag is non persistent. */
@@ -1055,7 +1158,9 @@ ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
 
 /** Flag for @ref ham_env_create_db.
  * This flag is persisted in the Database. */
-#define HAM_ENABLE_DUPLICATES                       0x00004000
+#define HAM_ENABLE_DUPLICATE_KEYS                   0x00004000
+/* deprecated */
+#define HAM_ENABLE_DUPLICATES                       HAM_ENABLE_DUPLICATE_KEYS
 
 /** Flag for @ref ham_env_create, @ref ham_env_open.
  * This flag is non persistent. */
@@ -1073,13 +1178,16 @@ ham_txn_abort(ham_txn_t *txn, ham_u32_t flags);
  * This flag is non persistent. */
 #define HAM_CACHE_UNLIMITED                         0x00040000
 
-/** Flag for @ref ham_env_create_db.
- * This flag is persisted in the Database. */
-#define HAM_ENABLE_EXTENDED_KEYS                    0x00080000
+/* unused                                           0x00080000 */
 
-/* reserved: DB_IS_REMOTE   (not persistent)        0x00200000 */
+/* internal use only! (not persistent) */
+#define HAM_IS_REMOTE_INTERNAL                      0x00200000
 
-/* reserved: DB_REDUCED_FREELIST (persistent)       0x00400000 */
+/* internal use only! (not persistent) */
+#define HAM_DISABLE_RECLAIM_INTERNAL                0x00400000
+
+/* internal use only! (persistent) */
+#define HAM_FORCE_RECORDS_INLINE                    0x00800000
 
 /**
  * Returns the last error code
@@ -1094,41 +1202,6 @@ HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_db_get_error(ham_db_t *db);
 
 /**
- * Typedef for a prefix comparison function
- *
- * @remark This function compares two index keys. It returns -1 if @a lhs
- * ("left-hand side", the parameter on the left side) is smaller than
- * @a rhs ("right-hand side"), 0 if both keys are equal, and 1 if @a lhs
- * is larger than @a rhs.
- *
- * @remark If one of the keys is only partially loaded, but the comparison
- * function needs the full key, the return value should be
- * HAM_PREFIX_REQUEST_FULLKEY.
- */
-typedef int HAM_CALLCONV (*ham_prefix_compare_func_t)
-                 (ham_db_t *db,
-                  const ham_u8_t *lhs, ham_size_t lhs_length,
-                  ham_size_t lhs_real_length,
-                  const ham_u8_t *rhs, ham_size_t rhs_length,
-                  ham_size_t rhs_real_length);
-
-/**
- * Sets the prefix comparison function
- *
- * The prefix comparison function is called when an index uses
- * keys with variable length and at least one of the two keys is loaded
- * only partially.
- *
- * @param db A valid Database handle
- * @param foo A pointer to the prefix compare function
- *
- * @return @ref HAM_SUCCESS upon success
- * @return @ref HAM_INV_PARAMETER if the @a db parameter is NULL
- */
-HAM_EXPORT ham_status_t HAM_CALLCONV
-ham_db_set_prefix_compare_func(ham_db_t *db, ham_prefix_compare_func_t foo);
-
-/**
  * Typedef for a key comparison function
  *
  * @remark This function compares two index keys. It returns -1, if @a lhs
@@ -1137,8 +1210,8 @@ ham_db_set_prefix_compare_func(ham_db_t *db, ham_prefix_compare_func_t foo);
  * is larger than @a rhs.
  */
 typedef int HAM_CALLCONV (*ham_compare_func_t)(ham_db_t *db,
-                  const ham_u8_t *lhs, ham_size_t lhs_length,
-                  const ham_u8_t *rhs, ham_size_t rhs_length);
+                  const ham_u8_t *lhs, ham_u32_t lhs_length,
+                  const ham_u8_t *rhs, ham_u32_t rhs_length);
 
 /**
  * Sets the comparison function
@@ -1147,17 +1220,17 @@ typedef int HAM_CALLCONV (*ham_compare_func_t)(ham_db_t *db,
  * first key is smaller, +1 if the second key is smaller or 0 if both
  * keys are equal.
  *
- * Note that if you use a custom comparison routine in combination with
- * extended keys, it might be useful to disable the prefix comparison, which
- * is based on memcmp(3). See @ref ham_db_set_prefix_compare_func for details.
+ * Supplying a comparison function is only allowed for the key type
+ * @ref HAM_TYPE_CUSTOM; see the documentation of @sa ham_env_create_db 
+ * for more information.
  *
  * @param db A valid Database handle
  * @param foo A pointer to the compare function
  *
  * @return @ref HAM_SUCCESS upon success
  * @return @ref HAM_INV_PARAMETER if one of the parameters is NULL
- *
- * @sa ham_db_set_prefix_compare_func
+ * @return @ref HAM_INV_PARAMETER if the database's key type was not
+ *          specified as @ref HAM_TYPE_CUSTOM
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_db_set_compare_func(ham_db_t *db, ham_compare_func_t foo);
@@ -1315,7 +1388,7 @@ ham_db_find(ham_db_t *db, ham_txn_t *txn, ham_key_t *key,
  * are enabled. In such a case, @ref HAM_INV_PARAMETER is returned.
  *
  * If you wish to insert a duplicate key specify the flag @ref HAM_DUPLICATE.
- * (Note that the Database has to be created with @ref HAM_ENABLE_DUPLICATES
+ * (Note that the Database has to be created with @ref HAM_ENABLE_DUPLICATE_KEYS
  * in order to use duplicate keys.)
  * The duplicate key is inserted after all other duplicate keys (see
  * @ref HAM_DUPLICATE_INSERT_LAST).
@@ -1352,7 +1425,7 @@ ham_db_find(ham_db_t *db, ham_txn_t *txn, ham_key_t *key,
  * @return @ref HAM_INV_PARAMETER if the flags @ref HAM_OVERWRITE <b>and</b>
  *        @ref HAM_DUPLICATE were specified, or if @ref HAM_DUPLICATE
  *        was specified, but the Database was not created with
- *        flag @ref HAM_ENABLE_DUPLICATES.
+ *        flag @ref HAM_ENABLE_DUPLICATE_KEYS.
  * @return @ref HAM_INV_PARAMETER if @ref HAM_PARTIAL is specified and
  *        record->partial_offset+record->partial_size exceeds the
  *        record->size
@@ -1360,17 +1433,13 @@ ham_db_find(ham_db_t *db, ham_txn_t *txn, ham_key_t *key,
  *        Database
  * @return @ref HAM_TXN_CONFLICT if the same key was inserted in another
  *        Transaction which was not yet committed or aborted
- * @return @ref HAM_INV_KEYSIZE if the key size is larger than the @a keysize
- *        parameter specified for @ref ham_env_create and variable
- *        key sizes are disabled (see @ref HAM_DISABLE_VAR_KEYLEN)
- *        OR if the @a keysize parameter specified for @ref ham_env_create
- *        is smaller than 8
+ * @return @ref HAM_INV_KEY_SIZE if the key size is larger than the
+ *        @a HAM_PARAMETER_KEY_SIZE parameter specified for
+ *        @ref ham_env_create_db
  *        OR if the key's size is greater than the Btree key size (see
- *        @ref HAM_PARAM_KEYSIZE) and extended keys are not enabled (see
- *        @ref HAM_ENABLE_EXTENDED_KEYS).
- *
- * @sa HAM_DISABLE_VAR_KEYLEN
- * @sa HAM_ENABLE_EXTENDED_KEYS
+ *        @ref HAM_PARAM_KEY_SIZE).
+ * @return @ref HAM_INV_RECORD_SIZE if the record size is different from
+ *        the one specified with @a HAM_PARAM_RECORD_SIZE
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_db_insert(ham_db_t *db, ham_txn_t *txn, ham_key_t *key,
@@ -1509,9 +1578,16 @@ ham_db_get_key_count(ham_db_t *db, ham_txn_t *txn, ham_u32_t flags,
  *    <li>HAM_PARAM_FLAGS</li> returns the flags which were used to
  *        open or create this Database
  *    <li>HAM_PARAM_DATABASE_NAME</li> returns the Database name
- *    <li>HAM_PARAM_KEYSIZE</li> returns the Btree key size
+ *    <li>HAM_PARAM_KEY_TYPE</li> returns the Btree key type
+ *    <li>HAM_PARAM_KEY_SIZE</li> returns the Btree key size
+ *        or @ref HAM_KEY_SIZE_UNLIMITED if there was no fixed key size
+ *        specified.
+ *    <li>HAM_PARAM_RECORD_SIZE</li> returns the record size,
+ *        or @ref HAM_RECORD_SIZE_UNLIMITED if there was no fixed record size
+ *        specified.
  *    <li>HAM_PARAM_MAX_KEYS_PER_PAGE</li> returns the maximum number
- *        of keys per page
+ *        of keys per page. This number is precise if the key size is fixed
+ *        and duplicates are disabled; otherwise it's an estimate.
  *    </ul>
  *
  * @param db A valid Database handle
@@ -1526,32 +1602,54 @@ ham_db_get_parameters(ham_db_t *db, ham_parameter_t *param);
 
 /** Parameter name for @ref ham_env_open, @ref ham_env_create;
  * sets the cache size */
-#define HAM_PARAM_CACHESIZE             0x00000100
+#define HAM_PARAM_CACHE_SIZE            0x00000100
+/* deprecated */
+#define HAM_PARAM_CACHESIZE             HAM_PARAM_CACHE_SIZE
 
 /** Parameter name for @ref ham_env_create; sets the page size */
-#define HAM_PARAM_PAGESIZE              0x00000101
+#define HAM_PARAM_PAGE_SIZE             0x00000101
+/* deprecated */
+#define HAM_PARAM_PAGESIZE              HAM_PARAM_PAGE_SIZE
 
 /** Parameter name for @ref ham_env_create_db; sets the key size */
-#define HAM_PARAM_KEYSIZE               0x00000102
+#define HAM_PARAM_KEY_SIZE              0x00000102
+/* deprecated */
+#define HAM_PARAM_KEYSIZE               HAM_PARAM_KEY_SIZE
 
 /** Parameter name for @ref ham_env_create; sets the number of maximum
  * Databases */
 #define HAM_PARAM_MAX_DATABASES         0x00000103
 
+/** Parameter name for @ref ham_env_create_db; sets the key type */
+#define HAM_PARAM_KEY_TYPE              0x00000104
+
 /** Parameter name for @ref ham_env_open, @ref ham_env_create;
  * sets the path of the log files */
 #define HAM_PARAM_LOG_DIRECTORY         0x00000105
 
-/**
- * Retrieve the Database/Environment flags as were specified at the time of
- * @ref ham_env_create/@ref ham_env_open invocation.
- */
+/** Parameter name for @ref ham_env_open, @ref ham_env_create;
+ * sets the AES encryption key */
+#define HAM_PARAM_ENCRYPTION_KEY        0x00000106
+
+/** Parameter name for @ref ham_env_open, @ref ham_env_create;
+ * sets the network timeout (in seconds) */
+#define HAM_PARAM_NETWORK_TIMEOUT_SEC   0x00000107
+
+/** Parameter name for @ref ham_env_create_db; sets the key size */
+#define HAM_PARAM_RECORD_SIZE           0x00000108
+
+/** Value for unlimited record sizes */
+#define HAM_RECORD_SIZE_UNLIMITED       ((ham_u32_t)-1)
+
+/** Value for unlimited key sizes */
+#define HAM_KEY_SIZE_UNLIMITED          ((ham_u16_t)-1)
+
+/** Retrieves the Database/Environment flags as were specified at the time of
+ * @ref ham_env_create/@ref ham_env_open invocation. */
 #define HAM_PARAM_FLAGS                 0x00000200
 
-/**
- * Retrieve the filesystem file access mode as was specified at the time
- * of @ref @ref ham_env_create/@ref ham_env_open invocation.
- */
+/** Retrieves the filesystem file access mode as was specified at the time
+ * of @ref ham_env_create/@ref ham_env_open invocation. */
 #define HAM_PARAM_FILEMODE              0x00000201
 
 /**
@@ -1574,11 +1672,8 @@ ham_db_get_parameters(ham_db_t *db, ham_parameter_t *param);
 
 /**
  * Retrieve the maximum number of keys per page; this number depends on the
- * currently active page and key sizes.
- *
- * When no Database or Environment is specified with the request, the default
- * settings for all of these will be assumed in order to produce a viable
- * ball park value for this one.
+ * currently active page and key sizes. Can be an estimate if keys do not
+ * have constant sizes or if duplicate keys are used.
  */
 #define HAM_PARAM_MAX_KEYS_PER_PAGE     0x00000204
 
@@ -1892,12 +1987,8 @@ ham_cursor_overwrite(ham_cursor_t *cursor, ham_record_t *record,
  * Searches with a key and points the Cursor to the key found, retrieves
  * the located record
  *
- * This function is identical to @ref ham_cursor_find, but it immediately
- * retrieves the located record if the lookup operation was successful.
- *
- * Searches for an item in the Database and points the
- * Cursor to this item. If the item could not be found, the Cursor is
- * not modified.
+ * Searches for an item in the Database and points the Cursor to this item.
+ * If the item could not be found, the Cursor is not modified.
  *
  * Note that @ref ham_cursor_find can not search for duplicate keys. If @a key
  * has multiple duplicates, only the first duplicate is returned.
@@ -1948,7 +2039,7 @@ ham_cursor_overwrite(ham_cursor_t *cursor, ham_record_t *record,
  *    Note that key->data will point to temporary data. This pointer
  *    will be invalidated by subsequent hamsterdb API calls. See
  *    @a HAM_KEY_USER_ALLOC on how to change this behaviour.
- * @param record A pointer to a @ref ham_record_t structure. If this
+ * @param record Optional pointer to a @ref ham_record_t structure. If this
  *    pointer is not NULL, the record of the new item is returned.
  *    Note that record->data will point to temporary data. This pointer
  *    will be invalidated by subsequent hamsterdb API calls. See
@@ -2126,8 +2217,8 @@ ham_cursor_find(ham_cursor_t *cursor, ham_key_t *key,
  * with @ref HAM_DUPLICATE.
  *
  * If you wish to insert a duplicate key specify the flag @ref HAM_DUPLICATE.
- * (Note that the Database has to be created with @ref HAM_ENABLE_DUPLICATES,
- * in order to use duplicate keys.)
+ * (In order to use duplicate keys, the Database has to be created with
+ * @ref HAM_ENABLE_DUPLICATE_KEYS.)
  * By default, the duplicate key is inserted after all other duplicate keys
  * (see @ref HAM_DUPLICATE_INSERT_LAST). This behaviour can be overwritten by
  * specifying @ref HAM_DUPLICATE_INSERT_FIRST, @ref HAM_DUPLICATE_INSERT_BEFORE
@@ -2215,22 +2306,16 @@ ham_cursor_find(ham_cursor_t *cursor, ham_key_t *key,
  * @return @ref HAM_INV_PARAMETER if the flags @ref HAM_OVERWRITE <b>and</b>
  *        @ref HAM_DUPLICATE were specified, or if @ref HAM_DUPLICATE
  *        was specified, but the Database was not created with
- *        flag @ref HAM_ENABLE_DUPLICATES.
+ *        flag @ref HAM_ENABLE_DUPLICATE_KEYS.
  * @return @ref HAM_WRITE_PROTECTED if you tried to insert a key to a read-only
  *        Database.
- * @return @ref HAM_INV_KEYSIZE if the key's size is larger than the @a keysize
- *        parameter specified for @ref ham_env_create and variable
- *        key sizes are disabled (see @ref HAM_DISABLE_VAR_KEYLEN)
- *        OR if the @a keysize parameter specified for @ref ham_env_create
- *        is smaller than 8
- *        OR if the key's size is greater than the Btree key size (see
- *        @ref HAM_PARAM_KEYSIZE) and extended keys are not enabled (see
- *        @ref HAM_ENABLE_EXTENDED_KEYS).
+ * @return @ref HAM_INV_KEY_SIZE if the key size is different from
+ *        the one specified with @a HAM_PARAM_KEY_SIZE
+ * @return @ref HAM_INV_RECORD_SIZE if the record size is different from
+ *        the one specified with @a HAM_PARAM_RECORD_SIZE
  * @return @ref HAM_CURSOR_IS_NIL if the Cursor does not point to an item
  * @return @ref HAM_TXN_CONFLICT if the same key was inserted in another
  *        Transaction which was not yet committed or aborted
- *
- * @sa HAM_DISABLE_VAR_KEYLEN
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_cursor_insert(ham_cursor_t *cursor, ham_key_t *key,
@@ -2243,7 +2328,7 @@ ham_cursor_insert(ham_cursor_t *cursor, ham_key_t *key,
  * successful, the Cursor is invalidated and does no longer point to
  * any item. In case of an error, the Cursor is not modified.
  *
- * If the Database was opened with the flag @ref HAM_ENABLE_DUPLICATES,
+ * If the Database was opened with the flag @ref HAM_ENABLE_DUPLICATE_KEYS,
  * this function erases only the duplicate item to which the Cursor refers.
  *
  * @param cursor A valid Cursor handle
@@ -2279,7 +2364,7 @@ ham_cursor_erase(ham_cursor_t *cursor, ham_u32_t flags);
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_cursor_get_duplicate_count(ham_cursor_t *cursor,
-            ham_size_t *count, ham_u32_t flags);
+            ham_u32_t *count, ham_u32_t flags);
 
 /**
  * Returns the record size of the current key

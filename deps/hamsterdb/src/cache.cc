@@ -27,7 +27,7 @@
 
 namespace hamsterdb {
 
-Cache::Cache(Environment *env, ham_u64_t capacity_bytes)
+Cache::Cache(LocalEnvironment *env, ham_u64_t capacity_bytes)
   : m_env(env), m_capacity(capacity_bytes), m_cur_elements(0),
     m_alloc_elements(0), m_totallist(0), m_totallist_tail(0),
     m_cache_hits(0), m_cache_misses(0)
@@ -35,14 +35,14 @@ Cache::Cache(Environment *env, ham_u64_t capacity_bytes)
   if (m_capacity == 0)
     m_capacity = HAM_DEFAULT_CACHESIZE;
 
-  for (ham_size_t i = 0; i < CACHE_BUCKET_SIZE; i++)
+  for (ham_u32_t i = 0; i < kCacheBucketSize; i++)
     m_buckets.push_back(0);
 }
 
-ham_status_t
+void
 Cache::check_integrity()
 {
-  ham_size_t elements = 0;
+  ham_u32_t elements = 0;
   Page *head;
   Page *tail = m_totallist_tail;
 
@@ -50,28 +50,26 @@ Cache::check_integrity()
   head = m_totallist;
   while (head) {
     elements++;
-    head = head->get_next(Page::LIST_CACHED);
+    head = head->get_next(Page::kListCache);
   }
 
   /* did we count the correct numbers? */
   if (m_cur_elements != elements) {
     ham_trace(("cache's number of elements (%u) != actual number (%u)",
         m_cur_elements, elements));
-    return (HAM_INTEGRITY_VIOLATED);
+    throw Exception(HAM_INTEGRITY_VIOLATED);
   }
 
   /* make sure that the totallist HEAD -> next -> TAIL is set correctly,
    * and that the TAIL is the chronologically oldest page */
   head = m_totallist;
   while (head) {
-    if (tail && !head->get_next(Page::LIST_CACHED))
+    if (tail && !head->get_next(Page::kListCache))
       ham_assert(head == tail);
-    head = head->get_next(Page::LIST_CACHED);
+    head = head->get_next(Page::kListCache);
   }
   if (tail)
-    ham_assert(tail->get_next(Page::LIST_CACHED) == 0);
-
-  return (0);
+    ham_assert(tail->get_next(Page::kListCache) == 0);
 }
 
 } // namespace hamsterdb

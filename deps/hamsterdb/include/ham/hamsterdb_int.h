@@ -64,6 +64,18 @@ extern "C" {
 @}
 */
 
+/** get the (non-persisted) flags of a key */
+#define ham_key_get_intflags(key)       (key)->_flags
+
+/**
+ * set the flags of a key
+ *
+ * Note that the ham_find/ham_cursor_find/ham_cursor_find_ex flags must
+ * be defined such that those can peacefully co-exist with these; that's
+ * why those public flags start at the value 0x1000 (4096).
+ */
+#define ham_key_set_intflags(key, f)    (key)->_flags=(f)
+
 /**
  * Verifies the integrity of the Database
  *
@@ -126,8 +138,11 @@ ham_cursor_get_database(ham_cursor_t *cursor);
  * that applications can use to verify that the structure layout is compatible.
  *
  * These metrics are NOT persisted to disk.
+ *
+ * Metrics marked "global" are stored globally and shared between multiple
+ * Environments.
  */
-#define HAM_METRICS_VERSION         1
+#define HAM_METRICS_VERSION         4
 
 typedef struct ham_env_metrics_t {
   // the version indicator - must be HAM_METRICS_VERSION
@@ -192,6 +207,21 @@ typedef struct ham_env_metrics_t {
   // number of direct I/O bytes allocated (disk only)
   ham_u64_t blob_direct_allocated;
 
+  // (global) number of btree page splits
+  ham_u64_t btree_smo_split;
+
+  // (global) number of btree page merges
+  ham_u64_t btree_smo_merge;
+
+  // (global) number of btree page shifts
+  ham_u64_t btree_smo_shift;
+
+  // (global) number of extended keys
+  ham_u64_t extended_keys;
+
+  // (global) number of extended duplicate tables
+  ham_u64_t extended_duptables;
+
 } ham_env_metrics_t;
 
 /**
@@ -199,6 +229,13 @@ typedef struct ham_env_metrics_t {
  */
 HAM_EXPORT ham_status_t HAM_CALLCONV
 ham_env_get_metrics(ham_env_t *env, ham_env_metrics_t *metrics);
+
+/**
+ * Retrieves whether this hamsterdb library was compiled with debug
+ * diagnostics, checks and asserts
+ */
+HAM_EXPORT ham_bool_t HAM_CALLCONV
+ham_is_debug_build();
 
 /**
  * @}

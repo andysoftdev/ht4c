@@ -19,28 +19,33 @@
 
 #include <vector>
 
-#include "internal_fwd_decl.h"
-#include "env.h"
+#include "config.h"
+#include "env_local.h"
 
 namespace hamsterdb {
 
-/** CACHE_BUCKET_SIZE should be a prime number or similar, as it is used in
- * a MODULO hash scheme */
-#define CACHE_BUCKET_SIZE    10317
+class LocalEnvironment;
 
 /**
  * the cache manager
  */
 class Cache
 {
+    enum {
+      // bucket size should be a prime number or similar, as it is used in
+      // a MODULO hash scheme
+      kCacheBucketSize = 10317
+    };
+
   public:
     /** don't remove the page from the cache */
     static const int NOREMOVE = 1;
 
     /** the default constructor
-     * @remark max_size is in bytes!
+     * @remark capacity_Bytes is in bytes!
      */
-    Cache(Environment *env, ham_u64_t capacity_bytes = HAM_DEFAULT_CACHESIZE);
+    Cache(LocalEnvironment *env,
+            ham_u64_t capacity_bytes = HAM_DEFAULT_CACHESIZE);
 
     /**
      * get a page from the cache
@@ -52,9 +57,9 @@ class Cache
       ham_u64_t hash = calc_hash(address);
       Page *page = m_buckets[hash];
       while (page) {
-        if (page->get_self() == address)
+        if (page->get_address() == address)
           break;
-        page = page->get_next(Page::LIST_BUCKET);
+        page = page->get_next(Page::kListBucket);
       }
 
       /* not found? then return */
@@ -82,9 +87,9 @@ class Cache
 
     /** store a page in the cache */
     void put_page(Page *page) {
-      ham_u64_t hash = calc_hash(page->get_self());
+      ham_u64_t hash = calc_hash(page->get_address());
 
-      ham_assert(page->get_pers());
+      ham_assert(page->get_data());
 
       /* first remove the page from the cache, if it's already cached
        *
@@ -92,16 +97,16 @@ class Cache
        * cache->_totallist_tail pointer is updated and that the page
        * is inserted at the HEAD of the list
        */
-      if (page->is_in_list(m_totallist, Page::LIST_CACHED))
+      if (page->is_in_list(m_totallist, Page::kListCache))
         remove_page(page);
 
       /* now (re-)insert into the list of all cached pages, and increment
        * the counter */
-      ham_assert(!page->is_in_list(m_totallist, Page::LIST_CACHED));
-      m_totallist = page->list_insert(m_totallist, Page::LIST_CACHED);
+      ham_assert(!page->is_in_list(m_totallist, Page::kListCache));
+      m_totallist = page->list_insert(m_totallist, Page::kListCache);
 
       m_cur_elements++;
-      if (page->get_flags() & Page::NPERS_MALLOC)
+      if (page->get_flags() & Page::kNpersMalloc)
         m_alloc_elements++;
 
       /*
@@ -110,16 +115,18 @@ class Cache
        * to avoid inserting the page twice, we first remove it from the
        * bucket
        */
-      if (page->is_in_list(m_buckets[hash], Page::LIST_BUCKET))
-        m_buckets[hash] = page->list_remove(m_buckets[hash], Page::LIST_BUCKET);
-      ham_assert(!page->is_in_list(m_buckets[hash], Page::LIST_BUCKET));
-      m_buckets[hash] = page->list_insert(m_buckets[hash], Page::LIST_BUCKET);
+      if (page->is_in_list(m_buckets[hash], Page::kListBucket))
+        m_buckets[hash] = page->list_remove(m_buckets[hash], Page::kListBucket);
+      ham_assert(!page->is_in_list(m_buckets[hash], Page::kListBucket));
+      m_buckets[hash] = page->list_insert(m_buckets[hash], Page::kListBucket);
 
       /* is this the chronologically oldest page? then set the pointer */
       if (!m_totallist_tail)
         m_totallist_tail = page;
 
-      ham_assert(check_integrity() == 0);
+#ifdef HAM_DEBUG
+      check_integrity();
+#endif
     }
 
     /** remove a page from the cache */
@@ -129,33 +136,35 @@ class Cache
       /* are we removing the chronologically oldest page? then
        * update the pointer with the next oldest page */
       if (m_totallist_tail == page)
-        m_totallist_tail = page->get_previous(Page::LIST_CACHED);
+        m_totallist_tail = page->get_previous(Page::kListCache);
 
       /* remove the page from the cache buckets */
-      if (page->get_self()) {
-        ham_u64_t hash = calc_hash(page->get_self());
-        if (page->is_in_list(m_buckets[hash], Page::LIST_BUCKET)) {
+      if (page->get_address()) {
+        ham_u64_t hash = calc_hash(page->get_address());
+        if (page->is_in_list(m_buckets[hash], Page::kListBucket)) {
           m_buckets[hash] = page->list_remove(m_buckets[hash],
-                        Page::LIST_BUCKET);
+                        Page::kListBucket);
         }
       }
 
       /* remove it from the list of all cached pages */
-      if (page->is_in_list(m_totallist, Page::LIST_CACHED)) {
-        m_totallist = page->list_remove(m_totallist, Page::LIST_CACHED);
+      if (page->is_in_list(m_totallist, Page::kListCache)) {
+        m_totallist = page->list_remove(m_totallist, Page::kListCache);
         removed = true;
       }
       /* decrease the number of cached elements */
       if (removed) {
         m_cur_elements--;
-        if (page->get_flags() & Page::NPERS_MALLOC)
+        if (page->get_flags() & Page::kNpersMalloc)
           m_alloc_elements--;
       }
 
-      ham_assert(check_integrity() == 0);
+#ifdef HAM_DEBUG
+      check_integrity();
+#endif
     }
 
-    typedef ham_status_t (*PurgeCallback)(Page *page);
+    typedef void (*PurgeCallback)(Page *page);
 
     /**
      * purges the cache; the callback is called for every page that needs
@@ -164,9 +173,9 @@ class Cache
      * By default this is capped to 20 pages to avoid I/O spikes.
      * In benchmarks this has proven to be a good limit.
      */
-    ham_status_t purge(PurgeCallback cb, bool strict, unsigned limit = 20) {
+    void purge(PurgeCallback cb, bool strict, unsigned limit = 20) {
       if (!is_too_big())
-        return (0);
+        return;
 
       unsigned i = 0;
       unsigned max_pages = (unsigned)m_cur_elements;
@@ -182,8 +191,11 @@ class Cache
 
       /* get the chronologically oldest page */
       Page *oldest = m_totallist_tail;
-      if (!oldest)
-        return (strict ? HAM_CACHE_FULL : 0);
+      if (!oldest) {
+        if (strict)
+          throw Exception(HAM_CACHE_FULL);
+        return;
+      }
 
       /* now iterate through all pages, starting from the oldest
        * (which is the tail of the "totallist", the list of ALL cached
@@ -191,25 +203,21 @@ class Cache
       Page *page = oldest;
       do {
         /* pick the first unused page (not in a changeset) that is NOT mapped */
-        if (page->get_flags() & Page::NPERS_MALLOC
+        if (page->get_flags() & Page::kNpersMalloc
             && !m_env->get_changeset().contains(page)) {
           remove_page(page);
-          Page *prev = page->get_previous(Page::LIST_CACHED);
-          ham_status_t st = cb(page);
-          if (st)
-            return (st);
+          Page *prev = page->get_previous(Page::kListCache);
+          cb(page);
           i++;
           page = prev;
         }
         else
-          page = page->get_previous(Page::LIST_CACHED);
+          page = page->get_previous(Page::kListCache);
         ham_assert(page != oldest);
       } while (i < max_pages && page && page != oldest);
 
       if (i == 0 && strict)
-        return (HAM_CACHE_FULL);
-
-      return (0);
+        throw Exception(HAM_CACHE_FULL);
     }
 
     /** the visitor callback returns true if the page should be removed from
@@ -218,10 +226,10 @@ class Cache
 
     /** visits all pages in the "totallist"; this is used by the Environment
      * to flush (and delete) pages */
-    ham_status_t visit(VisitCallback cb, Database *db, ham_u32_t flags) {
+    void visit(VisitCallback cb, Database *db, ham_u32_t flags) {
       Page *head = m_totallist;
       while (head) {
-        Page *next = head->get_next(Page::LIST_CACHED);
+        Page *next = head->get_next(Page::kListCache);
 
         if (cb(head, db, flags)) {
           remove_page(head);
@@ -229,12 +237,11 @@ class Cache
         }
         head = next;
       }
-      return (0);
     }
 
     /** returns true if the caller should purge the cache */
-    bool is_too_big() {
-      return (m_alloc_elements * m_env->get_pagesize() > m_capacity);
+    bool is_too_big() const {
+      return (m_alloc_elements * m_env->get_page_size() > m_capacity);
     }
 
     /** get the capacity (in bytes) */
@@ -248,7 +255,7 @@ class Cache
     }
 
     /** check the cache integrity */
-    ham_status_t check_integrity();
+    void check_integrity();
 
     // Fills in the current metrics
     void get_metrics(ham_env_metrics_t *metrics) const {
@@ -259,7 +266,7 @@ class Cache
   private:
     /** calculate the hash of a page address */
     ham_u64_t calc_hash(ham_u64_t o) const {
-      return (o % CACHE_BUCKET_SIZE);
+      return (o % kCacheBucketSize);
     }
 
     /** set the HEAD of the global page list */
@@ -268,7 +275,7 @@ class Cache
     }
 
     /** the current Environment */
-    Environment *m_env;
+    LocalEnvironment *m_env;
 
     /** the capacity (in bytes) */
     ham_u64_t m_capacity;

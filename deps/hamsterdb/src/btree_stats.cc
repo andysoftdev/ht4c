@@ -16,15 +16,16 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "btree_node.h"
-#include "btree_stats.h"
 #include "page.h"
+#include "db_local.h"
+#include "btree_stats.h"
+#include "btree_index.h"
+#include "btree_node_proxy.h"
 
 namespace hamsterdb {
 
-
-BtreeStatistics::BtreeStatistics(Database *db)
-  : m_db(db), m_append_count(0), m_prepend_count(0)
+BtreeStatistics::BtreeStatistics()
+  : m_append_count(0), m_prepend_count(0)
 {
   memset(&m_last_leaf_pages[0], 0, sizeof(m_last_leaf_pages));
   memset(&m_last_leaf_count[0], 0, sizeof(m_last_leaf_count));
@@ -34,7 +35,7 @@ void
 BtreeStatistics::find_succeeded(Page *page)
 {
   ham_u64_t old = m_last_leaf_pages[kOperationFind];
-  if (old != page->get_self()) {
+  if (old != page->get_address()) {
     m_last_leaf_pages[kOperationFind] = 0;
     m_last_leaf_count[kOperationFind] = 0;
   }
@@ -53,14 +54,15 @@ void
 BtreeStatistics::insert_succeeded(Page *page, ham_u16_t slot)
 {
   ham_u64_t old = m_last_leaf_pages[kOperationInsert];
-  if (old != page->get_self()) {
-    m_last_leaf_pages[kOperationInsert] = page->get_self();
+  if (old != page->get_address()) {
+    m_last_leaf_pages[kOperationInsert] = page->get_address();
     m_last_leaf_count[kOperationInsert] = 0;
   }
   else
     m_last_leaf_count[kOperationInsert]++;
 
-  PBtreeNode *node = PBtreeNode::from_page(page);
+  BtreeNodeProxy *node;
+  node = page->get_db()->get_btree_index()->get_node_from_page(page);
   ham_assert(node->is_leaf());
   
   if (!node->get_right() && slot == node->get_count() - 1)
@@ -87,8 +89,8 @@ void
 BtreeStatistics::erase_succeeded(Page *page)
 {
   ham_u64_t old = m_last_leaf_pages[kOperationErase];
-  if (old != page->get_self()) {
-    m_last_leaf_pages[kOperationErase] = page->get_self();
+  if (old != page->get_address()) {
+    m_last_leaf_pages[kOperationErase] = page->get_address();
     m_last_leaf_count[kOperationErase] = 0;
   }
   else

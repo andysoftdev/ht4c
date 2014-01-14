@@ -22,7 +22,7 @@
   while (m_inducer) {                                               \
     ham_status_t st = m_inducer->induce(id);                        \
     if (st)                                                         \
-      return (st);                                                  \
+      throw Exception(st);                                          \
     break;                                                          \
   }
 
@@ -34,17 +34,14 @@ void (*g_CHANGESET_POST_LOG_HOOK)(void);
 void
 Changeset::add_page(Page *page)
 {
-  if (page->is_in_list(m_head, Page::LIST_CHANGESET))
+  if (page->is_in_list(m_head, Page::kListChangeset))
     return;
 
-  ham_assert(0 == page->get_next(Page::LIST_CHANGESET));
-  ham_assert(0 == page->get_previous(Page::LIST_CHANGESET));
+  ham_assert(0 == page->get_next(Page::kListChangeset));
+  ham_assert(0 == page->get_previous(Page::kListChangeset));
   ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
-  page->set_next(Page::LIST_CHANGESET, m_head);
-  if (m_head)
-    m_head->set_previous(Page::LIST_CHANGESET, page);
-  m_head = page;
+  m_head = page->list_insert(m_head, Page::kListChangeset);
 }
 
 Page *
@@ -55,9 +52,9 @@ Changeset::get_page(ham_u64_t pageid)
   while (page) {
     ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
-    if (page->get_self() == pageid)
+    if (page->get_address() == pageid)
       return (page);
-    page = page->get_next(Page::LIST_CHANGESET);
+    page = page->get_next(Page::kListChangeset);
   }
 
   return (0);
@@ -66,35 +63,22 @@ Changeset::get_page(ham_u64_t pageid)
 void
 Changeset::clear()
 {
-  Page *n, *p = m_head;
-  while (p) {
-    n = p->get_next(Page::LIST_CHANGESET);
-    p->set_next(Page::LIST_CHANGESET, 0);
-    p->set_previous(Page::LIST_CHANGESET, 0);
-    p = n;
-  }
-  m_head = 0;
+  while (m_head)
+    m_head = m_head->list_remove(m_head, Page::kListChangeset);
 }
 
-ham_status_t
-Changeset::log_bucket(Page **bucket, ham_size_t bucket_size,
-            ham_u64_t lsn, ham_size_t &page_count)
+void
+Changeset::log_bucket(Page **bucket, ham_u32_t bucket_size,
+            ham_u64_t lsn, ham_u32_t &page_count)
 {
-  for (ham_size_t i = 0; i < bucket_size; i++) {
+  for (ham_u32_t i = 0; i < bucket_size; i++) {
     ham_assert(bucket[i]->is_dirty());
 
     Log *log = m_env->get_log();
-
     INDUCE(ErrorInducer::kChangesetFlush);
-
     ham_assert(page_count > 0);
-
-    ham_status_t st = log->append_page(bucket[i], lsn, --page_count);
-    if (st)
-      return (st);
+    log->append_page(bucket[i], lsn, --page_count);
   }
-
-  return (0);
 }
 
 #define append(b, bs, bc, p)                                          \
@@ -104,14 +88,13 @@ Changeset::log_bucket(Page **bucket, ham_size_t bucket_size,
   }                                                                   \
   b[bs++] = p;
 
-ham_status_t
+void
 Changeset::flush(ham_u64_t lsn)
 {
-  ham_status_t st;
-  ham_size_t page_count = 0;
+  ham_u32_t page_count = 0;
   Page *n, *p = m_head;
   if (!p)
-    return (0);
+    return;
 
   INDUCE(ErrorInducer::kChangesetFlush);
 
@@ -123,7 +106,7 @@ Changeset::flush(ham_u64_t lsn)
   // first step: remove all pages that are not dirty and sort all others
   // into the buckets
   while (p) {
-    n = p->get_next(Page::LIST_CHANGESET);
+    n = p->get_next(Page::kListChangeset);
     if (!p->is_dirty()) {
       p = n;
       continue;
@@ -132,20 +115,20 @@ Changeset::flush(ham_u64_t lsn)
     if (p->is_header()) {
       append(m_indices, m_indices_size, m_indices_capacity, p);
     }
-    else if (p->get_flags() & Page::NPERS_NO_HEADER) {
+    else if (p->get_flags() & Page::kNpersNoHeader) {
       append(m_blobs, m_blobs_size, m_blobs_capacity, p);
     }
     else {
       switch (p->get_type()) {
-        case Page::TYPE_BLOB:
+        case Page::kTypeBlob:
           append(m_blobs, m_blobs_size, m_blobs_capacity, p);
           break;
-        case Page::TYPE_B_ROOT:
-        case Page::TYPE_B_INDEX:
-        case Page::TYPE_HEADER:
+        case Page::kTypeBroot:
+        case Page::kTypeBindex:
+        case Page::kTypeHeader:
           append(m_indices, m_indices_size, m_indices_capacity, p);
           break;
-        case Page::TYPE_FREELIST:
+        case Page::kTypeFreelist:
           append(m_freelists, m_freelists_size, m_freelists_capacity, p);
           break;
         default:
@@ -162,7 +145,7 @@ Changeset::flush(ham_u64_t lsn)
   if (page_count == 0) {
     INDUCE(ErrorInducer::kChangesetFlush);
     clear();
-    return (0);
+    return;
   }
 
   INDUCE(ErrorInducer::kChangesetFlush);
@@ -178,14 +161,10 @@ Changeset::flush(ham_u64_t lsn)
   // - if there's more than one index operation then the operation must
   //   be atomic
   if (m_others_size || m_indices_size > 1 || m_freelists_size > 1) {
-    if ((st = log_bucket(m_blobs, m_blobs_size, lsn, page_count)))
-      return (st);
-    if ((st = log_bucket(m_freelists, m_freelists_size, lsn, page_count)))
-      return (st);
-    if ((st = log_bucket(m_indices, m_indices_size, lsn, page_count)))
-      return (st);
-    if ((st = log_bucket(m_others, m_others_size, lsn, page_count)))
-      return (st);
+    log_bucket(m_blobs, m_blobs_size, lsn, page_count);
+    log_bucket(m_freelists, m_freelists_size, lsn, page_count);
+    log_bucket(m_indices, m_indices_size, lsn, page_count);
+    log_bucket(m_others, m_others_size, lsn, page_count);
     log_written = true;
   }
 
@@ -210,12 +189,9 @@ Changeset::flush(ham_u64_t lsn)
 
   /* now write all the pages to the file; if any of these writes fail,
    * we can still recover from the log */
-  PageManager *pm = m_env->get_page_manager();
   while (p) {
-    st = pm->flush_page(p);
-    if (st)
-      return (st);
-    p = p->get_next(Page::LIST_CHANGESET);
+    m_env->get_page_manager()->flush_page(p);
+    p = p->get_next(Page::kListChangeset);
 
     INDUCE(ErrorInducer::kChangesetFlush);
   }
@@ -226,7 +202,7 @@ Changeset::flush(ham_u64_t lsn)
 
   /* done - we can now clear the changeset and the log */
   clear();
-  return (log->clear());
+  log->clear();
 }
 
 } // namespace hamsterdb

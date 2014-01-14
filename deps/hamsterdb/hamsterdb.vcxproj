@@ -19,34 +19,39 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\backend.h" />
+    <ClInclude Include="src\abi.h" />
+    <ClInclude Include="src\aes.h" />
     <ClInclude Include="src\blob_manager.h" />
     <ClInclude Include="src\blob_manager_disk.h" />
     <ClInclude Include="src\blob_manager_factory.h" />
     <ClInclude Include="src\blob_manager_inmem.h" />
-    <ClInclude Include="src\btree.h" />
     <ClInclude Include="src\btree_cursor.h" />
-    <ClInclude Include="src\btree_key.h" />
+    <ClInclude Include="src\btree_flags.h" />
+    <ClInclude Include="src\btree_impl_default.h" />
+    <ClInclude Include="src\btree_impl_pax.h" />
+    <ClInclude Include="src\btree_index.h" />
+    <ClInclude Include="src\btree_index_factory.h" />
     <ClInclude Include="src\btree_node.h" />
+    <ClInclude Include="src\btree_node_proxy.h" />
     <ClInclude Include="src\btree_stats.h" />
     <ClInclude Include="src\cache.h" />
     <ClInclude Include="src\changeset.h" />
     <ClInclude Include="src\config.h" />
     <ClInclude Include="src\cursor.h" />
     <ClInclude Include="src\db.h" />
+    <ClInclude Include="src\db_local.h" />
+    <ClInclude Include="src\device.h" />
     <ClInclude Include="src\device_disk.h" />
     <ClInclude Include="src\device_factory.h" />
     <ClInclude Include="src\device_inmem.h" />
-    <ClInclude Include="src\duplicates.h" />
     <ClInclude Include="src\endianswap.h" />
     <ClInclude Include="src\env.h" />
+    <ClInclude Include="src\env_header.h" />
+    <ClInclude Include="src\env_local.h" />
     <ClInclude Include="src\error.h" />
     <ClInclude Include="src\errorinducer.h" />
-    <ClInclude Include="src\extkeys.h" />
     <ClInclude Include="src\freelist.h" />
     <ClInclude Include="src\freelist_stats.h" />
-    <ClInclude Include="src\hash-table.h" />
-    <ClInclude Include="src\internal_fwd_decl.h" />
     <ClInclude Include="src\journal.h" />
     <ClInclude Include="src\journal_entries.h" />
     <ClInclude Include="src\log.h" />
@@ -59,7 +64,6 @@
     <ClInclude Include="src\page_manager.h" />
     <ClInclude Include="src\rb.h" />
     <ClInclude Include="src\serial.h" />
-    <ClInclude Include="src\statistics.h" />
     <ClInclude Include="src\txn.h" />
     <ClInclude Include="src\txn_cursor.h" />
     <ClInclude Include="src\util.h" />
@@ -68,21 +72,21 @@
   <ItemGroup>
     <ClCompile Include="src\blob_manager_disk.cc" />
     <ClCompile Include="src\blob_manager_inmem.cc" />
-    <ClCompile Include="src\btree.cc" />
     <ClCompile Include="src\btree_check.cc" />
     <ClCompile Include="src\btree_cursor.cc" />
     <ClCompile Include="src\btree_enum.cc" />
     <ClCompile Include="src\btree_erase.cc" />
     <ClCompile Include="src\btree_find.cc" />
+    <ClCompile Include="src\btree_index.cc" />
     <ClCompile Include="src\btree_insert.cc" />
-    <ClCompile Include="src\btree_key.cc" />
     <ClCompile Include="src\btree_stats.cc" />
     <ClCompile Include="src\cache.cc" />
     <ClCompile Include="src\changeset.cc" />
     <ClCompile Include="src\cursor.cc" />
     <ClCompile Include="src\db.cc" />
-    <ClCompile Include="src\duplicates.cc" />
+    <ClCompile Include="src\db_local.cc" />
     <ClCompile Include="src\env.cc" />
+    <ClCompile Include="src\env_local.cc" />
     <ClCompile Include="src\error.cc" />
     <ClCompile Include="src\freelist.cc" />
     <ClCompile Include="src\freelist_stats.cc" />
@@ -96,6 +100,10 @@
     <ClCompile Include="src\txn.cc" />
     <ClCompile Include="src\txn_cursor.cc" />
     <ClCompile Include="src\util.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Makefile.am" />
+    <None Include="src\Makefile.in" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{67D88850-0B1E-4b14-B452-7688A968BECC}</ProjectGuid>

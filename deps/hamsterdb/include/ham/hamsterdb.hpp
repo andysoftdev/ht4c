@@ -12,7 +12,7 @@
 /**
  * @file hamsterdb.hpp
  * @author Christoph Rupp, chris@crupp.de
- * @version 2.1.1
+ * @version 2.1.4
  *
  * This C++ wrapper class is a very tight wrapper around the C API. It does
  * not attempt to be STL compatible.
@@ -317,13 +317,6 @@ class db {
       return (ham_db_get_error(m_db));
     }
 
-    /** Sets the prefix comparison function. */
-    void set_prefix_compare_func(ham_prefix_compare_func_t foo) {
-      ham_status_t st = ham_db_set_prefix_compare_func(m_db, foo);
-      if (st)
-        throw error(st);
-    }
-
     /** Sets the comparison function. */
     void set_compare_func(ham_compare_func_t foo) {
       ham_status_t st = ham_db_set_compare_func(m_db, foo);
@@ -341,6 +334,17 @@ class db {
       if (st)
         throw error(st);
       return (r);
+    }
+
+    /** Finds a record by looking up the key. */
+    record &find(txn *t, key *k, record *r, ham_u32_t flags = 0) {
+      ham_status_t st = ham_db_find(m_db,
+                t ? t->get_handle() : 0,
+                k ? k->get_handle() : 0,
+                r->get_handle(), flags);
+      if (st)
+        throw error(st);
+      return (*r);
     }
 
     /** Finds a record by looking up the key. */
@@ -676,7 +680,7 @@ class env {
 
     /** Get all Database names. */
     std::vector<ham_u16_t> get_database_names() {
-      ham_size_t count = 32;
+      ham_u32_t count = 32;
       ham_status_t st;
       std::vector<ham_u16_t> v(count);
 

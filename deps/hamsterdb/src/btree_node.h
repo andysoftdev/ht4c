@@ -12,113 +12,129 @@
 #ifndef HAM_BTREE_NODE_H__
 #define HAM_BTREE_NODE_H__
 
-#include "internal_fwd_decl.h"
-
 #include "endianswap.h"
-#include "btree_key.h"
-#include "db.h"
+#include "btree_flags.h"
+#include "db_local.h"
+#include "page.h"
 
 #include "packstart.h"
 
 namespace hamsterdb {
 
-/**
- * A btree-node; it spans the persistent part of a Page
+class PBtreeKeyDefault;
+
+/*
+ * A BtreeNode structure spans the persistent part of a Page
  *
  * This structure is directly written to/read from the file. The
  * getters/setters provide endian-agnostic access.
  */
 HAM_PACK_0 struct HAM_PACK_1 PBtreeNode
 {
-  /** get a PBtreeNode from a Page */
-  static PBtreeNode *from_page(Page *page) {
-    return ((PBtreeNode *)page->get_payload());
-  }
+  public:
+    enum {
+      // node is a leaf
+      kLeafNode = 1
+    };
 
-  /** get the number of entries of a btree-node */
-  ham_u16_t get_count() {
-    return (ham_db2h16(_count));
-  }
+    // Returns a PBtreeNode from a Page
+    static PBtreeNode *from_page(Page *page) {
+      return ((PBtreeNode *)page->get_payload());
+    }
 
-  /** set the number of entries of a btree-node */
-  void set_count(ham_u16_t c) {
-    _count = ham_h2db16(c);
-  }
+    // Returns the offset (in bytes) of the member |m_data|
+    static ham_u32_t get_entry_offset() {
+      return (OFFSETOF(PBtreeNode, m_data));
+    }
 
-  /** get the address of the left sibling of a btree-node */
-  ham_u64_t get_left() {
-    return (ham_db2h_offset(_left));
-  }
+    // Returns the flags of the btree node (|kLeafNode|)
+    ham_u32_t get_flags() const {
+      return (ham_db2h32(m_flags));
+    }
 
-  /** set the address of the left sibling of a btree-node */
-  void set_left(ham_u64_t o) {
-    _left = ham_h2db_offset(o);
-  }
+    // Sets the flags of the btree node (|kLeafNode|)
+    void set_flags(ham_u32_t flags) {
+      m_flags = ham_h2db32(flags);
+    }
 
-  /** get the address of the right sibling of a btree-node */
-  ham_u64_t get_right() {
-    return (ham_db2h_offset(_right));
-  }
+    // Returns the number of entries in a BtreeNode
+    ham_u32_t get_count() const {
+      return (ham_db2h32(m_count));
+    }
 
-  /** set the address of the right sibling of a btree-node */
-  void set_right(ham_u64_t o) {
-    _right = ham_h2db_offset(o);
-  }
+    // Sets the number of entries in a BtreeNode
+    void set_count(ham_u32_t c) {
+      ham_assert((int)c >= 0);
+      m_count = ham_h2db32(c);
+    }
 
-  /** get the ptr_left of a btree-node */
-  ham_u64_t get_ptr_left() {
-    return (ham_db2h_offset(_ptr_left));
-  }
+    // Returns the address of the left sibling of this node
+    ham_u64_t get_left() const {
+      return (ham_db2h_offset(m_left));
+    }
 
-  /** check if a btree node is a leaf node */
-  bool is_leaf() {
-    return (_ptr_left == 0);
-  }
+    // Sets the address of the left sibling of this node
+    void set_left(ham_u64_t o) {
+      m_left = ham_h2db_offset(o);
+    }
 
-  /** set the ptr_left of a btree-node */
-  void set_ptr_left(ham_u64_t o) {
-    _ptr_left = ham_h2db_offset(o);
-  }
+    // Returns the address of the right sibling of this node
+    ham_u64_t get_right() const {
+      return (ham_db2h_offset(m_right));
+    }
 
-  /** get entry @a i of a btree node
-   *
-   * note that this function does not check the boundaries (i.e. whether
-   * i <= get_count(), because some functions deliberately write to
-   * elements "after" get_count() */
-  PBtreeKey *get_key(Database *db, int i) {
-    return ((PBtreeKey *)&((const char *)_entries)
-              [(db->get_keysize() + PBtreeKey::ms_sizeof_overhead) * i]);
-  }
+    // Sets the address of the right sibling of this node
+    void set_right(ham_u64_t o) {
+      m_right = ham_h2db_offset(o);
+    }
 
-  /**
-   * flags of this node - flags are always the first member
-   * of every page - regardless of the btree.
-   * Currently only used for the page type.
-   */
-  ham_u16_t _flags;
+    // Returns the ptr_down of this node
+    ham_u64_t get_ptr_down() const {
+      return (ham_db2h_offset(m_ptr_down));
+    }
 
-  /** number of used entries in the node */
-  ham_u16_t _count;
+    // Returns true if this btree node is a leaf node
+    bool is_leaf() const {
+      return (m_flags & kLeafNode);
+    }
 
-  /** address of left sibling */
-  ham_u64_t _left;
+    // Sets the ptr_down of this node
+    void set_ptr_down(ham_u64_t o) {
+      m_ptr_down = ham_h2db_offset(o);
+    }
 
-  /** address of right sibling */
-  ham_u64_t _right;
+    // Returns a pointer to the key data
+    ham_u8_t *get_data() {
+      return (&m_data[0]);
+    }
 
-  /**
-   * address of child node whose items are smaller than all items
-   * in this node
-   */
-  ham_u64_t _ptr_left;
+    const ham_u8_t *get_data() const {
+      return (&m_data[0]);
+    }
 
-  /** the entries of this node */
-  PBtreeKey _entries[1];
+  private:
+    // flags of this node
+    ham_u32_t m_flags;
+
+    // number of used entries in the node
+    ham_u32_t m_count;
+  
+    // address of left sibling
+    ham_u64_t m_left;
+
+    // address of right sibling
+    ham_u64_t m_right;
+
+    // address of child node whose items are smaller than all items
+    // in this node
+    ham_u64_t m_ptr_down;
+
+    // the entries of this node
+    ham_u8_t m_data[1];
 
 } HAM_PACK_2;
 
 #include "packstop.h"
-
 
 } // namespace hamsterdb
 

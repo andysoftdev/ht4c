@@ -24,11 +24,12 @@
 #  include <stdlib.h>
 #endif
 
-#include "internal_fwd_decl.h"
-#include "errorinducer.h"
 #include "page.h"
+#include "errorinducer.h"
 
 namespace hamsterdb {
+
+class LocalEnvironment;
 
 /**
  * The changeset class
@@ -36,7 +37,7 @@ namespace hamsterdb {
 class Changeset
 {
   public:
-    Changeset(Environment *env)
+    Changeset(LocalEnvironment *env)
     : m_env(env), m_head(0), m_blobs(0), m_blobs_size(0), m_blobs_capacity(0),
       m_freelists(0), m_freelists_size(0), m_freelists_capacity(0),
       m_indices(0), m_indices_size(0), m_indices_capacity(0),
@@ -44,8 +45,7 @@ class Changeset
     }
 
     ~Changeset() {
-      if (m_inducer)
-        delete m_inducer;
+      delete m_inducer;
       if (m_blobs)
         ::free(m_blobs);
       if (m_freelists)
@@ -57,7 +57,7 @@ class Changeset
     }
 
     /** is the changeset empty? */
-    bool is_empty() {
+    bool is_empty() const {
       return (m_head == 0);
     }
 
@@ -79,20 +79,20 @@ class Changeset
      *
      * on success: will clear the changeset and the log
      */
-    ham_status_t flush(ham_u64_t lsn);
+    void flush(ham_u64_t lsn);
 
     /** check if the page is already part of the changeset */
     bool contains(Page *page) {
-      return (page->is_in_list(m_head, Page::LIST_CHANGESET));
+      return (page->is_in_list(m_head, Page::kListChangeset));
     }
 
   private:
     /** The Environment which created this Changeset */
-    Environment *m_env;
+    LocalEnvironment *m_env;
 
     /** write all pages in a bucket to the log file */
-    ham_status_t log_bucket(Page **bucket, ham_size_t bucket_size,
-                            ham_u64_t lsn, ham_size_t &page_count) ;
+    void log_bucket(Page **bucket, ham_u32_t bucket_size, ham_u64_t lsn,
+                ham_u32_t &page_count) ;
 
     /** the head of our linked list */
     Page *m_head;
@@ -104,20 +104,20 @@ class Changeset
      *   http://social.msdn.microsoft.com/Forums/en-us/vcgeneral/thread/1bf2b062-150f-4f86-8081-d4d5dd0d1956
      */
     Page **m_blobs;
-    ham_size_t m_blobs_size;
-    ham_size_t m_blobs_capacity;
+    ham_u32_t m_blobs_size;
+    ham_u32_t m_blobs_capacity;
 
     Page **m_freelists;
-    ham_size_t m_freelists_size;
-    ham_size_t m_freelists_capacity;
+    ham_u32_t m_freelists_size;
+    ham_u32_t m_freelists_capacity;
 
     Page **m_indices;
-    ham_size_t m_indices_size;
-    ham_size_t m_indices_capacity;
+    ham_u32_t m_indices_size;
+    ham_u32_t m_indices_capacity;
 
     Page **m_others;
-    ham_size_t m_others_size;
-    ham_size_t m_others_capacity;
+    ham_u32_t m_others_size;
+    ham_u32_t m_others_capacity;
 
   public:
     /** an error inducer - required for testing */

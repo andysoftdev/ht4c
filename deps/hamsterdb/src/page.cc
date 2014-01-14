@@ -24,111 +24,55 @@
 #include "mem.h"
 #include "os.h"
 #include "page.h"
+#include "btree_index.h"
+#include "btree_node_proxy.h"
 
 namespace hamsterdb {
 
-int Page::sizeof_persistent_header = (OFFSETOF(PageData, _s._payload));
+int Page::sizeof_persistent_header = (OFFSETOF(PPageData, _s._payload));
 
-Page::Page(Environment *env, Database *db)
-  : m_self(0), m_db(db), m_device(0), m_flags(0), m_dirty(false),
-    m_cursors(0), m_pers(0)
+Page::Page(LocalEnvironment *env, LocalDatabase *db)
+  : m_env(env), m_db(db), m_address(0), m_flags(0), m_dirty(false),
+    m_cursor_list(0), m_node_proxy(0), m_data(0)
 {
-  if (env)
-    m_device = env->get_device();
   memset(&m_prev[0], 0, sizeof(m_prev));
   memset(&m_next[0], 0, sizeof(m_next));
 }
 
 Page::~Page()
 {
-  ham_assert(get_pers() == 0);
-  ham_assert(get_cursors() == 0);
+  if (m_env && m_env->get_device() && m_data != 0)
+    m_env->get_device()->free_page(this);
+
+  if (m_node_proxy) {
+    delete m_node_proxy;
+    m_node_proxy = 0;
+  }
+
+  ham_assert(m_data == 0);
+  ham_assert(m_cursor_list == 0);
 }
 
-ham_status_t
+void
 Page::allocate()
 {
-  return (get_device()->alloc_page(this));
+  m_env->get_device()->alloc_page(this);
 }
 
-ham_status_t
+void
 Page::fetch(ham_u64_t address)
 {
-  set_self(address);
-  return (get_device()->read_page(this));
+  set_address(address);
+  m_env->get_device()->read_page(this);
 }
 
-ham_status_t
+void
 Page::flush()
 {
-  if (!is_dirty())
-    return (HAM_SUCCESS);
-
-  ham_status_t st = get_device()->write_page(this);
-  if (st)
-    return (st);
-
-  set_dirty(false);
-  return (HAM_SUCCESS);
-}
-
-void
-Page::free()
-{
-  ham_assert(get_cursors() == 0);
-  get_device()->free_page(this);
-}
-
-void
-Page::add_cursor(Cursor *cursor)
-{
-  if (get_cursors()) {
-    cursor->set_next_in_page(get_cursors());
-    cursor->set_previous_in_page(0);
-    get_cursors()->set_previous_in_page(cursor);
+  if (is_dirty()) {
+    m_env->get_device()->write_page(this);
+    set_dirty(false);
   }
-  set_cursors(cursor);
-}
-
-void
-Page::remove_cursor(Cursor *cursor)
-{
-  Cursor *n, *p;
-
-  if (cursor == get_cursors()) {
-    n = cursor->get_next_in_page();
-    if (n)
-      n->set_previous_in_page(0);
-    set_cursors(n);
-  }
-  else {
-    n = cursor->get_next_in_page();
-    p = cursor->get_previous_in_page();
-    if (p)
-      p->set_next_in_page(n);
-    if (n)
-      n->set_previous_in_page(p);
-  }
-
-  cursor->set_next_in_page(0);
-  cursor->set_previous_in_page(0);
-}
-
-ham_status_t
-Page::uncouple_all_cursors(ham_size_t start)
-{
-  Cursor *c = get_cursors();
-
-  if (c) {
-    Database *db = c->get_db();
-    if (db) {
-      BtreeIndex *be = db->get_btree();
-      if (be)
-        return (be->uncouple_all_cursors(this, start));
-    }
-  }
-
-  return (HAM_SUCCESS);
 }
 
 } // namespace hamsterdb

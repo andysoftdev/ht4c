@@ -48,58 +48,13 @@ namespace ht4c { namespace Hamster {
 
 		static int HAM_CALLCONV KeyCompare( ham_db_t *db
 																			, const ham_u8_t *lhs
-																			, ham_size_t lhs_size
+																			, ham_u32_t lhs_size
 																			, const ham_u8_t *rhs
-																			, ham_size_t rhs_size ) {
+																			, ham_u32_t rhs_size ) {
 
 				Hypertable::SerializedKey klhs( lhs );
 				Hypertable::SerializedKey krhs( rhs );
 				return klhs.compare( krhs );
-		}
-
-		static int HAM_CALLCONV KeyPrefixCompare( ham_db_t *db
-																						, const ham_u8_t *lhs
-																						, ham_size_t lhs_length
-																						, ham_size_t lhs_real_length
-																						, const ham_u8_t *rhs
-																						, ham_size_t rhs_length
-																						, ham_size_t rhs_real_length ) {
-
-				if( lhs_length < 4 || rhs_length < 4 ) {
-					return HAM_PREFIX_REQUEST_FULLKEY;
-				}
-
-				Hypertable::SerializedKey klhs( lhs );
-				Hypertable::SerializedKey krhs( rhs );
-
-				lhs_length -= 4;
-				rhs_length -= 4;
-
-				const uint8_t *ptr1, *ptr2;
-				int len1 = klhs.decode_length(&ptr1);
-				int len2 = krhs.decode_length(&ptr2);
-
-				if (*ptr1 != *ptr2) {
-					// see Key.h
-					if (*ptr1 >= 0x80 && *ptr1 != 0xD0)
-						len1 -= 8;
-					if (*ptr2 >= 0x80 && *ptr2 != 0xD0)
-						len2 -= 8;
-				}
-
-				bool partial = false;
-				if( len1 > (int)lhs_length ) {
-					len1 = lhs_length;
-					partial = true;
-				}
-				if( len2 > (int)rhs_length ) {
-					len2 = rhs_length;
-					partial = true;
-				}
-
-				int len = (len1 < len2) ? len1 : len2;
-				int cmp = memcmp(ptr1+1, ptr2+1, len-1);
-				return !cmp ? (partial ? HAM_PREFIX_REQUEST_FULLKEY : len1 - len2) : cmp;
 		}
 
 		static void HAM_CALLCONV errhandler(int level, const char *message) {
@@ -206,7 +161,6 @@ namespace ht4c { namespace Hamster {
 		}
 		
 		hamsterdb::db db = env->create_db( id, dbCreateFlags, table_pars );
-		db.set_prefix_compare_func( KeyPrefixCompare );
 		db.set_compare_func( KeyCompare );
 		return id;
 	}
@@ -216,7 +170,6 @@ namespace ht4c { namespace Hamster {
 		if( it == tables.end() ) {
 			db_t db;
 			db.db = From( env->open_db(id, dbOpenFlags) );
-			db.db->set_prefix_compare_func( KeyPrefixCompare );
 			db.db->set_compare_func( KeyCompare );
 			db.ref.insert( table );
 			::InitializeCriticalSection( &db.cs );

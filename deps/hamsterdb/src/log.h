@@ -9,8 +9,8 @@
  * See files COPYING.* for License information.
  */
 
-/**
- * @brief structures and routines for physical logging/recovery
+/*
+ * @brief Structures and routines for physical logging/recovery
  *
  * The physical WAL stores modifications on page level. It is required
  * since several logical operations are not atomic - i.e. SMOs (Btree structure
@@ -28,193 +28,179 @@
 #ifndef HAM_LOG_H__
 #define HAM_LOG_H__
 
-#include "internal_fwd_decl.h"
-
-
 #include "os.h"
 
 namespace hamsterdb {
 
-/**
- * a Log object
- */
+class Page;
+class ByteArray;
+class LocalEnvironment;
+
+//
+// The write-ahead Log object
+//
 class Log
 {
   public:
-    /** the magic of the header */
+    // the header magic - first bytes in every file
     static const ham_u32_t HEADER_MAGIC = (('h' << 24) | ('l' << 16)
                                          | ('o' << 8) | 'g');
 
 #include "packstart.h"
 
-    /**
-     * the header structure of a log file
-     */
-    HAM_PACK_0 struct HAM_PACK_1 PHeader
-    {
-      PHeader() : magic(0), _reserved(0), lsn(0) { }
+    //
+    // The header structure of a log file
+    //
+    HAM_PACK_0 struct HAM_PACK_1 PEnvironmentHeader {
+      PEnvironmentHeader()
+        : magic(0), _reserved(0), lsn(0) {
+      }
 
-      /* the magic */
+      // the magic
       ham_u32_t magic;
 
-      /* a reserved field */
+      // a reserved field - for padding
       ham_u32_t _reserved;
 
-      /* the last used lsn */
+      // the last used lsn
       ham_u64_t lsn;
     } HAM_PACK_2;
 
-    /**
-     * a log file entry
-     */
-    HAM_PACK_0 struct HAM_PACK_1 PEntry
-    {
-      PEntry() : lsn(0), flags(0), _reserved(0), offset(0), data_size(0) { }
+    //
+    // A entry in the log file
+    //
+    HAM_PACK_0 struct HAM_PACK_1 PEntry {
+      PEntry()
+        : lsn(0), flags(0), _reserved(0), offset(0), data_size(0) {
+      }
 
-      /** the lsn of this entry */
+      // the lsn of this entry
       ham_u64_t lsn;
 
-      /** the flags of this entry, see below */
+      // the flags of this entry, see below
       ham_u32_t flags;
 
-      /** a reserved value */
+      // a reserved value
       ham_u32_t _reserved;
 
-      /** the offset of this operation */
+      // the address of the modified page
       ham_u64_t offset;
 
-      /** the size of the data */
+      // the size of the data
       ham_u64_t data_size;
     } HAM_PACK_2;
 
 #include "packstop.h"
 
-    /** flags for PEntry::flags */
-    static const ham_u32_t CHANGESET_IS_COMPLETE = 1;
+    // flags for PEntry::flags
+    enum {
+      kChangesetIsComplete = 1
+    };
 
-    /** an "iterator" structure for traversing the log files */
+    // an "iterator" structure for traversing the log files
     typedef ham_u64_t Iterator;
 
-    /** constructor */
-    Log(Environment *env, ham_u32_t flags = 0)
-      : m_env(env), m_flags(flags), m_lsn(0), m_fd(HAM_INVALID_FD) {
+    // Constructor
+    Log(LocalEnvironment *env)
+      : m_env(env), m_lsn(0), m_fd(HAM_INVALID_FD) {
     }
 
-    /** create a new log */
-    ham_status_t create();
+    ~Log() {
+      close(true);
+    }
 
-    /** open an existing log */
-    ham_status_t open();
+    // Creates a new log
+    void create();
 
-    /** checks if the log is empty */
+    // Opens an existing log
+    void open();
+
+    // Checks if the log is empty
     bool is_empty() {
-      ham_u64_t size;
-
       if (m_fd == HAM_INVALID_FD)
         return (true);
 
-      ham_status_t st = os_get_filesize(m_fd, &size);
-      if (st)
-        return (st ? false : true); /* TODO throw */
-      if (size && size != sizeof(Log::PHeader))
+      ham_u64_t size = os_get_filesize(m_fd);
+      if (size && size != sizeof(Log::PEnvironmentHeader))
         return (false);
-
       return (true);
     }
 
-    /** adds an AFTER-image of a page */
-    ham_status_t append_page(Page *page, ham_u64_t lsn, ham_size_t page_count);
+    // Adds the write-ahead information of a page
+    void append_page(Page *page, ham_u64_t lsn, ham_u32_t page_count);
 
-    /** retrieves the current lsn */
+    // Retrieves the current lsn
     ham_u64_t get_lsn() {
       return (m_lsn);
     }
 
-    /** retrieves the file handle (for unittests) */
-    ham_fd_t get_fd() {
+    // Retrieves the file handle (for unittests)
+    ham_fd_t test_get_fd() {
       return (m_fd);
     }
 
-    /**
-     * clears the logfile
-     *
-     * invoked after every checkpoint (which is immediately after each
-     * txn_commit or txn_abort)
-     */
-    ham_status_t clear() {
-      ham_status_t st = os_truncate(m_fd, sizeof(Log::PHeader));
-      if (st)
-        return (st);
+    // clears the logfile
+    //
+    // This is called after every checkpoint (which is immediately after each
+    // txn_commit or txn_abort)
+    void clear() {
+      os_truncate(m_fd, sizeof(Log::PEnvironmentHeader));
 
-      /* after truncate, the file pointer is far beyond the new end of file;
-       * reset the file pointer, or the next write will resize the file to
-       * the original size */
-      return (os_seek(m_fd, sizeof(Log::PHeader), HAM_OS_SEEK_SET));
+      // after truncate, the file pointer is far beyond the new end of file;
+      // reset the file pointer, or the next write will resize the file to
+      // the original size
+      os_seek(m_fd, sizeof(Log::PEnvironmentHeader), HAM_OS_SEEK_SET);
     }
 
-    /** flush the logfile to disk */
-    ham_status_t flush() {
-      return (os_flush(m_fd));
+    // Flushes the log file to disk
+    void flush() {
+      os_flush(m_fd);
     }
 
-    /**
-     * closes the log, frees all allocated resources.
-     *
-     * if @a noclear is true then the log will not be clear()ed. This is
-     * useful for debugging.
-     */
-    ham_status_t close(bool noclear = false);
+    // Closes the log, frees all allocated resources.
+    //
+    // If |noclear| is true then the log will not be clear()ed. This is
+    // required for debugging.
+    void close(bool noclear = false);
 
-    /** do the recovery */
-    ham_status_t recover();
+    // Performs the recovery by walking through the log from start to end
+    // and writing all modified pages.
+    void recover();
 
   private:
 	friend struct LogFixture;
 	friend struct LogHighLevelFixture;
 
-    /**
-     * returns the next log entry
-     *
-     * iter must be initialized with zeroes for the first call
-     *
-     * 'data' returns the data of the entry, or NULL if there is no data.
-     * The memory has to be freed by the caller.
-     *
-     * returns SUCCESS and an empty entry (lsn is zero) after the last element.
-     */
-    ham_status_t get_entry(Log::Iterator *iter, Log::PEntry *entry,
-                         ham_u8_t **data);
+    // Returns the next log entry
+    //
+    // |iter| must be initialized with zeroes for the first call.
+    // |data| returns the data of the entry.
+    //
+    // Returns SUCCESS and an empty entry (lsn is zero) after the last element.
+    void get_entry(Log::Iterator *iter, Log::PEntry *entry, ByteArray *buffer);
 
-    /**
-     * append a log entry for a page modification
-     *
-     * @note invoked by @ref Log::append_page() to save the new
-     * content of the specified page.
-     *
-     * @sa Log::append_page
-     */
-    ham_status_t append_write(ham_u64_t lsn, ham_u32_t flags,
-                    ham_u64_t offset, ham_u8_t *data, ham_size_t size);
+    // Appends a log entry for a page modification
+    //
+    // Invoked by |Log::append_page()| to save the new
+    // content of the specified page.
+    void append_write(ham_u64_t lsn, ham_u32_t flags, ham_u64_t offset,
+                    ham_u8_t *data, ham_u32_t size);
 
-    /** returns the path of the log file */
+    // Returns the path of the log file
     std::string get_path();
 
-    /** writes a byte buffer to the logfile */
-    ham_status_t append_entry(Log::PEntry *entry, ham_size_t size);
+    // Writes a byte buffer to the log file
+    void append_entry(Log::PEntry *entry, ham_u32_t size);
 
-    /** references the Environment this log file is for */
-    Environment *m_env;
+    // References the Environment this log file is for
+    LocalEnvironment *m_env;
 
-    /** the log flags - unused so far */
-    ham_u32_t m_flags;
-
-    /** the current lsn */
+    // The current lsn
     ham_u64_t m_lsn;
 
-    /** the file descriptor of the log file */
+    // The file descriptor of the log file
     ham_fd_t m_fd;
 };
-
 
 } // namespace hamsterdb
 
