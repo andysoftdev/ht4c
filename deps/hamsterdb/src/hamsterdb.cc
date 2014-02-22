@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -26,11 +26,12 @@
 #include "blob_manager.h"
 #include "btree_index.h"
 #include "btree_cursor.h"
-#include "cache.h"
 #include "cursor.h"
 #include "db.h"
 #include "device.h"
 #include "env.h"
+#include "env_header.h"
+#include "env_local.h"
 #include "env_remote.h"
 #include "error.h"
 #include "log.h"
@@ -42,7 +43,6 @@
 #include "txn.h"
 #include "util.h"
 #include "version.h"
-#include "freelist.h"
 
 using namespace hamsterdb;
 
@@ -197,8 +197,6 @@ ham_strerror(ham_status_t result)
       return ("Data blob not found");
     case HAM_IO_ERROR:
       return ("System I/O error");
-    case HAM_CACHE_FULL:
-      return ("Database cache is full");
     case HAM_NOT_IMPLEMENTED:
       return ("Operation not implemented");
     case HAM_FILE_NOT_FOUND:
@@ -327,7 +325,7 @@ ham_env_create(ham_env_t **henv, const char *filename,
 {
   ham_u32_t page_size = HAM_DEFAULT_PAGESIZE;
   ham_u64_t cache_size = 0;
-  ham_u16_t maxdbs = 0;
+  ham_u16_t max_databases = 0;
   ham_u32_t timeout = 0;
   std::string logdir;
   ham_u8_t *encryption_key = 0;
@@ -342,13 +340,6 @@ ham_env_create(ham_env_t **henv, const char *filename,
   /* creating a file in READ_ONLY mode? doesn't make sense */
   if (flags & HAM_READ_ONLY) {
     ham_trace(("cannot create a file in read-only mode"));
-    return (HAM_INV_PARAMETER);
-  }
-
-  /* in-memory? don't allow cache limits! */
-  if ((flags & HAM_IN_MEMORY) && (flags & HAM_CACHE_STRICT)) {
-    ham_trace(("combination of HAM_IN_MEMORY and HAM_CACHE_STRICT "
-            "not allowed"));
     return (HAM_INV_PARAMETER);
   }
 
@@ -374,7 +365,6 @@ ham_env_create(ham_env_t **henv, const char *filename,
   ham_u32_t mask = HAM_ENABLE_FSYNC
             | HAM_IN_MEMORY
             | HAM_DISABLE_MMAP
-            | HAM_CACHE_STRICT
             | HAM_CACHE_UNLIMITED
             | HAM_ENABLE_RECOVERY
             | HAM_AUTO_RECOVERY
@@ -392,25 +382,17 @@ ham_env_create(ham_env_t **henv, const char *filename,
       case HAM_PARAM_CACHESIZE:
         cache_size = param->value;
         if (flags & HAM_IN_MEMORY && cache_size != 0) {
-          ham_trace(("combination of HAM_IN_MEMORY and cache_size != 0 "
+          ham_trace(("combination of HAM_IN_MEMORY and cache size != 0 "
                 "not allowed"));
           return (HAM_INV_PARAMETER);
         }
         break;
       case HAM_PARAM_PAGESIZE:
         if (param->value != 1024 && param->value % 2048 != 0) {
-          ham_trace(("invalid page_size - must be 1024 or a multiple of 2048"));
+          ham_trace(("invalid page size - must be 1024 or a multiple of 2048"));
           return (HAM_INV_PAGESIZE);
         }
         page_size = (ham_u32_t)param->value;
-        break;
-      case HAM_PARAM_MAX_DATABASES:
-        maxdbs = (ham_u32_t)param->value;
-        if (maxdbs == 0) {
-          ham_trace(("invalid value %u for parameter HAM_PARAM_MAX_DATABASES",
-                 (unsigned)param->value));
-          return (HAM_INV_PARAMETER);
-        }
         break;
       case HAM_PARAM_LOG_DIRECTORY:
         logdir = (const char *)param->value;
@@ -441,12 +423,10 @@ ham_env_create(ham_env_t **henv, const char *filename,
   }
 
   /* don't allow cache limits with unlimited cache */
-  if (flags & HAM_CACHE_UNLIMITED) {
-    if ((flags & HAM_CACHE_STRICT) || cache_size != 0) {
-      ham_trace(("combination of HAM_CACHE_UNLIMITED and cache_size != 0 "
-            "or HAM_CACHE_STRICT not allowed"));
-      return (HAM_INV_PARAMETER);
-    }
+  if (flags & HAM_CACHE_UNLIMITED && cache_size != 0) {
+    ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
+          "not allowed"));
+    return (HAM_INV_PARAMETER);
   }
 
   if (cache_size == 0)
@@ -462,27 +442,10 @@ ham_env_create(ham_env_t **henv, const char *filename,
   /*
    * make sure that max_databases actually fit in a header
    * page!
-   * leave at least 128 bytes for the freelist and the other header data
+   * leave at least 128 bytes for other header data
    */
-  {
-    ham_u32_t l = page_size - sizeof(PEnvironmentHeader)
-        - PFreelistPayload::get_bitmap_offset() - 128;
-
-    l /= sizeof(PBtreeHeader);
-    if (maxdbs > l) {
-      ham_trace(("parameter HAM_PARAM_MAX_DATABASES too high for "
-            "this page_size; the maximum allowed is %u",
-            (unsigned)l));
-      return (HAM_INV_PARAMETER);
-    }
-    else if (maxdbs == 0) {
-      if (Database::kMaxIndices > l)
-        maxdbs = (ham_u16_t)l;  /* small page sizes (e.g. 1K) cannot carry 
-                                 * Database::kMaxIndices databases! */
-      else
-        maxdbs = Database::kMaxIndices;
-    }
-  }
+  max_databases = page_size - sizeof(PEnvironmentHeader) - 128;
+  max_databases /= sizeof(PBtreeHeader);
 
   ham_status_t st = 0;
   Environment *env = 0;
@@ -511,7 +474,8 @@ ham_env_create(ham_env_t **henv, const char *filename,
 #endif
 
     /* and finish the initialization of the Environment */
-    st = env->create(filename, flags, mode, page_size, cache_size, maxdbs);
+    st = env->create(filename, flags, mode, page_size,
+                    cache_size, max_databases);
 
     /* flush the environment to make sure that the header page is written
      * to disk */
@@ -707,12 +671,10 @@ ham_env_open(ham_env_t **henv, const char *filename, ham_u32_t flags,
   }
 
   /* don't allow cache limits with unlimited cache */
-  if (flags & HAM_CACHE_UNLIMITED) {
-    if ((flags & HAM_CACHE_STRICT) || cache_size != 0) {
-      ham_trace(("combination of HAM_CACHE_UNLIMITED and cache_size != 0 "
-            "or HAM_CACHE_STRICT not allowed"));
-      return (HAM_INV_PARAMETER);
-    }
+  if (flags & HAM_CACHE_UNLIMITED && cache_size != 0) {
+    ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
+          "not allowed"));
+    return (HAM_INV_PARAMETER);
   }
 
   if (cache_size == 0)
@@ -1355,7 +1317,13 @@ ham_db_close(ham_db_t *hdb, ham_u32_t flags)
     if (st)
       return (db->set_error(st));
 
+    ham_u16_t dbname = db->get_name();
     delete db;
+
+    /* in-memory database: make sure that a database with the same name
+     * can be re-created */
+    if (env->get_flags() & HAM_IN_MEMORY)
+      (void)env->erase_db(dbname, 0);
     return (0);
   }
   catch (Exception &ex) {

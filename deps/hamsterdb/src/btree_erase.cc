@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -561,17 +561,6 @@ class BtreeEraseAction
          * items from this page */
         node->shift_to_right(sibnode, s + 1, c);
 
-        /*
-         * internal nodes: the pointer of the highest item
-         * in the node will become the ptr_down of the sibling
-         */
-        if (internal) {
-          sibnode->set_ptr_down(node->get_record_id(node->get_count() - 1));
-
-          /* free the greatest key */
-          node->erase(node->get_count() - 1);
-        }
-
         /* replace the old anchor key with the new anchor key */
         if (anchor) {
           if (internal) {
@@ -582,6 +571,17 @@ class BtreeEraseAction
             slot = ancnode->find(sibnode, 0);
             sibnode->replace_key(0, ancnode, slot + 1);
           }
+        }
+
+        /*
+         * internal nodes: the pointer of the highest item
+         * in the node will become the ptr_down of the sibling
+         */
+        if (internal) {
+          sibnode->set_ptr_down(node->get_record_id(node->get_count() - 1));
+
+          /* free the greatest key */
+          node->erase(node->get_count() - 1);
         }
       }
 

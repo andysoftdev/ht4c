@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -14,7 +14,6 @@
 
 #include <string.h>
 
-#include "cache.h"
 #include "cursor.h"
 #include "db.h"
 #include "device.h"
@@ -28,8 +27,6 @@
 #include "btree_node_proxy.h"
 
 namespace hamsterdb {
-
-int Page::sizeof_persistent_header = (OFFSETOF(PPageData, _s._payload));
 
 Page::Page(LocalEnvironment *env, LocalDatabase *db)
   : m_env(env), m_db(db), m_address(0), m_flags(0), m_dirty(false),
@@ -54,16 +51,20 @@ Page::~Page()
 }
 
 void
-Page::allocate()
+Page::allocate(ham_u32_t type, ham_u32_t flags)
 {
-  m_env->get_device()->alloc_page(this);
+  m_env->get_device()->alloc_page(this, m_env->get_page_size());
+  if (flags & kInitializeWithZeroes)
+    memset(get_raw_payload(), 0, m_env->get_page_size());
+  if (type)
+    set_type(type);
 }
 
 void
 Page::fetch(ham_u64_t address)
 {
   set_address(address);
-  m_env->get_device()->read_page(this);
+  m_env->get_device()->read_page(this, m_env->get_page_size());
 }
 
 void

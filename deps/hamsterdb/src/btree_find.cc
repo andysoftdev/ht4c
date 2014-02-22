@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -62,7 +62,7 @@ class BtreeFindAction
          * should be discarded.
          */
         page = env->get_page_manager()->fetch_page(db, hints.leaf_page_addr,
-                true);
+                                            true);
         if (page) {
           node = m_btree->get_node_from_page(page);
           ham_assert(node->is_leaf());

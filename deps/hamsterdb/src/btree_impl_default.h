@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -194,8 +194,7 @@ class DefaultIterator
 
     // Sets the record address of an extended key overflow area
     void set_extended_blob_id(ham_u64_t rid) {
-      rid = ham_h2db_offset(rid);
-      *(ham_u64_t *)get_key_data() = rid;
+      *(ham_u64_t *)get_key_data() = ham_h2db_offset(rid);
     }
 
     // Returns the record id
@@ -1063,7 +1062,7 @@ class DefaultNodeImpl
       // for capacity, freelist_count, next_offset
       kPayloadOffset = 12,
 
-      // only rearrange if freelist_count > 32
+      // only rearrange if freelist_count is high enough
       kRearrangeThreshold = 5,
 
       // sizeof(ham_u64_t) + 1 (for flags)
@@ -1088,7 +1087,8 @@ class DefaultNodeImpl
     }
 
     // Returns the actual key size (including overhead, without record)
-    static ham_u16_t get_actual_key_size(ham_u32_t key_size) {
+    static ham_u16_t get_actual_key_size(ham_u32_t key_size,
+                        bool enable_duplicates = false) {
       // unlimited/variable keys require 5 bytes for flags + key size + offset;
       // assume an average key size of 32 bytes (this is a random guess, but
       // will be good enough)
@@ -1096,8 +1096,7 @@ class DefaultNodeImpl
         return ((ham_u16_t)32 - 8);// + 5 - 8
 
       // otherwise 1 byte for flags and 1 byte for record counter
-      // TODO add record counter only if duplicates are enabled!
-      return ((ham_u16_t)(key_size + 2));
+      return ((ham_u16_t)(key_size + (enable_duplicates ? 2 : 0)));
     }
 
     // Returns an iterator which points at the first key
@@ -1438,7 +1437,7 @@ class DefaultNodeImpl
             return;
           }
           // free the existing record (if there is one)
-          env->get_blob_manager()->free(db, ptr);
+          env->get_blob_manager()->erase(db, ptr);
           // fall through
         }
         // write the new inline record
@@ -1471,7 +1470,7 @@ class DefaultNodeImpl
             m_records.table_set_record_id(&table, duplicate_index, ptr);
             return;
           }
-          db->get_local_env()->get_blob_manager()->free(db, ptr, 0);
+          db->get_local_env()->get_blob_manager()->erase(db, ptr, 0);
         }
 
         // now overwrite with an inline key
@@ -1507,7 +1506,7 @@ class DefaultNodeImpl
           tmpkey.size = get_total_key_data_size(slot)
                         + get_total_inline_record_size();
 
-          if (requires_split_impl(&tmpkey, false))
+          if (!has_enough_space(&tmpkey, false))
             force_duptable = true;
         }
 
@@ -1529,8 +1528,7 @@ class DefaultNodeImpl
 
           // allocate new space, copy the key data and write the new record id
           m_layout.set_key_data_offset(slot,
-                          append_key(slot, m_node->get_count(),
-                                  it->get_key_data(),
+                          append_key(m_node->get_count(), it->get_key_data(),
                                   it->get_key_data_size()
                                         + kExtendedDuplicatesSize,
                                   true));
@@ -1547,7 +1545,7 @@ class DefaultNodeImpl
           // ran out of space? rearrange, otherwise the space which just was
           // freed would be lost
           if (force_duptable)
-            rearrange(m_node->get_count());
+            rearrange(m_node->get_count(), true);
 
           // fall through
         }
@@ -1725,7 +1723,7 @@ class DefaultNodeImpl
 
       LocalDatabase *db = m_page->get_db();
       LocalEnvironment *env = db->get_local_env();
-      return (env->get_blob_manager()->get_datasize(db, ptr));
+      return (env->get_blob_manager()->get_blob_size(db, ptr));
     }
 
     // Erases an extended key
@@ -1758,7 +1756,7 @@ class DefaultNodeImpl
             // non-inline record? free the blob
             if (!m_records.table_is_record_inline(&table, i)) {
               ptr = m_records.table_get_record_id(&table, i);
-              db->get_local_env()->get_blob_manager()->free(db, ptr, 0);
+              db->get_local_env()->get_blob_manager()->erase(db, ptr, 0);
             }
           }
 
@@ -1769,7 +1767,7 @@ class DefaultNodeImpl
           // non-inline record? free the blob
           if (!m_records.table_is_record_inline(&table, duplicate_index)) {
             ptr = m_records.table_get_record_id(&table, duplicate_index);
-            db->get_local_env()->get_blob_manager()->free(db, ptr, 0);
+            db->get_local_env()->get_blob_manager()->erase(db, ptr, 0);
           }
 
           // remove the record from the duplicate table
@@ -1809,7 +1807,7 @@ class DefaultNodeImpl
         // if records are not inline: delete the blobs
         for (ham_u32_t i = 0; i < record_count; i++) {
           if (!it->is_record_inline(i))
-            db->get_local_env()->get_blob_manager()->free(db,
+            db->get_local_env()->get_blob_manager()->erase(db,
                             it->get_record_id(i), 0);
             it->remove_inline_record(i);
         }
@@ -1826,7 +1824,7 @@ class DefaultNodeImpl
       else {
         // if record is not inline: delete the blob
         if (!it->is_record_inline(duplicate_index))
-          db->get_local_env()->get_blob_manager()->free(db,
+          db->get_local_env()->get_blob_manager()->erase(db,
                           it->get_record_id(duplicate_index), 0);
 
         // shift duplicate records "to the left"
@@ -1865,6 +1863,13 @@ class DefaultNodeImpl
         return;
       }
 
+      // adjust next offset?
+      bool recalc_offset = false;
+      if (get_next_offset() == m_layout.get_key_data_offset(slot)
+                                    + get_key_data_size(slot)
+                                    + get_total_inline_record_size())
+        recalc_offset = true;
+
       // get rid of the extended key (if there is one)
       if (get_key_flags(slot) & BtreeKey::kExtendedKey)
         erase_key(slot);
@@ -1881,6 +1886,9 @@ class DefaultNodeImpl
                             * (get_freelist_count() + m_node->get_count()
                                     - slot - 1));
 
+      if (recalc_offset)
+        set_next_offset(calc_next_offset(m_node->get_count() - 1));
+
 #ifdef HAM_DEBUG
       check_index_integrity(m_node->get_count() - 1);
 #endif
@@ -1889,7 +1897,8 @@ class DefaultNodeImpl
     // Inserts a new key at |slot|. 
     // Also inserts an empty record which has to be overwritten in
     // the next call of set_record().
-    void insert(ham_u32_t slot, const ham_key_t *key) {
+    void insert(ham_u32_t slot, const ham_key_t *key,
+                    bool is_recursive = false) {
       ham_u32_t count = m_node->get_count();
 
 #ifdef HAM_DEBUG
@@ -1917,21 +1926,41 @@ class DefaultNodeImpl
       }
       // not found: append at the end
       else {
-        if (count == 0) {
-          idx = 0;
+        if (count == 0)
           offset = 0;
-        }
-        else {
+        else
           offset = get_next_offset();
-        }
+
         // make sure that the key really fits! if not then use an extended key.
         // this can happen if a page is split, but the new key still doesn't
         // fit into the splitted page.
         if (!extended_key) {
           if (offset + m_layout.get_key_index_span() * get_capacity()
               + key->size + get_total_inline_record_size()
-                  >= get_usable_page_size())
+                  >= get_usable_page_size()) {
             extended_key = true;
+            // check once more if the key fits
+            if (offset
+                  + m_layout.get_key_index_span() * get_capacity()
+                  + sizeof(ham_u64_t) + get_total_inline_record_size()
+                      >= get_usable_page_size()) {
+              // Arghl, still does not fit - rearrange the page, try again.
+              //
+              // This scenario can occur when we're inserting an anchor element
+              // while two pages are merged (during erase). These pages are
+              // both nearly empty, and calling rearrange() will give us ample
+              // free space.
+              //
+              // This can NOT occur durning regular inserts, because the page
+              // would have been splitted already.
+              ham_verify(is_recursive == false);
+              if (!is_recursive) {
+                rearrange(m_node->get_count(), true);
+                insert(slot, key, true);
+                return;
+              }
+            }
+          }
         }
 
         set_next_offset(offset
@@ -1988,7 +2017,7 @@ class DefaultNodeImpl
       ham_key_t key = {0};
       ConstIterator it = src_node->at(src_slot);
       if (it->get_key_flags() & BtreeKey::kExtendedKey) {
-        get_extended_key(it->get_extended_blob_id(), &key);
+        src_node->get_extended_key(it->get_extended_blob_id(), &key);
       }
       else {
         key.data = (void *)it->get_key_data();
@@ -2013,11 +2042,13 @@ class DefaultNodeImpl
     // This function is only called with |dest| pointing to an internal
     // node. Therefore we will never see duplicates here.
     void replace_key(ham_key_t *src, Iterator dest) {
+      ham_u32_t count = m_node->get_count();
 #ifdef HAM_DEBUG
-      check_index_integrity(m_node->get_count());
+      check_index_integrity(count);
 #endif
       ham_u32_t slot = dest->get_slot();
 
+      ham_assert((src->_flags & BtreeKey::kExtendedKey) == 0);
       ham_assert(dest->get_key_flags() == 0);
 
       // internal nodes are not allowed to have blob-related flags, because
@@ -2028,61 +2059,76 @@ class DefaultNodeImpl
       // copy the record ID, will be required later
       ham_u64_t rid = dest->get_record_id();
 
-      // copy the extended key, if there is one
-      if (src->_flags & BtreeKey::kExtendedKey) {
-        ham_u32_t next_offset = m_layout.get_key_data_offset(dest->get_slot())
-                                + get_total_key_data_size(dest->get_slot());
-        ham_u64_t newblobid, oldblobid = *(ham_u64_t *)src->data;
-        oldblobid = ham_db2h_offset(oldblobid);
-        newblobid = copy_extended_key(oldblobid);
-        dest->set_extended_blob_id(newblobid);
-        dest->set_key_flags(BtreeKey::kExtendedKey);
-
-        if (get_next_offset() == next_offset)
-            set_next_offset(m_layout.get_key_data_offset(dest->get_slot())
-                                + get_total_key_data_size(dest->get_slot()));
-      }
-      else {
-        // check if the current key space is large enough; if not then move the
-        // space to the freelist and allocate new space.
-        // however, there are two caveats:
-        //  1. it's possible that the number of used slots already reached the 
-        //      capacity limit
-        //  2. it's possible that the new key does not fit into the page.
-        //      in this case we simply allocate an extended key, which
-        //      only requires 8 bytes
-        if (dest->get_key_data_size() < src->size) {
-          // add this slot to the freelist
+      // check if the current key space is large enough; if not then move the
+      // space to the freelist and allocate new space.
+      // however, there are two caveats:
+      //  1. it's possible that the number of used slots already reached the 
+      //      capacity limit
+      //  2. it's possible that the new key does not fit into the page.
+      //      in this case we simply allocate an extended key, which
+      //      only requires 8 bytes
+      //      -> but make sure that those 8 bytes fit into the slot!
+      if (dest->get_key_data_size() < src->size) {
+        // append the new key, if there's enough space available
+        if (has_enough_space(src, false)) {
+          // add existing key to freelist
           freelist_add(slot);
-          // and append the new key, if there's enough space available
-          if (!requires_split(src)) {
-            ham_u32_t key_size = src->size;
+
+          ham_u32_t key_size = src->size;
+          // internal nodes only have a record-id, no duplicates etc
+          ham_u32_t rec_size = get_total_inline_record_size();
+          ham_u32_t offset = append_key(count, src->data,
+                                    key_size + rec_size, true);
+          m_layout.set_key_data_offset(slot, offset);
+        }
+        // otherwise allocate and store an extended key
+        else {
+          // we might have to update the next offset
+          bool update_next_offset = false;
+          if (get_next_offset() == m_layout.get_key_data_offset(slot)
+                                        + dest->get_key_data_size()
+                                      + sizeof(ham_u64_t))
+            update_next_offset = true;
+
+          ham_u64_t blobid = add_extended_key(src);
+          if (dest->get_key_data_size() < sizeof(blobid)) {
+            // add to freelist
+            freelist_add(slot);
+            // then allocate an extended key
+            ham_key_t tmp = {0};
+            tmp.size = sizeof(blobid);
+            tmp.data = &blobid;
+            // we NEED that space now!
+            force_more_space();
+            if (count + get_freelist_count() >= get_capacity() - 1)
+              resize(count + 1, &tmp);
+            ham_assert(has_enough_space(&tmp, false, true));
             // internal nodes only have a record-id, no duplicates etc
-            ham_u32_t rec_size = get_total_inline_record_size();
-            ham_u32_t offset = append_key(slot, m_node->get_count(),
-                                src->data, key_size + rec_size, true);
+            ham_u32_t offset = append_key(count, tmp.data,
+                                  tmp.size + get_total_inline_record_size(),
+                                  true);
             m_layout.set_key_data_offset(slot, offset);
           }
-          // otherwise allocate and store an extended key
-          else {
-            ham_u64_t blobid = add_extended_key(src);
-            dest->set_extended_blob_id(blobid);
-            dest->set_key_flags(BtreeKey::kExtendedKey);
+          else if (update_next_offset) {
+            set_next_offset(get_next_offset()
+                            - (dest->get_key_data_size() - sizeof(blobid)));
           }
+          dest->set_extended_blob_id(blobid);
+          dest->set_key_flags(BtreeKey::kExtendedKey);
         }
-        // if the existing space is too large then we COULD move the remainder
-        // to the freelist, but i'm not sure it's worth the effort
-        else {
-          // adjust next offset?
-          if (src->size < dest->get_key_data_size()) {
-            ham_u32_t next = m_layout.get_key_data_offset(slot)
-                                + get_total_key_data_size(slot);
-            if (next == get_next_offset())
-              set_next_offset(next - (dest->get_key_data_size() - src->size));
-          }
-          // now copy the key data
-          dest->set_key_data(src->data, src->size);
+      }
+      // if the existing space is too large then we COULD move the remainder
+      // to the freelist, but i'm not sure it's worth the effort
+      else {
+        // adjust next offset?
+        if (src->size < dest->get_key_data_size()) {
+          ham_u32_t next = m_layout.get_key_data_offset(slot)
+                              + get_total_key_data_size(slot);
+          if (next == get_next_offset())
+            set_next_offset(next - (dest->get_key_data_size() - src->size));
         }
+        // now copy the key data
+        dest->set_key_data(src->data, src->size);
       }
 
       dest->set_key_size(src->size);
@@ -2090,14 +2136,16 @@ class DefaultNodeImpl
       dest->set_record_id(rid);
 
 #ifdef HAM_DEBUG
-      check_index_integrity(m_node->get_count());
+      check_index_integrity(count);
 #endif
     }
 
     // Returns true if |key| cannot be inserted because a split is required
     // Rearranges the node if required
+    // Leaves some additional headroom in internal pages, in case we
+    // overwrite small keys with longer keys and need more space
     bool requires_split(const ham_key_t *key) {
-      if (!requires_split_impl(key))
+      if (has_enough_space(key, true, false, (!m_node->is_leaf() ? 128 : 0)))
         return (false);
 
       rearrange(m_node->get_count());
@@ -2143,9 +2191,16 @@ class DefaultNodeImpl
         ham_u32_t key_size = get_key_data_size(start + i);
         ham_u32_t rec_size = get_record_data_size(start + i);
         ham_u8_t *data = get_key_data(start + i);
-        ham_u32_t offset = other->append_key(i, i, data, key_size + rec_size,
+        ham_u32_t offset = other->append_key(i, data, key_size + rec_size,
                                 false);
         other->m_layout.set_key_data_offset(i, offset);
+
+        if (m_layout.get_key_flags(start + i) & BtreeKey::kExtendedKey)
+          other->m_layout.set_key_flags(i,
+                    other->m_layout.get_key_flags(i) | BtreeKey::kExtendedKey);
+        else
+          other->m_layout.set_key_flags(i,
+                    other->m_layout.get_key_flags(i) & ~BtreeKey::kExtendedKey);
       }
 
       // now move all shifted keys to the freelist. those shifted keys are
@@ -2178,7 +2233,7 @@ class DefaultNodeImpl
 
       // re-arrange the node: moves all keys sequentially to the beginning
       // of the key space, removes the whole freelist
-      rearrange(m_node->get_count());
+      rearrange(m_node->get_count(), true);
 
       ham_assert(m_node->get_count() + other_count <= get_capacity());
 
@@ -2192,10 +2247,17 @@ class DefaultNodeImpl
         ham_u32_t key_size = other->get_key_data_size(i);
         ham_u32_t rec_size = other->get_record_data_size(i);
         ham_u8_t *data = other->get_key_data(i);
-        ham_u32_t offset = append_key(count + i, count + i, data,
+        ham_u32_t offset = append_key(count + i, data,
                                 key_size + rec_size, false);
         m_layout.set_key_data_offset(count + i, offset);
         m_layout.set_key_size(count + i, other->get_key_size(i));
+
+        if (other->m_layout.get_key_flags(i) & BtreeKey::kExtendedKey)
+          m_layout.set_key_flags(count + i,
+                    m_layout.get_key_flags(count + i) | BtreeKey::kExtendedKey);
+        else
+          m_layout.set_key_flags(count + i,
+                    m_layout.get_key_flags(count + i) & ~BtreeKey::kExtendedKey);
       }
 
       other->set_next_offset(0);
@@ -2214,7 +2276,7 @@ class DefaultNodeImpl
 
       // re-arrange the node: moves all keys sequentially to the beginning
       // of the key space, removes the whole freelist
-      rearrange(m_node->get_count());
+      rearrange(m_node->get_count(), true);
       ham_assert(m_node->get_count() + count <= get_capacity());
 
       other->clear_caches();
@@ -2231,15 +2293,22 @@ class DefaultNodeImpl
         ham_u32_t key_size = other->get_key_data_size(i);
         ham_u32_t rec_size = other->get_record_data_size(i);
         ham_u8_t *data = other->get_key_data(i);
-        ham_u32_t offset = append_key(pos + i, pos + i, data,
+        ham_u32_t offset = append_key(pos + i, data,
                                 key_size + rec_size, false);
         m_layout.set_key_data_offset(pos + i, offset);
         m_layout.set_key_size(pos + i, other->get_key_size(i));
+
+        if (other->m_layout.get_key_flags(i) & BtreeKey::kExtendedKey)
+          m_layout.set_key_flags(pos + i,
+                    m_layout.get_key_flags(pos + i) | BtreeKey::kExtendedKey);
+        else
+          m_layout.set_key_flags(pos + i,
+                    m_layout.get_key_flags(pos + i) & ~BtreeKey::kExtendedKey);
       }
 
       // now close the "gap" in the |other| page by moving the shifted
       // keys to the freelist
-      other->freelist_add_many(0, count);
+      other->freelist_add_many(count);
 
 #ifdef HAM_DEBUG
       check_index_integrity(pos + count);
@@ -2256,7 +2325,7 @@ class DefaultNodeImpl
 
       // re-arrange the node: moves all keys sequentially to the beginning
       // of the key space, removes the whole freelist
-      other->rearrange(other->m_node->get_count());
+      other->rearrange(other->m_node->get_count(), true);
       ham_assert(other->m_node->get_count() + count <= other->get_capacity());
       clear_caches();
 
@@ -2272,18 +2341,26 @@ class DefaultNodeImpl
                       m_layout.get_key_index_span() * count);
 
       // and the key data
+      ham_u32_t oc = other->m_node->get_count();
       for (int i = 0; i < count; i++) {
         ham_u32_t key_size = get_key_data_size(pos + i);
         ham_u32_t rec_size = get_record_data_size(pos + i);
         ham_u8_t *data = get_key_data(pos + i);
-        ham_u32_t offset = other->append_key(i, other->m_node->get_count() + i,
-                                data, key_size + rec_size, false);
+        ham_u32_t offset = other->append_key(oc + i, data,
+                                key_size + rec_size, false);
         other->m_layout.set_key_data_offset(i, offset);
         other->m_layout.set_key_size(i, get_key_size(pos + i));
+
+        if (m_layout.get_key_flags(pos + i) & BtreeKey::kExtendedKey)
+          other->m_layout.set_key_flags(i,
+                    other->m_layout.get_key_flags(i) | BtreeKey::kExtendedKey);
+        else
+          other->m_layout.set_key_flags(i,
+                    other->m_layout.get_key_flags(i) & ~BtreeKey::kExtendedKey);
       }
 
       // and rearrange the page because it's nearly empty
-      rearrange(pos);
+      rearrange(pos, true);
 
 #ifdef HAM_DEBUG
       check_index_integrity(pos);
@@ -2294,8 +2371,8 @@ class DefaultNodeImpl
     // Clears the page with zeroes and reinitializes it; only
     // for testing
     void test_clear_page() {
-      ham_u32_t page_size = m_page->get_db()->get_local_env()->get_page_size();
-      memset(m_page->get_raw_payload(), 0, page_size);
+      memset(m_page->get_payload(), 0,
+                    m_page->get_db()->get_local_env()->get_usable_page_size());
       initialize();
     }
 
@@ -2314,21 +2391,18 @@ class DefaultNodeImpl
       m_layout.initialize(m_node->get_data() + kPayloadOffset, key_size);
 
       if (m_node->get_count() == 0 && !(db->get_rt_flags() & HAM_READ_ONLY)) {
-        ham_u32_t rec_size = db->get_btree_index()->get_record_size();
         ham_u32_t page_size = get_usable_page_size();
 
-        // estimate the capacity of keys and records that fit into the page.
-        // if duplicates are enabled then take the duplicate threshold
-        // into account! but assume that only 10% of the duplicate threshold
-        // is actually used. (This assumption is a guess.)
-        ham_u32_t rec_factor = 1;
-        if (db->get_rt_flags() & HAM_ENABLE_DUPLICATE_KEYS)
-          rec_factor = get_duplicate_threshold() / 10;
+        ham_u32_t rec_size = db->get_btree_index()->get_record_size();
         if (rec_size == HAM_RECORD_SIZE_UNLIMITED)
           rec_size = 9;
-        ham_u32_t capacity = page_size / (m_layout.get_key_index_span()
-                                  + get_actual_key_size(key_size)
-                                  + (rec_size * rec_factor));
+
+        bool has_duplicates = db->get_local_env()->get_flags()
+                                & HAM_ENABLE_DUPLICATES;
+        ham_u32_t capacity = page_size
+                            / (m_layout.get_key_index_span()
+                              + get_actual_key_size(key_size, has_duplicates)
+                              + rec_size);
         capacity = (capacity & 1 ? capacity - 1 : capacity);
 
         set_capacity(capacity);
@@ -2468,13 +2542,13 @@ class DefaultNodeImpl
         m_duptable_cache->erase(it);
 
       LocalDatabase *db = m_page->get_db();
-      db->get_local_env()->get_blob_manager()->free(db, tableid, 0);
+      db->get_local_env()->get_blob_manager()->erase(db, tableid, 0);
     }
 
     // Erases an extended key from disk and from the cache
     void erase_extended_key(ham_u64_t blobid) {
       LocalDatabase *db = m_page->get_db();
-      db->get_local_env()->get_blob_manager()->free(db, blobid);
+      db->get_local_env()->get_blob_manager()->erase(db, blobid);
       if (m_extkey_cache) {
         ExtKeyCache::iterator it = m_extkey_cache->find(blobid);
         if (it != m_extkey_cache->end())
@@ -2664,27 +2738,37 @@ class DefaultNodeImpl
     }
 
     // Adds a bunch of indices to the freelist
-    void freelist_add_many(int start, int count) {
-      // copy the indices to the freelist area
-      memmove(m_layout.get_key_index_ptr(m_node->get_count()
-                              + get_freelist_count()),
-                      m_layout.get_key_index_ptr(start),
+    void freelist_add_many(int count) {
+      // Copy the indices to the freelist area. This might overwrite the
+      // end of the index area and corrupt the payload data, therefore
+      // first copy those indices to a temporary array
+      void *tmp = m_arena.resize(count * m_layout.get_key_index_span());
+      memcpy(tmp, m_layout.get_key_index_ptr(0),
+                      m_layout.get_key_index_span() * count);
+
+      // then remove the deleted index keys by shifting all remaining
+      // indices/freelist items "to the left"
+      memmove(m_layout.get_key_index_ptr(0),
+                      m_layout.get_key_index_ptr(count),
+                      m_layout.get_key_index_span()
+                            * (get_freelist_count() + m_node->get_count()
+                                    - count));
+
+      // Add the previously stored indices to the freelist
+      memcpy(m_layout.get_key_index_ptr(m_node->get_count()
+                              + get_freelist_count() - count), tmp,
                       m_layout.get_key_index_span() * count);
 
       set_freelist_count(get_freelist_count() + count);
 
-      // then remove the deleted index keys by shifting all remaining
-      // indices/freelist items "to the left"
-      memmove(m_layout.get_key_index_ptr(start),
-                      m_layout.get_key_index_ptr(start + count),
-                      m_layout.get_key_index_span()
-                            * (get_freelist_count() + m_node->get_count()
-                                    - start - count));
       ham_assert(get_freelist_count() + m_node->get_count() - count
                       <= get_capacity());
     }
 
     // Adds the index at |slot| to the freelist
+    //
+    // TODO this has a different behavior than freelist_add_many(), because
+    // it leaves the slot in place. change this!
     void freelist_add(ham_u32_t slot) {
       memcpy(m_layout.get_key_index_ptr(m_node->get_count()
                               + get_freelist_count()),
@@ -2699,9 +2783,8 @@ class DefaultNodeImpl
     // Appends a key to the key space; if |use_freelist| is true, it will
     // first search for a sufficiently large freelist entry. Returns the
     // offset of the new key.
-    ham_u32_t append_key(ham_u32_t slot, ham_u32_t count,
-                    const void *key_data, ham_u32_t total_size,
-                    bool use_freelist) {
+    ham_u32_t append_key(ham_u32_t count, const void *key_data,
+                    ham_u32_t total_size, bool use_freelist) {
       ham_u32_t offset = allocate(count, total_size, use_freelist);
      
       // copy the key data AND the record data
@@ -2803,12 +2886,11 @@ class DefaultNodeImpl
 
     // Re-arranges the node: moves all keys sequentially to the beginning
     // of the key space, removes the whole freelist
-    void rearrange(ham_u32_t count) {
-      // already properly arranged? then return
-      if (get_freelist_count() == 0) {
-        set_next_offset(calc_next_offset(count));
+    void rearrange(ham_u32_t count, bool force = false) {
+      // only continue if it's very likely that we can make free space;
+      // otherwise this call would be too expensive
+      if (!force && get_freelist_count() == 0 && count > 10)
         return;
-      }
 
       // get rid of the freelist - this node is now completely rewritten,
       // and the freelist would just complicate things
@@ -2853,11 +2935,10 @@ class DefaultNodeImpl
     // Tries to resize the node's capacity to fit |new_count| keys and at
     // least |key->size| additional bytes
     bool resize(ham_u32_t new_count, const ham_key_t *key) {
-      ham_u32_t count = m_node->get_count();
       ham_u32_t page_size = get_usable_page_size();
 
       // increase capacity of the indices by shifting keys "to the right"
-      if (count + get_freelist_count() >= new_count - 1) {
+      if (new_count + get_freelist_count() >= get_capacity() - 1) {
         // the absolute offset of the new key (including length and record)
         ham_u32_t capacity = get_capacity();
         ham_u32_t offset = get_next_offset();
@@ -2881,7 +2962,7 @@ class DefaultNodeImpl
         set_capacity(capacity);
 
         // check if the new space is sufficient
-        return (requires_split_impl(key));
+        return (!has_enough_space(key, true));
       }
 
       // increase key data capacity by reducing capacity and shifting
@@ -2915,32 +2996,35 @@ class DefaultNodeImpl
         // store the new capacity
         set_capacity(capacity);
 
-        return (false);
+        return (!has_enough_space(key, true));
       }
     }
 
-    // Returns true if |key| cannot be inserted because a split is required
-    bool requires_split_impl(const ham_key_t *key, bool use_extended = true) {
+    // Returns true if |key| can be inserted without splitting the page
+    bool has_enough_space(const ham_key_t *key, bool use_extended,
+                    bool force = false, int headroom = 0) {
       ham_u32_t count = m_node->get_count();
 
       if (count == 0) {
         set_freelist_count(0);
         set_next_offset(0);
-        return (false);
+        return (true);
       }
 
       // leave some headroom - a few operations create new indices; make sure
       // that they have index capacity left
-      if (count + get_freelist_count() >= get_capacity() - 2)
-        return (true);
+      if (count + get_freelist_count() >= get_capacity() - 
+                      (force ? 1 : 2))
+        return (false);
 
-      ham_u32_t offset = get_next_offset();
+      ham_u32_t offset = headroom + get_next_offset();
       if (use_extended)
         offset += key->size > get_extended_threshold()
                       ? sizeof(ham_u64_t)
                       : key->size;
       else
         offset += key->size;
+
       // need at least 8 byte for the record, in case we need to store a
       // reference to a duplicate table
       if (get_total_inline_record_size() < sizeof(ham_u64_t))
@@ -2949,11 +3033,11 @@ class DefaultNodeImpl
         offset += get_total_inline_record_size();
       offset += m_layout.get_key_index_span() * get_capacity();
       if (offset < get_usable_page_size())
-        return (false);
+        return (true);
 
       // if there's a freelist entry which can store the new key then
       // a split won't be required
-      return (-1 == freelist_find(count,
+      return (-1 != freelist_find(count,
                         key->size + get_total_inline_record_size()));
     }
 
@@ -3050,10 +3134,38 @@ class DefaultNodeImpl
     // Returns the usable page size that can be used for actually
     // storing the data
     ham_u32_t get_usable_page_size() const {
-      return (m_page->get_db()->get_local_env()->get_page_size()
+      return (m_page->get_db()->get_local_env()->get_usable_page_size()
                     - kPayloadOffset
-                    - PBtreeNode::get_entry_offset()
-                    - Page::sizeof_persistent_header);
+                    - PBtreeNode::get_entry_offset());
+    }
+
+    // Generate more space for at least |required| bytes; returns the offset
+    // to this space
+    void force_more_space() {
+      // pick the largest key
+      ham_u32_t count = m_node->get_count();
+      for (ham_u32_t i = 0; i < count; i++) {
+        Iterator it = at(i);
+        // can we move this key to an extended key?
+        // we need 8 byte for the extkey + 16 byte for the new key and record
+        // id
+        if (it->get_key_flags() & BtreeKey::kExtendedKey)
+          continue;
+
+        if (m_layout.get_key_size(i) >= 24) {
+          ham_u64_t rid = it->get_record_id();
+          ham_key_t key = {0};
+          key.data = it->get_key_data();
+          key.size = it->get_key_size();
+          ham_u64_t blobid = add_extended_key(&key);
+          it->set_extended_blob_id(blobid);
+          it->set_key_flags(BtreeKey::kExtendedKey);
+          it->set_record_id(rid);
+          break;
+        }
+      }
+
+      rearrange(m_node->get_count(), true);
     }
 
     // The page that we're operating on

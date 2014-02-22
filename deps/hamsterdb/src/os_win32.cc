@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -302,7 +302,7 @@ os_tell(ham_fd_t fd)
 #endif
 
 ham_u64_t
-os_get_filesize(ham_fd_t fd)
+os_get_file_size(ham_fd_t fd)
 {
   ham_status_t st;
   LARGE_INTEGER i;

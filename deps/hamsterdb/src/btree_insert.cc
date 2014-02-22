@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,7 +16,6 @@
 #include <algorithm>
 
 #include "cursor.h"
-#include "cache.h"
 #include "db.h"
 #include "env.h"
 #include "error.h"
@@ -165,8 +164,11 @@ class BtreeInsertAction
       /* OK - we're really appending/prepending the new key.  */
       if (force_append || force_prepend)
         return (insert_in_leaf(page, m_key, 0, force_prepend, force_append));
-      else
-        return (insert());
+
+      /* otherwise reset the hints because they would be misleading */
+      m_hints.flags &= ~HAM_HINT_APPEND;
+      m_hints.flags &= ~HAM_HINT_PREPEND;
+      return (insert());
     }
 
     ham_status_t insert() {
@@ -195,8 +197,7 @@ class BtreeInsertAction
       LocalEnvironment *env = db->get_local_env();
 
       /* allocate a new root page */
-      Page *newroot = env->get_page_manager()->alloc_page(db,
-                            Page::kTypeBroot, 0);
+      Page *newroot = env->get_page_manager()->alloc_page(db, Page::kTypeBroot);
       ham_assert(newroot->get_db());
 
       m_btree->get_statistics()->reset_page(root);
@@ -302,7 +303,7 @@ class BtreeInsertAction
 
       /* allocate a new page */
       Page *new_page = env->get_page_manager()->alloc_page(db,
-                            Page::kTypeBindex, 0);
+                                    Page::kTypeBindex);
       {
         PBtreeNode *node = PBtreeNode::from_page(new_page);
         node->set_flags(old_node->is_leaf() ? PBtreeNode::kLeafNode : 0);

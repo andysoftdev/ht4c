@@ -130,11 +130,10 @@ libhamsterdb_la_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__append_3)
 am_libhamsterdb_la_OBJECTS = blob_manager_inmem.lo \
 	blob_manager_disk.lo btree_check.lo btree_cursor.lo \
 	btree_enum.lo btree_erase.lo btree_find.lo btree_index.lo \
-	btree_insert.lo btree_stats.lo cache.lo changeset.lo cursor.lo \
-	db.lo db_local.lo db_remote.lo env.lo env_local.lo \
-	env_remote.lo error.lo freelist.lo freelist_stats.lo \
-	hamsterdb.lo journal.lo log.lo mem.lo os_posix.lo page.lo \
-	page_manager.lo txn.lo txn_cursor.lo util.lo
+	btree_insert.lo btree_stats.lo changeset.lo cursor.lo db.lo \
+	db_local.lo db_remote.lo env.lo env_local.lo env_remote.lo \
+	error.lo hamsterdb.lo journal.lo log.lo mem.lo os_posix.lo \
+	page.lo page_manager.lo txn.lo txn_cursor.lo util.lo
 libhamsterdb_la_OBJECTS = $(am_libhamsterdb_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -432,7 +431,6 @@ libhamsterdb_la_SOURCES = \
 	btree_node_proxy.h \
 	btree_stats.cc \
 	btree_stats.h \
-	cache.cc \
 	cache.h \
 	changeset.cc \
 	changeset.h \
@@ -460,10 +458,6 @@ libhamsterdb_la_SOURCES = \
 	error.cc \
 	error.h \
 	errorinducer.h \
-	freelist.cc \
-	freelist.h \
-	freelist_stats.cc \
-	freelist_stats.h \
 	hamsterdb.cc \
 	journal.cc \
 	journal_entries.h \
@@ -585,7 +579,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/btree_index.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/btree_insert.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/btree_stats.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/changeset.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/db.Plo@am__quote@
@@ -595,8 +588,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/env_local.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/env_remote.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/error.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/freelist.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/freelist_stats.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hamsterdb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/journal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Plo@am__quote@

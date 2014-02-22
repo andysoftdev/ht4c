@@ -100,12 +100,6 @@
     <ClInclude Include="src\errorinducer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\freelist.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\freelist_stats.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\journal.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -186,9 +180,6 @@
     <ClCompile Include="src\btree_stats.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\cache.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\changeset.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -208,12 +199,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\error.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\freelist.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\freelist_stats.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\hamsterdb.cc">

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -46,7 +46,7 @@ class Database
   public:
     enum {
       // The default number of indices in an Environment
-      kMaxIndices =  16 /* 16 * 32 = 512 byte wasted */
+      kMaxIndices1k = 32
     };
 
     // Constructor

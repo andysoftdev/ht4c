@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2013 Christoph Rupp (chris@crupp.de).
+ * Copyright (C) 2005-2014 Christoph Rupp (chris@crupp.de).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -57,7 +57,7 @@ RemoteEnvironment::perform_request(Protocol *request)
 
 ham_status_t
 RemoteEnvironment::create(const char *url, ham_u32_t flags,
-        ham_u32_t mode, ham_u32_t page_size, ham_u32_t cache_size,
+        ham_u32_t mode, ham_u32_t page_size, ham_u64_t cache_size,
         ham_u16_t maxdbs)
 {
   // the 'create' operation is identical to 'open'
@@ -66,7 +66,7 @@ RemoteEnvironment::create(const char *url, ham_u32_t flags,
 
 ham_status_t
 RemoteEnvironment::open(const char *url, ham_u32_t flags,
-        ham_u32_t cache_size)
+        ham_u64_t cache_size)
 {
   if (m_socket != HAM_INVALID_FD)
     os_socket_close(&m_socket);
