@@ -34,12 +34,11 @@ namespace ht4c { namespace Hamster {
 	namespace {
 
 		static const ham_parameter_t sys_pars[] = {
-			  { HAM_PARAM_KEYSIZE , HamsterEnv::KEYSIZE_SYSDB }
-			, { 0, 0 }
+			{ 0, 0 }
 		};
 
 		static const ham_parameter_t table_pars[] = {
-			  { HAM_PARAM_KEYSIZE , HamsterEnv::KEYSIZE_DB }
+			  { HAM_PARAM_KEY_TYPE, HAM_TYPE_CUSTOM }
 			, { 0, 0 }
 		};
 
