@@ -32,7 +32,7 @@
 // check for a valid build
 #if (!defined(HAM_DEBUG))
 #   if (defined(_DEBUG) || defined(DEBUG))
-#     define HAM_DEBUG 1
+//#     define HAM_DEBUG 1
 #   endif
 #endif
 
