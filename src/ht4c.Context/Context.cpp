@@ -188,7 +188,6 @@ namespace ht4c {
 					(Common::Config::HamsterFilename, str(), "Hamster db filename\n")
 					(Common::Config::HamsterEnableRecovery, boo()->default_value(false), "Enable or disable hamster db recovery (default: false)\n")
 					(Common::Config::HamsterEnableAutoRecovery, boo()->default_value(false), "Enable or disable hamster db auto-recovery (default: false)\n")
-					(Common::Config::HamsterMaxTables, i32()->default_value(1024), "Hamster db table limit (default:1024)\n")
 					(Common::Config::HamsterCacheSizeMB, i32()->default_value(64), "Hamster db cache size [MB] (default:64)\n")
 					(Common::Config::HamsterPageSizeKB, i32()->default_value(64), "Hamster db page size [KB] (default:64)\n");
 
@@ -655,7 +654,6 @@ namespace ht4c {
 				Hamster::HamsterEnvConfig config;
 				config.enableRecovery = properties->get_bool( Common::Config::HamsterEnableRecovery );
 				config.enableAutoRecovery = properties->get_bool( Common::Config::HamsterEnableAutoRecovery );
-				config.maxTables = properties->get_i32( Common::Config::HamsterMaxTables );
 				config.cacheSizeMB = properties->get_i32( Common::Config::HamsterCacheSizeMB );
 				config.pageSizeKB = properties->get_i32( Common::Config::HamsterPageSizeKB );
 

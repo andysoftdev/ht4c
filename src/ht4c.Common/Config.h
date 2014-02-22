@@ -110,11 +110,6 @@ namespace ht4c { namespace Common {
 			static const char* HamsterEnableAutoRecovery;
 
 			/// <summary>
-			/// Hamster db maximum table limit.
-			/// </summary>
-			static const char* HamsterMaxTables;
-
-			/// <summary>
 			/// Hamster db cache size [MB].
 			/// </summary>
 			static const char* HamsterCacheSizeMB;

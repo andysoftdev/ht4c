@@ -101,8 +101,7 @@ namespace ht4c { namespace Hamster {
 			}
 
 			const ham_parameter_t env_pars[] = {
-					{ HAM_PARAM_MAX_DATABASES, std::min(config.maxTables, HAM_DEFAULT_DATABASE_NAME - 1) }
-				, { HAM_PARAM_CACHESIZE, std::max(1, config.cacheSizeMB) * 1024 * 1024 }
+					{ HAM_PARAM_CACHESIZE, std::max(1, config.cacheSizeMB) * 1024 * 1024 }
 				, { HAM_PARAM_PAGESIZE, (std::min(64, config.pageSizeKB) / 64) * 64 * 1024 }
 				, { 0, 0 }
 			};

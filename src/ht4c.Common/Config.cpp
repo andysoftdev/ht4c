@@ -47,7 +47,6 @@ namespace ht4c { namespace Common {
 	const char* Config::HamsterFilename											= "Ht4n.Hamster.Filename";
 	const char* Config::HamsterEnableRecovery								= "Ht4n.Hamster.EnableRecovery";
 	const char* Config::HamsterEnableAutoRecovery						= "Ht4n.Hamster.EnableAutoRecovery";
-	const char* Config::HamsterMaxTables										= "Ht4n.Hamster.MaxTables";
 	const char* Config::HamsterCacheSizeMB									= "Ht4n.Hamster.CacheSizeMB";
 	const char* Config::HamsterPageSizeKB										= "Ht4n.Hamster.PageSizeKB";
 
