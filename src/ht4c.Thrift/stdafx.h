@@ -25,6 +25,7 @@
 
 #pragma warning( push, 3 )
 
+#include <Common/ReferenceCount.h>
 #include "Common/HRTimer.h"
 #include "Hypertable/Lib/Namespace.h"
 

@@ -30,7 +30,6 @@
 #include "Hyperspace/Session.h"
 #include "Hypertable/Lib/Client.h"
 
-#pragma warning( disable : 4250 ) // inherits via dominance
 #include "ThriftBroker/Client.h"
 
 #pragma warning( pop )
