@@ -37,19 +37,6 @@ namespace ht4c { namespace Thrift {
 		return new ThriftAsyncResult( asyncResultSink, capacity );
 	}
 
-	ThriftAsyncResult::ThriftAsyncResult( size_t _capacity )
-	: future( 0 )
-	, capacity( _capacity >= 0 ? _capacity : 0 )
-	, cancelled( false )
-	, outstanding( 0 )
-	, thread( 0 )
-	, abort( false )
-	, mutex( )
-	, cond( )
-	, asyncTableScanners( )
-	{
-	}
-
 	ThriftAsyncResult::ThriftAsyncResult( Common::AsyncResultSink* _asyncResultSink, size_t _capacity )
 	: future( 0 )
 	, asyncResultSink( _asyncResultSink )

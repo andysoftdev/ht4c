@@ -60,13 +60,6 @@ namespace ht4c { namespace Thrift {
 			/// <summary>
 			/// Initializes a new instance of the ThriftAsyncResult class.
 			/// </summary>
-			/// <param name="capacity">Capacity in bytes of result queue. If zero then the queue capacity will be unbounded.</param>
-			/// <remarks>Pure native constructor.</remarks>
-			explicit ThriftAsyncResult( size_t capacity );
-
-			/// <summary>
-			/// Initializes a new instance of the ThriftAsyncResult class.
-			/// </summary>
 			/// <param name="asyncResultSink">Callback for asynchronous table scan operations</param>
 			/// <param name="capacity">Capacity in bytes of result queue. If zero then the queue capacity will be unbounded.</param>
 			/// <remarks>Pure native constructor.</remarks>
