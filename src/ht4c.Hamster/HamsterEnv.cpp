@@ -73,7 +73,6 @@ namespace ht4c { namespace Hamster {
 			db = 0;
 		}
 		ref.clear();
-		::DeleteCriticalSection( &cs );
 	}
 
 	HamsterEnv::HamsterEnv( const std::string &filename, const HamsterEnvConfig& config )
@@ -163,20 +162,18 @@ namespace ht4c { namespace Hamster {
 		return id;
 	}
 
-	hamsterdb::db* HamsterEnv::openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs ) {
+	hamsterdb::db* HamsterEnv::openTable( uint16_t id, Db::Table* table ) {
 		tables_t::iterator it = tables.find( id );
 		if( it == tables.end() ) {
 			db_t db;
 			db.db = From( env->open_db(id, dbOpenFlags) );
 			db.db->set_compare_func( KeyCompare );
 			db.ref.insert( table );
-			::InitializeCriticalSection( &db.cs );
 			it = tables.insert(std::make_pair(id, db)).first;
 		}
 		else {
 			(*it).second.ref.insert( table );
 		}
-		cs = (*it).second.cs;
 		return (*it).second.db;
 	}
 

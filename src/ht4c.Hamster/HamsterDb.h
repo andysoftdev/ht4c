@@ -160,34 +160,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 			void open( );
 			void dispose( );
 
-			class Lock {
-
-				public:
-
-					inline Lock( Table* _table )
-					: table( _table ) {
-						table->lock();
-					}
-					inline ~Lock( ) {
-						table->unlock();
-					}
-
-				private:
-
-					Table* table;
-			};
-			friend class Lock;
-
 		private:
 
 			void init( );
-
-			inline void lock( ) {
-				::EnterCriticalSection( &cs );
-			}
-			inline void unlock( ) {
-				::LeaveCriticalSection( &cs );
-			}
 
 			Db::NamespacePtr ns;
 			std::string name;
@@ -196,7 +171,6 @@ namespace ht4c { namespace Hamster { namespace Db {
 			std::string keyName;
 			uint16_t id;
 			hamsterdb::db* db;
-			CRITICAL_SECTION cs;
 	};
 
 	class Mutator : public Hypertable::ReferenceCount {

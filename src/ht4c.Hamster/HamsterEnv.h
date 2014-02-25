@@ -70,7 +70,7 @@ namespace ht4c { namespace Hamster {
 			}
 			void flush( ) const;
 			uint16_t createTable( );
-			hamsterdb::db* openTable( uint16_t id, Db::Table* table, CRITICAL_SECTION& cs );
+			hamsterdb::db* openTable( uint16_t id, Db::Table* table );
 			void disposeTable( uint16_t id, Db::Table* table );
 			void eraseTable( uint16_t id );
 
@@ -102,7 +102,6 @@ namespace ht4c { namespace Hamster {
 			struct db_t {
 				hamsterdb::db* db;
 				std::set<Db::Table*> ref;
-				CRITICAL_SECTION cs;
 
 				db_t()
 					: db(0)

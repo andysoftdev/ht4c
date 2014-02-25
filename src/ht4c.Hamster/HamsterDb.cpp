@@ -644,7 +644,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		hamsterdb::key key;
 		toKey( key );
 		fromRecord( getEnv()->getSysDb()->find(&key) );
-		db = getEnv()->openTable( id, this, cs );
+		db = getEnv()->openTable( id, this );
 	}
 
 	void Table::dispose( ) {
