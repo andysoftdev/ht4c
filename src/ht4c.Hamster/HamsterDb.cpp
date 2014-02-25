@@ -927,24 +927,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	bool Scanner::nextCell( Hypertable::Cell& cell ) {
 		try {
 			Hypertable::Key key;
-			if( reader->nextCell(key, cell) ) {
-				buf.clear();
-				buf.ensure( key.row_len + 1 + key.column_qualifier_len + 1 + cell.value_len + 1 );
-				if( cell.row_key ) {
-					cell.row_key = reinterpret_cast<const char*>( buf.add(key.row, key.row_len + 1) );
-				}
-				if( cell.column_qualifier ) {
-					cell.column_qualifier = reinterpret_cast<const char*>( buf.add(key.column_qualifier, key.column_qualifier_len + 1) );
-				}
-				if( cell.value ) {
-					if( cell.value_len ) {
-						cell.value = reinterpret_cast<const uint8_t*>( buf.add(cell.value, cell.value_len) );
-					}
-					else {
-						cell.value = reinterpret_cast<const uint8_t*>( "" );
-					}
-				}
-
+			if( reader->nextCell(buf, key, cell) ) {
 				return true;
 			}
 		}
@@ -977,7 +960,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		cursor = 0;
 	}
 
-	bool Scanner::Reader::nextCell( Hypertable::Key& key, Hypertable::Cell& cell ) {
+	bool Scanner::Reader::nextCell( Hypertable::DynamicBuffer& buf, Hypertable::Key& key, Hypertable::Cell& cell ) {
 		hamsterdb::key k;
 		for( bool moved = moveNext(k); moved && !eos; moved = moveNext(k) ) {
 			Hypertable::SerializedKey sk( reinterpret_cast<const uint8_t*>(k.get_data()) );
@@ -988,7 +971,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 				const Hypertable::Schema::ColumnFamily* cf = filterCell( k, key );
 				if( cf ) {
-					if( getCell(key, *cf, cell) ) {
+					if( getCell(buf, key, *cf, cell) ) {
 						return true;
 					}
 				}
@@ -1108,23 +1091,19 @@ namespace ht4c { namespace Hamster { namespace Db {
 		return scanContext->columnFamilies[key.column_family_code];
 	}
 
-	bool Scanner::Reader::getCell( const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell ) {
+	bool Scanner::Reader::getCell( Hypertable::DynamicBuffer& buf, const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell ) {
 		if( !scanContext->valueRegexp ) {
 			if( !checkCellLimits(key) ) {
 				return false;
 			}
 		}
 
-		CellFilterInfo& cfi = scanContext->familyInfo[key.column_family_code];
+		buf.clear();
 
-		cell.row_key = key.row;
-		cell.column_family = cf.name.c_str();
-		cell.column_qualifier = key.column_qualifier;
-		cell.timestamp = key.timestamp;
-		cell.revision = key.revision;
-		cell.flag = key.flag;
 		cell.value = 0;
 		cell.value_len = 0;
+
+		CellFilterInfo& cfi = scanContext->familyInfo[key.column_family_code];
 
 		if( !scanContext->keysOnly || (scanContext->valueRegexp || cfi.hasColumnPredicateFilter()) ) {
 			hamsterdb::record record;
@@ -1149,10 +1128,25 @@ namespace ht4c { namespace Hamster { namespace Db {
 			}
 
 			if( !scanContext->keysOnly ) {
-				cell.value = reinterpret_cast<const uint8_t*>( record.get_data() );
 				cell.value_len = record.get_size();
+				if( cell.value_len ) {
+					buf.ensure( key.row_len + 1 + key.column_qualifier_len + 1 + cell.value_len + 1 );
+					cell.value = reinterpret_cast<const uint8_t*>( buf.add(record.get_data(), cell.value_len) );
+				}
+				else {
+					cell.value = reinterpret_cast<const uint8_t*>( "" );
+				}
 			}
 		}
+
+		buf.ensure( key.row_len + 1 + key.column_qualifier_len + 1 + cell.value_len + 1 );
+
+		cell.row_key = key.row ? reinterpret_cast<const char*>( buf.add(key.row, key.row_len + 1) ) : 0;
+		cell.column_qualifier = key.column_qualifier ? reinterpret_cast<const char*>( buf.add(key.column_qualifier, key.column_qualifier_len + 1) ) : 0;
+		cell.column_family = cf.name.c_str();
+		cell.timestamp = key.timestamp;
+		cell.revision = key.revision;
+		cell.flag = key.flag;
 
 		return true;
 	}

@@ -287,7 +287,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 					Reader( hamsterdb::cursor* cursor, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 					virtual ~Reader();
 
-					bool nextCell( Hypertable::Key& key, Hypertable::Cell& cell );
+					bool nextCell( Hypertable::DynamicBuffer& buf, Hypertable::Key& key, Hypertable::Cell& cell );
 
 				protected:
 
@@ -297,7 +297,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 					virtual void limitReached( ) {
 						eos = true;
 					}
-					bool getCell( const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell );
+					bool getCell( Hypertable::DynamicBuffer& buf, const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell );
 
 					hamsterdb::cursor* cursor;
 					ScanContext* scanContext;
