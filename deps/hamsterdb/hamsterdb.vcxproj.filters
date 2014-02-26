@@ -106,9 +106,6 @@
     <ClInclude Include="src\journal_entries.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\log.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\mem.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -207,9 +204,6 @@
     <ClCompile Include="src\journal.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\log.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\mem.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -231,13 +225,5 @@
     <ClCompile Include="src\util.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\Makefile.am">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="src\Makefile.in">
-      <Filter>Source Files</Filter>
-    </None>
   </ItemGroup>
 </Project>

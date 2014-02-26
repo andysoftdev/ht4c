@@ -52,7 +52,6 @@
     <ClInclude Include="src\errorinducer.h" />
     <ClInclude Include="src\journal.h" />
     <ClInclude Include="src\journal_entries.h" />
-    <ClInclude Include="src\log.h" />
     <ClInclude Include="src\mem.h" />
     <ClInclude Include="src\mutex.h" />
     <ClInclude Include="src\os.h" />
@@ -87,7 +86,6 @@
     <ClCompile Include="src\error.cc" />
     <ClCompile Include="src\hamsterdb.cc" />
     <ClCompile Include="src\journal.cc" />
-    <ClCompile Include="src\log.cc" />
     <ClCompile Include="src\mem.cc" />
     <ClCompile Include="src\os_win32.cc" />
     <ClCompile Include="src\page.cc" />
@@ -95,10 +93,6 @@
     <ClCompile Include="src\txn.cc" />
     <ClCompile Include="src\txn_cursor.cc" />
     <ClCompile Include="src\util.cc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="src\Makefile.am" />
-    <None Include="src\Makefile.in" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{67D88850-0B1E-4b14-B452-7688A968BECC}</ProjectGuid>
@@ -166,7 +160,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level1</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;NOMINMAX;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
@@ -192,7 +186,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level1</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_DEBUG;_LIB;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_DEBUG;_LIB;NOMINMAX;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
@@ -220,7 +214,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;NOMINMAX;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
@@ -250,7 +244,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_DEPRECATE;NOMINMAX;HAM_LITTLE_ENDIAN;HAM_DISABLE_ENCRYPTION;HAM_DISABLE_COMPRESSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>

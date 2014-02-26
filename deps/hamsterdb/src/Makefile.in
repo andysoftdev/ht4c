@@ -132,8 +132,8 @@ am_libhamsterdb_la_OBJECTS = blob_manager_inmem.lo \
 	btree_enum.lo btree_erase.lo btree_find.lo btree_index.lo \
 	btree_insert.lo btree_stats.lo changeset.lo cursor.lo db.lo \
 	db_local.lo db_remote.lo env.lo env_local.lo env_remote.lo \
-	error.lo hamsterdb.lo journal.lo log.lo mem.lo os_posix.lo \
-	page.lo page_manager.lo txn.lo txn_cursor.lo util.lo
+	error.lo hamsterdb.lo journal.lo mem.lo os_posix.lo page.lo \
+	page_manager.lo txn.lo txn_cursor.lo util.lo
 libhamsterdb_la_OBJECTS = $(am_libhamsterdb_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -462,8 +462,6 @@ libhamsterdb_la_SOURCES = \
 	journal.cc \
 	journal_entries.h \
 	journal.h \
-	log.cc \
-	log.h \
 	mem.cc \
 	mem.h \
 	mutex.h \
@@ -590,7 +588,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/error.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hamsterdb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/journal.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mem.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os_posix.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/page.Plo@am__quote@

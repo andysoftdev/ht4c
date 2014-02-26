@@ -10,11 +10,11 @@
  */
 
 #include "page.h"
-#include "changeset.h"
-#include "env.h"
-#include "log.h"
-#include "device.h"
 #include "db.h"
+#include "env.h"
+#include "journal.h"
+#include "device.h"
+#include "changeset.h"
 #include "errorinducer.h"
 #include "page_manager.h"
 
@@ -65,20 +65,6 @@ Changeset::clear()
 {
   while (m_head)
     m_head = m_head->list_remove(m_head, Page::kListChangeset);
-}
-
-void
-Changeset::log_bucket(Page **bucket, ham_u32_t bucket_size,
-            ham_u64_t lsn, ham_u32_t &page_count)
-{
-  for (ham_u32_t i = 0; i < bucket_size; i++) {
-    ham_assert(bucket[i]->is_dirty());
-
-    Log *log = m_env->get_log();
-    INDUCE(ErrorInducer::kChangesetFlush);
-    ham_assert(page_count > 0);
-    log->append_page(bucket[i], lsn, --page_count);
-  }
 }
 
 #define append(b, bs, bc, p)                                          \
@@ -151,34 +137,28 @@ Changeset::flush(ham_u64_t lsn)
 
   INDUCE(ErrorInducer::kChangesetFlush);
 
-  bool log_written = false;
-
-  // if "others" is not empty then log everything because we don't really
-  // know what's going on in this operation. otherwise we only need to log
-  // if there's more than one page in a bucket:
+  // If there's more than one index operation then the operation must
+  // be atomic and therefore logged.
   //
-  // - if there's more than one index operation then the operation must
-  //   be atomic
+  // If there are unknown pages (in m_others) or PageManager state pages
+  // then we also log the modifications.
+  //
+  // Blob pages do not need to be logged because they are idempotent. The
+  // Journal will re-apply the logical operation of this lsn, and this
+  // will update the blob space as required.
   if (m_others_size || m_page_manager_size || m_indices_size > 1) {
-    log_bucket(m_blobs, m_blobs_size, lsn, page_count);
-    log_bucket(m_page_manager, m_page_manager_size, lsn, page_count);
-    log_bucket(m_indices, m_indices_size, lsn, page_count);
-    log_bucket(m_others, m_others_size, lsn, page_count);
-    log_written = true;
+    m_env->get_journal()->append_changeset(m_blobs, m_blobs_size,
+                    m_page_manager, m_page_manager_size,
+                    m_indices, m_indices_size,
+                    m_others, m_others_size,
+                    lsn);
   }
 
   p = m_head;
 
-  Log *log = m_env->get_log();
-
-  /* flush the file handles (if required) */
-  if (m_env->get_flags() & HAM_ENABLE_FSYNC && log_written)
-    m_env->get_log()->flush();
-
   INDUCE(ErrorInducer::kChangesetFlush);
 
   // now flush all modified pages to disk
-  ham_assert(log != 0);
   ham_assert(m_env->get_flags() & HAM_ENABLE_RECOVERY);
 
   /* execute a post-log hook; this hook is set by the unittest framework
@@ -199,9 +179,8 @@ Changeset::flush(ham_u64_t lsn)
   if (m_env->get_flags() & HAM_ENABLE_FSYNC)
     m_env->get_device()->flush();
 
-  /* done - we can now clear the changeset and the log */
+  /* done - we can now clear the changeset */
   clear();
-  log->clear();
 }
 
 } // namespace hamsterdb
