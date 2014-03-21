@@ -463,7 +463,6 @@ namespace ht4c { namespace Hamster { namespace Db {
 		}
 	}
 
-	
 	void Namespace::renameTable( const std::string& name,const std::string& newName ) {
 		if( name.empty() ) {
 			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
