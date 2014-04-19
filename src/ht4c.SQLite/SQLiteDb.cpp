@@ -484,7 +484,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, name( _name )
 	, id( 0 )
 	, env( _ns->getEnv() )
-	, db( _ns->getEnv()->getDb() ) {
+	, db( 0 ) {
 		init();
 	}
 
@@ -687,6 +687,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
+		env->txBegin();
+
 		Util::StmtReset stmt( stmtInsert );
 
 		int st = sqlite3_bind_text( stmtInsert, 1, key.row, key.row_len, 0 );
@@ -748,8 +750,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Mutator::set( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
-		env->txBegin();
-
 		if( key.flag == Hypertable::FLAG_INSERT ) {
 			insert( key, value, valueLength );
 		}
@@ -762,6 +762,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		int st;
 
 		int64_t timestamp = timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp;
+
+		env->txBegin();
 
 		switch( key.flag ) {
 			case Hypertable::FLAG_DELETE_ROW: {
@@ -907,6 +909,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 	Scanner::ScanContext::ScanContext( const Hypertable::ScanSpec& _scanSpec, Hypertable::SchemaPtr _schema )
 	: Common::ScanContext( _scanSpec, _schema )
 	{
+	}
+
+	void Scanner::ScanContext::initialize( ) {
+		Common::ScanContext::initialize();
+
 		bool hasTimeOrderAsc = false;
 		bool hasTimeOrderDesc = false;
 		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
@@ -968,6 +975,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 		if( !hasQualifier || isRegexp ) {
 			cfPredicate += Hypertable::format( "%s'%d'", cfPredicate.empty() ? "" : ",", cf->id );
 		}
+		else if (isPrefix) {
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq>=%s)", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
+		}
 		else {
 			qPredicate += Hypertable::format( "%s(cf=%d AND cq='%s')", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
 		}
@@ -988,6 +998,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, cellPerFamilyCount( 0 )
 	, eos( false )
 	{
+		scanContext->initialize();
 		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
 		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
 		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {

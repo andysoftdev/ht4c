@@ -274,6 +274,8 @@ namespace ht4c { namespace Common {
 			ScanContext( const Hypertable::ScanSpec& scanSpec, Hypertable::SchemaPtr schema );
 			virtual ~ScanContext( );
 
+			virtual void initialize( );
+
 			Hypertable::SchemaPtr schema;
 			const Hypertable::ScanSpec& scanSpec;
 			std::pair<int64_t, int64_t> timeInterval;
