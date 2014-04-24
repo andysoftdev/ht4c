@@ -19,35 +19,21 @@
  * 02110-1301, USA.
  */
 
-#pragma once
-
-#include "Common/Compat.h"
-
-#pragma warning( push, 3 )
-
-#include "Common/Properties.h"
-#include "AsyncComm/ConnectionManager.h"
-#include "Hyperspace/Session.h"
-#include "Hypertable/Lib/Client.h"
-
-#include "ThriftBroker/Client.h"
-
-#pragma warning( pop )
-
-#ifdef SUPPORT_HAMSTERDB
-
-#include "ht4c.Hamster/HamsterFactory.h"
-
+#ifdef __cplusplus_cli
+#error compile native
 #endif
 
-#ifdef SUPPORT_SQLITEDB
+#include "stdafx.h"
+#include "OdbcFactory.h"
+#include "OdbcException.h"
 
-#include "ht4c.SQLite/SQLiteFactory.h"
+namespace ht4c { namespace Odbc {
 
-#endif
+	OdbcEnv* OdbcFactory::create( const std::string& connectionString, const OdbcEnvConfig& config ) {
+		HT4C_TRY {
+			return new OdbcEnv( connectionString, config );
+		}
+		HT4C_ODBC_RETHROW
+	}
 
-#ifdef SUPPORT_ODBC
-
-#include "ht4c.Odbc/OdbcFactory.h"
-
-#endif
+} }

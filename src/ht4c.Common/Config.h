@@ -72,6 +72,15 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+			/// <summary>
+			/// Provider name value - ODBC.
+			/// </summary>
+			static const char* ProviderOdbc;
+
+#endif
+
 			/// <summary>
 			/// Uri, hostname:port.
 			/// </summary>
@@ -162,6 +171,35 @@ namespace ht4c { namespace Common {
 			/// SQLite timestamp index.
 			/// </summary>
 			static const char* SQLiteIndexTimestamp;
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+			/// <summary>
+			/// Odbc connection string.
+			/// </summary>
+			static const char* OdbcConnectionString;
+
+			/// <summary>
+			/// Odbc column index.
+			/// </summary>
+			static const char* OdbcIndexColumn;
+
+			/// <summary>
+			/// Odbc column family index.
+			/// </summary>
+			static const char* OdbcIndexColumnFamily;
+
+			/// <summary>
+			/// Odbc column qualifier index.
+			/// </summary>
+			static const char* OdbcIndexColumnQualifier;
+
+			/// <summary>
+			/// Odbc timestamp index.
+			/// </summary>
+			static const char* OdbcIndexTimestamp;
 
 
 #endif

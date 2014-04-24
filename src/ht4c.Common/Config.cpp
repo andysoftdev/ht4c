@@ -66,4 +66,15 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+	const char* Config::ProviderOdbc												= "Odbc";
+	const char* Config::OdbcConnectionString								= "Ht4n.Odbc.ConnectionString";
+	const char* Config::OdbcIndexColumn											= "Ht4n.Odbc.Index.Column";
+	const char* Config::OdbcIndexColumnFamily								= "Ht4n.Odbc.Index.ColumnFamily";
+	const char* Config::OdbcIndexColumnQualifier						= "Ht4n.Odbc.Index.ColumnQualifier";
+	const char* Config::OdbcIndexTimestamp									= "Ht4n.Odbc.Index.Timestamp";
+
+#endif
+
 } }

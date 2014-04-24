@@ -120,7 +120,7 @@ namespace ht4c { namespace Hamster {
 
 			hamsterdb::env* env;
 			hamsterdb::db* sysdb;
-			typedef std::map<uint16_t, db_t> tables_t;
+			typedef std::unordered_map<uint16_t, db_t> tables_t;
 			tables_t tables;
 
 			CRITICAL_SECTION cs;

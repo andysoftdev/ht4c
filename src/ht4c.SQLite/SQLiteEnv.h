@@ -120,7 +120,8 @@ namespace ht4c { namespace SQLite {
 			sqlite3_stmt* stmtRead;
 			sqlite3_stmt* stmtDelete;
 
-			std::map<int64_t, std::set<Db::Table*>> tables;
+			typedef std::unordered_map<int64_t, std::set<Db::Table*>> tables_t;
+			tables_t tables;
 
 			CRITICAL_SECTION cs;
 	};

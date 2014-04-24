@@ -19,35 +19,42 @@
  * 02110-1301, USA.
  */
 
-#pragma once
-
-#include "Common/Compat.h"
-
-#pragma warning( push, 3 )
-
-#include "Common/Properties.h"
-#include "AsyncComm/ConnectionManager.h"
-#include "Hyperspace/Session.h"
-#include "Hypertable/Lib/Client.h"
-
-#include "ThriftBroker/Client.h"
-
-#pragma warning( pop )
-
-#ifdef SUPPORT_HAMSTERDB
-
-#include "ht4c.Hamster/HamsterFactory.h"
-
+#ifdef __cplusplus_cli
+#error compile native
 #endif
 
-#ifdef SUPPORT_SQLITEDB
+#include "stdafx.h"
+#include "OdbcTableScanner.h"
+#include "OdbcException.h"
 
-#include "ht4c.SQLite/SQLiteFactory.h"
+namespace ht4c { namespace Odbc {
 
-#endif
+	Common::TableScanner* OdbcTableScanner::create( Db::ScannerPtr tableScanner ) {
+		HT4C_TRY {
+			return new OdbcTableScanner( tableScanner );
+		}
+		HT4C_ODBC_RETHROW
+	}
 
-#ifdef SUPPORT_ODBC
+	OdbcTableScanner::~OdbcTableScanner( ) {
+		tableScanner = 0;
+	}
 
-#include "ht4c.Odbc/OdbcFactory.h"
+	bool OdbcTableScanner::next( Common::Cell*& _cell ) {
+		HT4C_TRY {
+			if( tableScanner->nextCell(cell.get()) ) {
+				_cell = &cell;
+				return true;
+			}
+			_cell = 0;
+			return false;
+		}
+		HT4C_ODBC_RETHROW
+	}
 
-#endif
+	OdbcTableScanner::OdbcTableScanner( Db::ScannerPtr _tableScanner )
+	: tableScanner( _tableScanner )
+	{
+	}
+
+} }

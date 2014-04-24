@@ -1,14 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup>
-    <SupportHamsterDb Condition="'$(SupportHamsterDb)' == ''">true</SupportHamsterDb>
-    <SupportSQLiteDb Condition="'$(SupportSQLiteDb)' == ''">true</SupportSQLiteDb>
-    <SupportOdbc Condition="'$(SupportOdbc)' == ''">true</SupportOdbc>
-
-    <SupportHamsterDbDefine Condition="$(SupportHamsterDb) == true">SUPPORT_HAMSTERDB</SupportHamsterDbDefine>
-    <SupportSQLiteDbDefine Condition="$(SupportSQLiteDb) == true">SUPPORT_SQLITEDB</SupportSQLiteDbDefine>
-    <SupportOdbcDefine Condition="$(SupportOdbc) == true">SUPPORT_ODBC</SupportOdbcDefine>
-  </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -28,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{3845C0F0-DF3B-4F3B-90BA-CA7B7E7C0747}</ProjectGuid>
+    <ProjectGuid>{53CB63AD-78BD-4018-B794-35FA889C9B2B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>ht4c</RootNamespace>
   </PropertyGroup>
@@ -96,16 +87,16 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;$(SupportHamsterDbDefine);$(SupportSQLiteDbDefine);$(SupportOdbcDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;SUPPORT_ODBC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..;$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\re2;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\db\build_windows;$(ProjectDir)\..\..\deps\Odbcdb\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <EnablePREfast>false</EnablePREfast>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -118,16 +109,16 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;$(SupportHamsterDbDefine);$(SupportSQLiteDbDefine);$(SupportOdbcDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;SUPPORT_ODBC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..;$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\re2;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\db\build_windows;$(ProjectDir)\..\..\deps\Odbcdb\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <EnablePREfast>false</EnablePREfast>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <GenerateXMLDocumentationFiles>true</GenerateXMLDocumentationFiles>
       <ExceptionHandling>Async</ExceptionHandling>
     </ClCompile>
     <Link>
@@ -142,12 +133,12 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;$(SupportHamsterDbDefine);$(SupportSQLiteDbDefine);$(SupportOdbcDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;SUPPORT_ODBC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..;$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\re2;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\db\build_windows;$(ProjectDir)\..\..\deps\Odbcdb\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
@@ -171,12 +162,12 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;$(SupportHamsterDbDefine);$(SupportSQLiteDbDefine);$(SupportOdbcDefine);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;SUPPORT_ODBC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ProgramDataBaseFileName>$(OutDir)$(TargetName).pdb</ProgramDataBaseFileName>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\re2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..;$(ProjectDir)\..\..\..\ht4w\src\cc;$(ProjectDir)\..\..\..\ht4w\deps\boost;$(ProjectDir)\..\..\..\ht4w\deps\expat;$(ProjectDir)\..\..\..\ht4w\deps\re2;$(ProjectDir)\..\..\..\ht4w\deps\stubs;$(ProjectDir)\..\..\..\ht4w\deps\db\build_windows;$(ProjectDir)\..\..\deps\Odbcdb\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zm300 </AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
@@ -194,46 +185,25 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AsyncCallbackResult.h" />
-    <ClInclude Include="AsyncResult.h" />
-    <ClInclude Include="AsyncResultSink.h" />
-    <ClInclude Include="AsyncTableMutator.h" />
-    <ClInclude Include="AsyncTableScanner.h" />
-    <ClInclude Include="BlockingAsyncResult.h" />
-    <ClInclude Include="Cell.h" />
-    <ClInclude Include="CellFlag.h" />
-    <ClInclude Include="Cells.h" />
-    <ClInclude Include="Client.h" />
-    <ClInclude Include="Config.h" />
-    <ClInclude Include="SessionState.h" />
-    <ClInclude Include="Context.h" />
-    <ClInclude Include="ContextKind.h" />
-    <ClInclude Include="Exception.h" />
-    <ClInclude Include="KeyBuilder.h" />
-    <ClInclude Include="Namespace.h" />
-    <ClInclude Include="NamespaceListing.h" />
-    <ClInclude Include="Properties.h" />
-    <ClInclude Include="ContextFeature.h" />
-    <ClInclude Include="ScanSpec.h" />
-    <ClInclude Include="SessionStateSink.h" />
+    <ClInclude Include="OdbcEnv.h" />
+    <ClInclude Include="OdbcDb.h" />
+    <ClInclude Include="otlv4.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Table.h" />
-    <ClInclude Include="TableMutator.h" />
-    <ClInclude Include="MutatorFlags.h" />
-    <ClInclude Include="TableScanner.h" />
-    <ClInclude Include="ScannerFlags.h" />
-    <ClInclude Include="Types.h" />
-    <ClInclude Include="Utils.h" />
+    <ClInclude Include="OdbcAsyncResult.h" />
+    <ClInclude Include="OdbcAsyncTableMutator.h" />
+    <ClInclude Include="OdbcAsyncTableScanner.h" />
+    <ClInclude Include="OdbcBlockingAsyncResult.h" />
+    <ClInclude Include="OdbcClient.h" />
+    <ClInclude Include="OdbcException.h" />
+    <ClInclude Include="OdbcFactory.h" />
+    <ClInclude Include="OdbcNamespace.h" />
+    <ClInclude Include="OdbcTable.h" />
+    <ClInclude Include="OdbcTableMutator.h" />
+    <ClInclude Include="OdbcTableScanner.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Cell.cpp" />
-    <ClCompile Include="Cells.cpp" />
-    <ClCompile Include="Config.cpp" />
-    <ClCompile Include="Exception.cpp" />
-    <ClCompile Include="KeyBuilder.cpp" />
-    <ClCompile Include="Namespace.cpp" />
-    <ClCompile Include="Properties.cpp" />
-    <ClCompile Include="ScanSpec.cpp" />
+    <ClCompile Include="OdbcEnv.cpp" />
+    <ClCompile Include="OdbcDb.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -244,7 +214,16 @@
       <GenerateXMLDocumentationFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</GenerateXMLDocumentationFiles>
       <GenerateXMLDocumentationFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateXMLDocumentationFiles>
     </ClCompile>
-    <ClCompile Include="Utils.cpp" />
+    <ClCompile Include="OdbcAsyncResult.cpp" />
+    <ClCompile Include="OdbcAsyncTableMutator.cpp" />
+    <ClCompile Include="OdbcAsyncTableScanner.cpp" />
+    <ClCompile Include="OdbcBlockingAsyncResult.cpp" />
+    <ClCompile Include="OdbcClient.cpp" />
+    <ClCompile Include="OdbcFactory.cpp" />
+    <ClCompile Include="OdbcNamespace.cpp" />
+    <ClCompile Include="OdbcTable.cpp" />
+    <ClCompile Include="OdbcTableMutator.cpp" />
+    <ClCompile Include="OdbcTableScanner.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

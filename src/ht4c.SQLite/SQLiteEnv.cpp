@@ -113,7 +113,7 @@ namespace ht4c { namespace SQLite {
 	SQLiteEnv::~SQLiteEnv( ) {
 		::DeleteCriticalSection( &cs );
 		HT4C_TRY {
-			for( std::map<int64_t, std::set<Db::Table*>>::iterator it = tables.begin(); it != tables.end(); ++it ) {
+			for( tables_t::iterator it = tables.begin(); it != tables.end(); ++it ) {
 				for each( Db::Table* table in (*it).second ) {
 					table->dispose();
 				}
@@ -342,7 +342,7 @@ namespace ht4c { namespace SQLite {
 	bool SQLiteEnv::sysDbDeleteTable( const char* name, int len ) {
 		int64_t id;
 		if( sysDbDelete(name, len, &id) ) {
-			std::map<int64_t, std::set<Db::Table*>>::iterator it = tables.find( id );
+			tables_t::iterator it = tables.find( id );
 			if( it != tables.end() ) {
 				std::set<Db::Table*> t( (*it).second ); // shallow copy, table->dispose() might call sysDbDisposeTable( id )
 				for each( Db::Table* table in t ) {

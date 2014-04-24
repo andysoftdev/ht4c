@@ -136,9 +136,20 @@ namespace ht4c {
 			/// <summary>
 			/// Returns the sqlite db environment.
 			/// </summary>
-			/// <returns>SQLIte db environment</returns>
+			/// <returns>SQLite db environment</returns>
 			/// <remarks>Pure native method.</remarks>
 			SQLite::SQLiteEnvPtr getSQLiteEnv( );
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+			/// <summary>
+			/// Returns the ODBC db environment.
+			/// </summary>
+			/// <returns>ODBC db environment</returns>
+			/// <remarks>Pure native method.</remarks>
+			Odbc::OdbcEnvPtr getOdbcEnv( );
 
 #endif
 
@@ -199,10 +210,16 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 			typedef std::pair<SQLite::SQLiteEnvPtr, uint32_t> sqlite_env_t;
-			typedef std::map<std::string, sqlite_env_t> sqlite_envs_t;
+			typedef std::unordered_map<std::string, sqlite_env_t> sqlite_envs_t;
 
 			SQLite::SQLiteEnvPtr sqliteEnv;
 			static sqlite_envs_t sqliteEnvs;
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+			Odbc::OdbcEnvPtr odbcEnv;
 
 #endif
 

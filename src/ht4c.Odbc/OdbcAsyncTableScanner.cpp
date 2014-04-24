@@ -19,35 +19,41 @@
  * 02110-1301, USA.
  */
 
-#pragma once
-
-#include "Common/Compat.h"
-
-#pragma warning( push, 3 )
-
-#include "Common/Properties.h"
-#include "AsyncComm/ConnectionManager.h"
-#include "Hyperspace/Session.h"
-#include "Hypertable/Lib/Client.h"
-
-#include "ThriftBroker/Client.h"
-
-#pragma warning( pop )
-
-#ifdef SUPPORT_HAMSTERDB
-
-#include "ht4c.Hamster/HamsterFactory.h"
-
+#ifdef __cplusplus_cli
+#error compile native
 #endif
 
-#ifdef SUPPORT_SQLITEDB
+#include "stdafx.h"
+#include "OdbcAsyncTableScanner.h"
+#include "OdbcException.h"
 
-#include "ht4c.SQLite/SQLiteFactory.h"
+namespace ht4c { namespace Odbc {
 
-#endif
+	Common::AsyncTableScanner* OdbcAsyncTableScanner::create( Db::ScannerAsyncPtr tableScanner ) {
+		HT4C_TRY {
+			return new OdbcAsyncTableScanner( tableScanner );
+		}
+		HT4C_ODBC_RETHROW
+	}
 
-#ifdef SUPPORT_ODBC
+	int64_t OdbcAsyncTableScanner::id( const Db::ScannerAsyncPtr& tableScanner ) {
+		return int64_t(tableScanner.get());
+	}
 
-#include "ht4c.Odbc/OdbcFactory.h"
+	OdbcAsyncTableScanner::~OdbcAsyncTableScanner( ) {
+		HT4C_TRY {
+			tableScanner = 0;
+		}
+		HT4C_ODBC_RETHROW
+	}
 
-#endif
+	int64_t OdbcAsyncTableScanner::id( ) const {
+		return id( tableScanner );
+	}
+
+	OdbcAsyncTableScanner::OdbcAsyncTableScanner( Db::ScannerAsyncPtr _tableScanner )
+	: tableScanner( _tableScanner )
+	{
+	}
+
+} }

@@ -24,45 +24,29 @@
 #endif
 
 #include "stdafx.h"
-#include "SQLiteException.h"
+#include "OdbcException.h"
 
-namespace ht4c { namespace SQLite { namespace Db {
+namespace ht4c { namespace Odbc { namespace Db {
 
-	namespace {
+	using namespace Util;
 
-		std::string escape( const std::string& s ) {
-			std::string escaped( s );
-			boost::replace_all( escaped, "'", "''" );
-			return escaped;
-		}
-
-		std::string escape( const char* s ) {
-			std::string escaped( s );
-			boost::replace_all( escaped, "'", "''" );
-			return escaped;
-		}
-
-	}
-
-	Client::Client( SQLiteEnvPtr _env )
+	Client::Client( OdbcEnvPtr _env )
 	: env( _env )
-	, db( _env->getDb() )
 	{
 	}
 
 	Client::~Client( ) {
-		db = 0;
 		env = 0;
 	}
 
 	void Client::createNamespace( const std::string& name, bool createIntermediate ) {
 		if( name.empty() ) { // root "/" always exists
-			HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_EXISTS, "Root namespace '/' always exists" );
+			HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_EXISTS, "Root namespace '/' always exists" );
 		}
 
 		char* ns_tmp = strdup( name.c_str() );
 		try {
-			Util::Tx tx( env.get() );
+			Tx tx( getDb() );
 
 			if( createIntermediate ) {
 				int created = 0;
@@ -85,7 +69,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				if( ptr ) {
 					*ptr = 0;
 					if( !namespaceExists(ns_tmp) ) {
-						HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", ns_tmp).c_str() );
+						HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", ns_tmp).c_str() );
 					}
 				}
 				createNamespace( name );
@@ -93,12 +77,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 			tx.commit();
 		}
-		catch( error& e ) {
+		catch( odbc::otl_exception& e ) {
 			std::string name( ns_tmp );
 			free( ns_tmp );
 
-			if( e.get_errno() == SQLITE_CONSTRAINT ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", name.c_str()).c_str() );
+			//  duplicate key
+			if( e.code == 2627 || strcmp(reinterpret_cast<const char*>(e.sqlstate), "23000") == 0 ) {
+				HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", name.c_str()).c_str() );
 			}
 
 			throw;
@@ -117,7 +102,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 
 		if( !namespaceExists(name) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", name.c_str()).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", name.c_str()).c_str() );
 		}
 		return ns;
 	}
@@ -131,49 +116,43 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Db::Namespace ns( this, name );
 		const char* key;
 		int len = ns.toKey( key );
-		return env->sysDbExists( key, len );
+		return OdbcEnv::sysDbExists( getDb(), key, len );
 	}
 
 	void Client::dropNamespace( const std::string& name, bool ifExists ) {
-		Util::Tx tx( env.get() );
+		Tx tx( getDb() );
 		dropNamespace( tx, name, ifExists );
 		tx.commit();
 	}
 
-	void Client::dropNamespace( Util::Tx& /*tx*/, const std::string& name, bool ifExists ) {
+	void Client::dropNamespace( Tx& tx, const std::string& name, bool ifExists ) {
 		if( name.empty() ) { // root "/" always exists
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, "Cannot drop root namepsace '/'" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, "Cannot drop root namepsace '/'" );
 		}
 
 		Db::Namespace ns( this, name );
 		const char* key;
 		int len = ns.toKey( key );
 
+		varbinary k;
 		{
-			sqlite3_stmt* stmtFindGt;
-			int st = sqlite3_prepare_v2( db, "SELECT k FROM sys_db WHERE k>? ORDER BY k;", -1, &stmtFindGt, 0 );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
+			odbc::otl_stream os( 64, "SELECT k:#1<raw[512]> FROM sys_db WHERE k>:k<raw[512]> ORDER BY k;", *tx.getDb() );
+			os << varbinary(key, len);
 
-			Util::StmtFinalize stmt( db, &stmtFindGt );
-
-			st = sqlite3_bind_text( stmtFindGt, 1, key, len, 0 );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
-
-			st = sqlite3_step( stmtFindGt );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
-			if( st == SQLITE_ROW ) {
-				key = reinterpret_cast<const char*>( sqlite3_column_text(stmtFindGt, 0) );
-				if( Util::KeyStartWith(key, KeyClassifiers::NamespaceListing, name + "/") ) {
-					HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, Hypertable::format("Namespace '%s' is not empty", name.c_str()).c_str() );
+			if( !os.eof() ) {
+				os >> k;
+				key = k.c_str();
+				if( KeyStartWith(key, KeyClassifiers::NamespaceListing, name + "/") ) {
+					HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, Hypertable::format("Namespace '%s' is not empty", name.c_str()).c_str() );
 				}
 			}
 		}
 
 		// Drop
 		len = ns.toKey( key );
-		bool dropped = env->sysDbDelete( key, len );
+		bool dropped = OdbcEnv::sysDbDelete( tx.getDb(), key, len );
 		if( !ifExists && !dropped ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", name.c_str()).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", name.c_str()).c_str() );
 		}
 	}
 
@@ -181,13 +160,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Db::Namespace ns( this, name );
 		const char* key;
 		int len = ns.toKey( key );
-		env->sysDbInsert( key, len, 0 , 0 );
+		OdbcEnv::sysDbInsert( getDb(), key, len, 0 , 0 );
 	}
 
 	Namespace::Namespace( ClientPtr _client, const std::string& name )
 	: client( _client )
 	, env( _client->getEnv() )
-	, db( _client->getEnv()->getDb() )
 	, keyName( ) {
 		keyName.reserve( name.size() + 1 );
 		keyName += KeyClassifiers::NamespaceListing;
@@ -195,7 +173,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	Namespace::~Namespace( ) {
-		db = 0;
 		env = 0;
 		client = 0;
 	}
@@ -207,89 +184,53 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Namespace::drop( const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 		drop( tx, nsName, listing, ifExists, dropTables );
 		tx.commit();
 	}
 
 	void Namespace::getNamespaceListing( bool deep, std::vector<Db::NamespaceListing>& listing ) {
-		listing.clear();
-
-		sqlite3_stmt* stmtFindGt;
-		int st = sqlite3_prepare_v2( db, "SELECT k, v FROM sys_db WHERE k>? ORDER BY k;", -1, &stmtFindGt, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		Util::StmtFinalize stmt( db, &stmtFindGt );
-
 		const char* key;
 		int len = toKey( key );
 
-		st = sqlite3_bind_text( stmtFindGt, 1, key, len, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		odbc::otl_stream os( 64, "SELECT k:#1<raw[512]>, v:#2<raw_long> FROM sys_db WHERE k>:k<raw[512]> ORDER BY k;", *getDb() );
+		os << varbinary(key, len);
 
-		if( (st = sqlite3_step(stmtFindGt)) == SQLITE_ROW ) {
-			key = reinterpret_cast<const char*>( sqlite3_column_text(stmtFindGt, 0) );
-
-			std::string tmp( getName() );
-			if( !tmp.empty() ) {
-				tmp += "/";
-			}
-
-			int len = tmp.size();
-			for( const char* ptr = Util::KeyToString(key, KeyClassifiers::NamespaceListing); ptr && strstr(ptr, tmp.c_str()) == ptr; ptr = Util::KeyToString(key, KeyClassifiers::NamespaceListing) ) {
-				ptr += len;
-				if( !strchr(ptr, '/') ) {
-					Db::NamespaceListing nsl;
-					nsl.name = ptr;
-					nsl.isNamespace = sqlite3_column_type( stmtFindGt, 1 ) == SQLITE_NULL;
-					listing.push_back( nsl );
-
-					if( deep ) {
-						Db::Namespace ns( client, tmp + ptr );
-						ns.getNamespaceListing( true, listing.back().subEntries );
-					}
-				}
-
-				if( (st = sqlite3_step(stmtFindGt)) != SQLITE_ROW ) {
-					break;
-				}
-				key = reinterpret_cast<const char*>( sqlite3_column_text(stmtFindGt, 0) );
-			}
-		}
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		varbinary k, v;
+		getNamespaceListing( os, deep, listing, k, v );
 	}
 
 	void Namespace::createTable( const std::string& name, const std::string& _schema ) {
 		if( name.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 
 		// Table already exists?
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		if( env->sysDbExists(key, len) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+		if( OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
 		}
 
 		// Namespace exists?
 		len = toKey( key );
-		if( !env->sysDbExists(key, len) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
+		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
 		}
 
 		// Validate schema
 		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance(_schema, _schema.length());
 		if( !schema->is_valid() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
 		}
 
 		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
 		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
 			if( cf->counter ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
+				HT4C_ODBC_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
 			}
 		}
 
@@ -300,18 +241,18 @@ namespace ht4c { namespace SQLite { namespace Db {
 		std::string finalschema;
 		schema->render( finalschema, true );
 
-		Db::Table newTable( this, name, finalschema, 0 );
+		Db::Table newTable( this, name, finalschema, "" );
 		len = newTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		newTable.toRecord( buf );
-		int64_t id;
-		env->sysDbCreateTable( key, len, buf.base, buf.fill(), id );
+		std::string id;
+		env->sysDbCreateTable( tx.getDb(), key, len, buf.base, buf.fill(), id );
 
 		tx.commit();
 	}
 
 	Db::TablePtr Namespace::openTable( const std::string& name ) {
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 
 		Db::TablePtr table = new Db::Table( this, name );
 		table->open( );
@@ -323,24 +264,24 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Namespace::alterTable( const std::string& name, const std::string& _schema ) {
 		if( name.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 
 		// Table already exists?
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		std::string rowid;
+		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len, &rowid) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		// Validate schema
 		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance(_schema, _schema.length());
 		if( !schema->is_valid() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
 		}
 
 		if( schema->need_id_assignment() ) {
@@ -354,7 +295,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		len = alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		alterTable.toRecord( buf );
-		env->sysDbUpdateValue( alterTable.getId(), buf.base, buf.fill() );
+		OdbcEnv::sysDbUpdateValue( tx.getDb(), alterTable.getId(), buf.base, buf.fill() );
 
 		tx.commit();
 	}
@@ -367,18 +308,16 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		return env->sysDbExists( key, len );
+		return OdbcEnv::sysDbExists( getDb(), key, len );
 	}
 
 	void Namespace::getTableId( const std::string& name, std::string& id ) {
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		if( !OdbcEnv::sysDbExists(getDb(), key, len, &id) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
-		id = Hypertable::format( "%lld", rowid );
 	}
 
 	void Namespace::getTableSchema( const std::string& name, bool withIds, std::string& _schema ) {
@@ -388,8 +327,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		const char* key;
 		int len = table.toKey( key );
 		Hypertable::DynamicBuffer buf;
-		if( !env->sysDbRead(key, len, buf) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		if( !OdbcEnv::sysDbRead(getDb(), key, len, buf) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		table.fromRecord( buf );
@@ -405,46 +344,90 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Namespace::renameTable( const std::string& name,const std::string& newName ) {
 		if( name.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 		if( newName.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty new table name" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty new table name" );
 		}
 
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 
 		{
 			// New table already exists?
 			Db::Table table( this, newName );
 			const char* key;
 			int len = table.toKey( key );
-			if( env->sysDbExists(key, len) ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+			if( OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
+				HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
 			}
 		}
 
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		std::string rowid;
+		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len, &rowid) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		Db::Table tableNew( this, newName, table );
 		len = tableNew.toKey( key );
-		env->sysDbUpdateKey( rowid, key, len );
+		OdbcEnv::sysDbUpdateKey( tx.getDb(), rowid, key, len );
 
 		tx.commit();
 	}
 
 	void Namespace::dropTable( const std::string& name, bool ifExists ) {
-		Util::Tx tx( env );
+		Tx tx( getDb() );
 		dropTable( tx, name, ifExists );
 		tx.commit();
 	}
 
-	void Namespace::drop( Util::Tx& tx, const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
+	bool Namespace::getNamespaceListing( odbc::otl_stream& os, bool deep, std::vector<Db::NamespaceListing>& listing, varbinary& k, varbinary& v ) {
+		listing.clear();
+
+		if( os.eof() ) {
+			return false;
+		}
+
+		os >> k >> v;
+		const char* key = k.c_str();
+
+		std::string tmp( getName() );
+		if( !tmp.empty() ) {
+			tmp += "/";
+		}
+
+		int len = tmp.size();
+		for( const char* ptr = KeyToString(key, KeyClassifiers::NamespaceListing); ptr && strstr(ptr, tmp.c_str()) == ptr; ptr = KeyToString(key, KeyClassifiers::NamespaceListing) ) {
+			ptr += len;
+			if( !strchr(ptr, '/') ) {
+				Db::NamespaceListing nsl;
+				nsl.name = ptr;
+				nsl.isNamespace = v.len() == 0;
+				listing.push_back( nsl );
+
+				if( deep ) {
+					Db::Namespace ns( client, tmp + ptr );
+					if( ns.getNamespaceListing(os, true, listing.back().subEntries, k, v) ) {
+						key = k.c_str();
+						continue;
+					}
+				}
+			}
+
+			if( os.eof() ) {
+				return false;
+			}
+
+			os >> k >> v;
+			key = k.c_str();
+		}
+
+		return true;
+	}
+
+	void Namespace::drop( Tx& tx, const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
 		for( std::vector<Db::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
 			if( (*it).isNamespace ) {
 				std::string nsSubName = nsName + "/" + (*it).name;
@@ -458,18 +441,18 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 	}
 
-	void Namespace::dropTable( Util::Tx& /*tx*/, const std::string& name, bool ifExists ) {
+	void Namespace::dropTable( Tx& tx, const std::string& name, bool ifExists ) {
 		if( name.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 
 		// Drop
 		Db::Table table( this, name );
 		const char* key;
 		int len = table.toKey( key );
-		if( !env->sysDbDeleteTable(key, len) ) {
+		if( !env->sysDbDeleteTable(tx.getDb(), key, len) ) {
 			if( !ifExists ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+				HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 			}
 		}
 	}
@@ -482,19 +465,19 @@ namespace ht4c { namespace SQLite { namespace Db {
 	Table::Table( NamespacePtr _ns, const std::string& _name )
 	: ns( _ns )
 	, name( _name )
-	, id( 0 )
+	, id( )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, opened( false ) {
 		init();
 	}
 
-	Table::Table( NamespacePtr _ns, const std::string& _name, const std::string& _schema, int64_t _id )
+	Table::Table( NamespacePtr _ns, const std::string& _name, const std::string& _schema, const std::string& _id )
 	: ns( _ns )
 	, name( _name )
 	, schemaSpec( _schema )
 	, id( _id )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, opened( false ) {
 		init();
 	}
 
@@ -505,7 +488,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, schema( other.schema )
 	, id( other.id )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, opened( false ) {
 		init();
 	}
 
@@ -524,21 +507,21 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	Db::MutatorPtr Table::createMutator( int32_t flags, int32_t flushInterval ) {
-		if( !id ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Invalid identifier for table '%s'", getFullName()).c_str() );
+		if( id.empty() ) {
+			HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Invalid identifier for table '%s'", getFullName()).c_str() );
 		}
-		if( !db ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' already disposed", getFullName()).c_str() );
+		if( !opened ) {
+			HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' already disposed", getFullName()).c_str() );
 		}
 		return new Db::Mutator( this, flags, flushInterval );
 	}
 
 	Db::ScannerPtr Table::createScanner( const Hypertable::ScanSpec& scanSpec, uint32_t flags) {
-		if( !id ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Invalid identifier for table '%s'", getFullName()).c_str() );
+		if( id.empty() ) {
+			HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Invalid identifier for table '%s'", getFullName()).c_str() );
 		}
-		if( !db ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' already disposed", getFullName()).c_str() );
+		if( !opened ) {
+			HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' already disposed", getFullName()).c_str() );
 		}
 		return new Db::Scanner( this, scanSpec, flags );
 	}
@@ -557,7 +540,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Table::toRecord( Hypertable::DynamicBuffer& buf ) {
 		if( schemaSpec.empty() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Undefined schema for table '%s'", getFullName()).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Undefined schema for table '%s'", getFullName()).c_str() );
 		}
 
 		size_t schema_len = schemaSpec.size() + 1;
@@ -578,22 +561,24 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Table::open( ) {
 		dispose();
-		if( !env->sysDbOpenTable(this, id) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+
+		if( !env->sysDbOpenTable(getDb(), this, id) ) {
+			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
-		db = env->getDb();
+
+		opened = true;
 	}
 
 	void Table::dispose( ) {
-		if( db ) {
+		if( opened ) {
 			env->sysDbDisposeTable( id );
-			db = 0;
+			opened = false;
 		}
-		id = 0;
+
+		id.clear();
 	}
 
 	void Table::init( ) {
-		db = env->getDb();
 		keyName.reserve( strlen(ns->getName()) + 1 + name.size() + 1 );
 		keyName += KeyClassifiers::NamespaceListing;
 		keyName += ns->getName();
@@ -605,14 +590,15 @@ namespace ht4c { namespace SQLite { namespace Db {
 	: table( _table )
 	, flags( _flags )
 	, flushInterval( _flushInterval )
-	, db( _table->getEnv()->getDb() )
+	, db( 0 )
+	, os( 0 )
+	, os_sm( 0 )
+	, os_del_row( 0 )
+	, os_del_cf( 0 )
+	, os_del_cell( 0 )
+	, os_del_cell_version( 0 )
 	, env( _table->getEnv() )
 	, schema( _table->getSchema().get() )
-	, stmtInsert( 0 )
-	, stmtDeleteRow( 0 )
-	, stmtDeleteCf( 0 )
-	, stmtDeleteCell( 0 )
-	, stmtDeleteCellVersion( 0 )
 	{
 		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
 		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
@@ -620,28 +606,30 @@ namespace ht4c { namespace SQLite { namespace Db {
 			timeOrderAsc[cf->id] = !cf->time_order_desc;
 		}
 
-		int st = sqlite3_prepare_v2( db, Hypertable::format("INSERT OR REPLACE INTO t%lld (r, cf, cq, ts, v) VALUES(?, ?, ?, ?, ?);", table->getId()).c_str(), -1, &stmtInsert, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND ts>?;", table->getId()).c_str(), -1, &stmtDeleteRow, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", table->getId()).c_str(), -1, &stmtDeleteCf, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND cq=? AND ts>?;", table->getId()).c_str(), -1, &stmtDeleteCell, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND cq=? AND ts=?;", table->getId()).c_str(), -1, &stmtDeleteCellVersion, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		os = newOdbcStream(
+			16, 
+			Hypertable::format(
+			"EXECUTE I%s @r=:r<raw[512]>, @cf=:cf<int>, @cq=:cq<raw[512]>, @ts=:ts<bigint>, @v=:v<raw_long>;",
+			table->getId()), 
+			getDb() );
 	}
 
 	Mutator::~Mutator( ) {
-		Util::stmt_finalize( db, &stmtInsert );
-		Util::stmt_finalize( db, &stmtDeleteRow );
-		Util::stmt_finalize( db, &stmtDeleteCf );
-		Util::stmt_finalize( db, &stmtDeleteCell );
-		Util::stmt_finalize( db, &stmtDeleteCellVersion );
+
+		#define SAFE_DELETE( p )	\
+			if( p ) {								\
+				delete p;							\
+				p = 0;								\
+			}
+
+		SAFE_DELETE( os_sm )
+		SAFE_DELETE( os_del_row )
+		SAFE_DELETE( os_del_cf )
+		SAFE_DELETE( os_del_cell )
+		SAFE_DELETE( os_del_cell_version )
+		SAFE_DELETE( os )
+
+		#undef SAFE_DELETE
 
 		schema = 0;
 		db = 0;
@@ -676,38 +664,56 @@ namespace ht4c { namespace SQLite { namespace Db {
 		toKey( schema, keySpec, key );
 
 		if( key.flag == Hypertable::FLAG_INSERT ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Invalid delete flag '%d'", key.flag).c_str() );
+			HT4C_ODBC_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Invalid delete flag '%d'", key.flag).c_str() );
 		}
 
 		del( key );
 	}
 
 	void Mutator::flush( ) {
-		env->txCommit();
+
+		#define SAFE_FLUSH( p ) \
+			if( p ) p->flush();
+
+		SAFE_FLUSH( os )
+		SAFE_FLUSH( os_sm )
+		SAFE_FLUSH( os_del_row )
+		SAFE_FLUSH( os_del_cf )
+		SAFE_FLUSH( os_del_cell )
+		SAFE_FLUSH( os_del_cell_version )
+
+		#undef SAFE_FLUSH
+
+		db->commit();
 	}
 
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
-		env->txBegin();
+		if( valueLength > static_cast<uint32_t>(getDb()->get_max_long_size()) ) {
+			if( !os_sm ) {
+				os_sm = newOdbcStream(
+					1, 
+					Hypertable::format("EXECUTE I%s @r=:r<raw[512]>, @cf=:cf<int>, @cq=:cq<raw[512]>, @ts=:ts<bigint>, @v=:v<raw_long>;", table->getId()), 
+					getDb(),
+					true );
+			}
 
-		Util::StmtReset stmt( stmtInsert );
+			odbc::otl_lob_stream lob;
+			*os_sm << varbinary(key.row, key.row_len)
+										  << static_cast<int>(key.column_family_code)
+											<< varbinary(CQ(key.column_qualifier), key.column_qualifier_len)
+											<< static_cast<OTL_BIGINT>(timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp)
+											<< lob;
 
-		int st = sqlite3_bind_text( stmtInsert, 1, key.row, key.row_len, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_bind_int( stmtInsert, 2, key.column_family_code );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_bind_text( stmtInsert, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_bind_int64( stmtInsert, 4, timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_bind_blob( stmtInsert, 5, value, valueLength, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		st = sqlite3_step( stmtInsert );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+			lob << varbinary(value, valueLength);
+			lob.close();
+		}
+		else {
+			*os << varbinary(key.row, key.row_len)
+					<< static_cast<int>(key.column_family_code)
+					<< varbinary(CQ(key.column_qualifier), key.column_qualifier_len)
+					<< static_cast<OTL_BIGINT>(timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp)
+					<< varbinary(value, valueLength);
+		}
 	}
 
 	void Mutator::toKey( Hypertable::Schema* schema
@@ -723,12 +729,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 	{
 		if( flag > Hypertable::FLAG_DELETE_ROW ) {
 			if( !columnFamily ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::BAD_KEY, "Column family not specified" );
+				HT4C_ODBC_THROW( Hypertable::Error::BAD_KEY, "Column family not specified" );
 			}
 
 			Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( columnFamily );
 			if( !cf ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Bad column family '%s'", columnFamily).c_str() );
+				HT4C_ODBC_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Bad column family '%s'", columnFamily).c_str() );
 			}
 			fullKey.column_family_code = (uint8_t)cf->id;
 		}
@@ -759,89 +765,62 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Mutator::del( Hypertable::Key& key ) {
-		int st;
-
 		int64_t timestamp = timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp;
 
-		env->txBegin();
+		#define NEWODBCSTREAM( p, sql )																										\
+			if( !p ) {																																			\
+					p = newOdbcStream( 16, Hypertable::format(sql, table->getId()), getDb() );	\
+				}
 
 		switch( key.flag ) {
 			case Hypertable::FLAG_DELETE_ROW: {
-				Util::StmtReset stmt( stmtDeleteRow );
+				NEWODBCSTREAM( os_del_row, "DELETE FROM %s WHERE r=:r<raw[512]> AND ts>:ts<bigint>" )
 
-				st = sqlite3_bind_text( stmtDeleteRow, 1, key.row, key.row_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
+				*os_del_row << varbinary(key.row, key.row_len)
+										<< static_cast<OTL_BIGINT>(timestamp);
 
-				st = sqlite3_bind_int64( stmtDeleteRow, 2, timestamp );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_step( stmtDeleteRow );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
 				break;
 			}
 
 			case Hypertable::FLAG_DELETE_COLUMN_FAMILY: {
-				Util::StmtReset stmt( stmtDeleteCf );
+				NEWODBCSTREAM( os_del_cf, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND ts>:ts<bigint>" )
 
-				st = sqlite3_bind_text( stmtDeleteCf, 1, key.row, key.row_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
+				*os_del_cf << varbinary(key.row, key.row_len)
+									 << static_cast<int>(key.column_family_code)
+									 << static_cast<OTL_BIGINT>(timestamp);
 
-				st = sqlite3_bind_int( stmtDeleteCf, 2, key.column_family_code );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_bind_int64( stmtDeleteCf, 3, timestamp );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_step( stmtDeleteCf );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
 				break;
 			}
 
 			case Hypertable::FLAG_DELETE_CELL: {
-				Util::StmtReset stmt( stmtDeleteCell );
+				NEWODBCSTREAM( os_del_cell, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND cq=:cq<raw[512]> AND ts>:ts<bigint>" )
 
-				st = sqlite3_bind_text( stmtDeleteCell, 1, key.row, key.row_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
+				*os_del_cell << varbinary(key.row, key.row_len)
+										 << static_cast<int>(key.column_family_code)
+										 << varbinary(CQ(key.column_qualifier), key.column_qualifier_len)
+										 << static_cast<OTL_BIGINT>(timestamp);
 
-				st = sqlite3_bind_int( stmtDeleteCell, 2, key.column_family_code );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_bind_text( stmtDeleteCell, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_bind_int64( stmtDeleteCell, 4, timestamp );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_step( stmtDeleteCell );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
 				break;
 			}
 
 			case Hypertable::FLAG_DELETE_CELL_VERSION: {
-				Util::StmtReset stmt( stmtDeleteCellVersion );
+				NEWODBCSTREAM( os_del_cell_version, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND cq=:cq<raw[512]> AND ts=:ts<bigint>" )
 
-				st = sqlite3_bind_text( stmtDeleteCellVersion, 1, key.row, key.row_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
+				*os_del_cell_version << varbinary(key.row, key.row_len)
+														 << static_cast<int>(key.column_family_code)
+														 << varbinary(CQ(key.column_qualifier), key.column_qualifier_len)
+														 << static_cast<OTL_BIGINT>(timestamp);
 
-				st = sqlite3_bind_int( stmtDeleteCellVersion, 2, key.column_family_code );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_bind_text( stmtDeleteCellVersion, 3, Util::CQ(key.column_qualifier), key.column_qualifier_len, 0 );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_bind_int64( stmtDeleteCellVersion, 4, timestamp );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
-
-				st = sqlite3_step( stmtDeleteCellVersion );
-				HT4C_SQLITE_VERIFY( st, db, 0 );
 				break;
 			}
 		}
+
+		#undef NEWODBCSTREAM
 	}
 
 	MutatorAsync::MutatorAsync( Db::TablePtr _table )
 	: table( _table )
-	, db( _table->getEnv()->getDb() )
+	, db( 0 )
 	, schema( _table->getSchema().get() ) {
 	}
 
@@ -854,12 +833,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 	Scanner::Scanner( Db::TablePtr _table, const Hypertable::ScanSpec& _scanSpec, uint32_t _flags )
 	: table( _table )
 	, flags( _flags )
-	, db( _table->getEnv()->getDb() )
+	, db( 0 )
 	, scanSpec( _scanSpec )
 	{
 		if( scanSpec.get().row_intervals.empty() ) {
 			if( scanSpec.get().cell_intervals.empty() ) {
-				reader = new Reader( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new Reader( getDb(), _table->getId(), _table->getSchema(), scanSpec.get() );
 			}
 			else {
 				Hypertable::CellIntervals& cellIntervals = scanSpec.get().cell_intervals;
@@ -871,11 +850,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 						ci->end_row = Hypertable::Key::END_ROW_MARKER;
 					}
 				}
-				reader = new ReaderCellIntervals( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new ReaderCellIntervals( getDb(), _table->getId(), _table->getSchema(), scanSpec.get() );
 			}
 		}
 		else if (scanSpec.get().scan_and_filter_rows) {
-			reader = new ReaderScanAndFilter( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderScanAndFilter( getDb(), _table->getId(), _table->getSchema(), scanSpec.get() );
 		}
 		else {
 			Hypertable::RowIntervals& rowIntervals = scanSpec.get().row_intervals;
@@ -888,7 +867,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				}
 			}
 
-			reader = new ReaderRowIntervals( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderRowIntervals( getDb(), _table->getId(), _table->getSchema(), scanSpec.get() );
 		}
 
 		reader->stmtPrepare( );
@@ -913,7 +892,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	void Scanner::ScanContext::initialize( ) {
 		Common::ScanContext::initialize();
-
 		bool hasTimeOrderAsc = false;
 		bool hasTimeOrderDesc = false;
 		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
@@ -965,9 +943,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 			predicate = predicate.empty() ? predicateTimestamp : Hypertable::format( "%s AND (%s)", predicateTimestamp.c_str(), predicate.c_str() );
 		}
 
-		columns = "r, cf, cq, ts";
+		columns = "r:#1<raw[512]>, cf, cq:#3<raw[512]>, ts";
 		if( !keysOnly ) {
-			columns += ", v";
+			columns += ", v:#5<raw_long>";
 		}
 	}
 
@@ -976,17 +954,17 @@ namespace ht4c { namespace SQLite { namespace Db {
 			cfPredicate += Hypertable::format( "%s'%d'", cfPredicate.empty() ? "" : ",", cf->id );
 		}
 		else if (isPrefix) {
-			qPredicate += Hypertable::format( "%s(cf=%d AND cq>=%s)", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq>=%s)", qPredicate.empty() ? "" : " OR ", cf->id, nhex(qualifier).c_str() );
 		}
 		else {
-			qPredicate += Hypertable::format( "%s(cf=%d AND cq='%s')", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq=%s)", qPredicate.empty() ? "" : " OR ", cf->id, hex(qualifier).c_str() );
 		}
 	}
 
-	Scanner::Reader::Reader( sqlite3* _db, int64_t _tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	Scanner::Reader::Reader( odbc::otl_connect* _db, const std::string& _tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
 	: db( _db )
+	, os( 0 )
 	, tableId( _tableId )
-	, stmtQuery( 0 )
 	, scanContext( new ScanContext(scanSpec, schema) )
 	, currkey( 64 )
 	, prevKey( 64 )
@@ -1004,30 +982,44 @@ namespace ht4c { namespace SQLite { namespace Db {
 		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
 			timeOrderAsc[cf->id] = !cf->time_order_desc;
 		}
-
-		int st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", tableId).c_str(), -1, &stmtDeleteCf, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
 	}
 
+#define READER_DELETE_OS			\
+	if( os ) {									\
+			delete os;							\
+			os = 0;									\
+		}
+
 	Scanner::Reader::~Reader() {
+		READER_DELETE_OS
+
 		delete scanContext;
 		scanContext = 0;
-
-		Util::stmt_finalize( db, &stmtQuery );
-		Util::stmt_finalize( db, &stmtDeleteCf );
 		db = 0;
 	}
 
 	bool Scanner::Reader::nextCell( Hypertable::Cell& cell ) {
 		Hypertable::Key key;
+		int cf;
+		OTL_BIGINT ts;
+
 		for( bool moved = moveNext(); moved && !eos; moved = moveNext() ) {
-			key.row = reinterpret_cast<const char*>( sqlite3_column_text(stmtQuery, 0) );
-			key.row_len = sqlite3_column_bytes( stmtQuery, 0 );
+			*os >> r >> cf >> cq >> ts;
+			if( !scanContext->keysOnly ) {
+				*os >> v;
+			}
+
+			r.v[r.len()] = 0;
+			cq.v[cq.len()] = 0;
+
+			key.row = r.c_str();
+			key.row_len = r.len();
 			if( filterRow(key.row) ) {
-				key.column_family_code = sqlite3_column_int( stmtQuery, 1 );
-				key.column_qualifier = reinterpret_cast<const char*>( sqlite3_column_text(stmtQuery, 2) );
-				key.column_qualifier_len = sqlite3_column_bytes( stmtQuery, 2 );
-				key.timestamp = timeOrderAsc[key.column_family_code] ? ~sqlite3_column_int64( stmtQuery, 3 ) : sqlite3_column_int64( stmtQuery, 3 );
+				key.column_family_code = static_cast<uint8_t>( cf );
+				key.column_qualifier = cq.c_str();
+				key.column_qualifier_len = cq.len();
+				key.timestamp = static_cast<int64_t>( timeOrderAsc[key.column_family_code] ? ~ts : ts );
+
 				const Hypertable::Schema::ColumnFamily* cf = filterCell( key );
 				if( cf ) {
 					if( getCell(key, *cf, cell) ) {
@@ -1037,26 +1029,25 @@ namespace ht4c { namespace SQLite { namespace Db {
 			}
 		}
 
+		READER_DELETE_OS
+
 		return false;
 	}
 
 	void Scanner::Reader::stmtPrepare( ) {
-		Util::stmt_finalize( db, &stmtQuery );
+		READER_DELETE_OS
 
 		std::string predicate;
 		if( !scanContext->predicate.empty() ) {
 			predicate = " WHERE " + scanContext->predicate;
 		}
 
-		std::string select = Hypertable::format( "SELECT %s FROM t%lld%s ORDER BY r, cf, cq, ts;", scanContext->columns.c_str(), tableId, predicate.c_str() );
-		int st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		std::string select = Hypertable::format( "SELECT %s FROM %s%s ORDER BY r, cf, cq, ts;", scanContext->columns.c_str(), tableId.c_str(), predicate.c_str() );
+		os = newOdbcStream( 16, select, db );
 	}
 
 	bool Scanner::Reader::moveNext( ) {
-		int st = sqlite3_step( stmtQuery );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-		return st == SQLITE_ROW;
+		return os && !os->eof();
 	}
 
 	bool Scanner::Reader::filterRow( const char* row ) {
@@ -1096,19 +1087,14 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		// cutoff time
 		if( key.timestamp < cfi.cutoffTime ) {
-			Util::StmtReset stmt( stmtDeleteCf );
+			odbc::otl_stream os( 
+					1,
+					Hypertable::format("DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND ts>:ts<bigint>", tableId.c_str()).c_str(), 
+					*db );
 
-			int st = sqlite3_bind_text( stmtDeleteCf, 1, key.row, key.row_len, 0 );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
-
-			st = sqlite3_bind_int( stmtDeleteCf, 2, key.column_family_code );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
-
-			st = sqlite3_bind_int64( stmtDeleteCf, 3, timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
-
-			st = sqlite3_step( stmtDeleteCf );
-			HT4C_SQLITE_VERIFY( st, db, 0 );
+				os << varbinary(key.row, key.row_len)
+					 << static_cast<int>(key.column_family_code)
+					 << static_cast<OTL_BIGINT>(timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp);
 
 			return 0;
 		}
@@ -1199,19 +1185,16 @@ namespace ht4c { namespace SQLite { namespace Db {
 		cell.value_len = 0;
 
 		if( !scanContext->keysOnly || scanContext->valueRegexp ) {
-			const void* v = sqlite3_column_blob( stmtQuery, 4 );
-			uint32_t len = sqlite3_column_bytes( stmtQuery, 4 );
-
 			// filter by column predicate
 			if( cfi.hasColumnPredicateFilter() ) {
-				if( !cfi.columnPredicateMatches(reinterpret_cast<const char*>(v), len) ) {
+				if( !cfi.columnPredicateMatches(v.c_str(), v.len()) ) {
 					return false;
 				}
 			}
 
 			// filter by value regexp
 			if( scanContext->valueRegexp ) {
-				if( !RE2::PartialMatch(re2::StringPiece(reinterpret_cast<const char*>(v), len), *(scanContext->valueRegexp)) ) {
+				if( !RE2::PartialMatch(re2::StringPiece(v.c_str(), v.len()), *(scanContext->valueRegexp)) ) {
 					return false;
 				}
 
@@ -1221,8 +1204,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 			}
 
 			if( !scanContext->keysOnly ) {
-				cell.value = reinterpret_cast<const uint8_t*>( v );
-				cell.value_len = len;
+				cell.value = reinterpret_cast<const uint8_t*>( v.v );
+				cell.value_len = v.len();
 			}
 		}
 
@@ -1259,13 +1242,14 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return true;
 	}
 
-	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( odbc::otl_connect* db, const std::string& tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
 	: Reader( db, tableId, schema, scanSpec )
 	{
 	}
 
 	void Scanner::ReaderScanAndFilter::stmtPrepare( ) {
-		Util::stmt_finalize( db, &stmtQuery );
+		READER_DELETE_OS
+
 		std::string predicate;
 		if( !scanContext->predicate.empty() ) {
 			predicate = " AND (" + scanContext->predicate + ")";
@@ -1273,27 +1257,29 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		std::string select;
 		if( strcmp(*scanContext->rowset.begin(),*scanContext->rowset.rbegin()) ) {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM %s WHERE (r>=:r1<raw[512]> AND r<=:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
 																	, scanContext->columns.c_str()
-																	, tableId
-																	, escape(*scanContext->rowset.begin()).c_str()
-																	, escape(*scanContext->rowset.rbegin()).c_str()
+																	, tableId.c_str()
 																	, predicate.c_str()
 																	);
+
+			os = newOdbcStream( 16, select, db );
+			*os << varbinary(*scanContext->rowset.begin())
+				  << varbinary(*scanContext->rowset.rbegin());
 		}
 		else {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]>%s ORDER BY r, cf, cq, ts;"
 																	, scanContext->columns.c_str()
-																	, tableId
-																	, escape(*scanContext->rowset.begin()).c_str()
+																	, tableId.c_str()
 																	, predicate.c_str()
 																	);
+
+			os = newOdbcStream( 16, select, db );
+			*os << varbinary(*scanContext->rowset.begin());
 		}
-		int st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 )
 	}
 
-	Scanner::ReaderRowIntervals::ReaderRowIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	Scanner::ReaderRowIntervals::ReaderRowIntervals( odbc::otl_connect* db, const std::string& tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
 	: Reader( db, tableId, schema, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.row_intervals.begin() )
@@ -1302,12 +1288,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Scanner::ReaderRowIntervals::stmtPrepare( ) {
+		READER_DELETE_OS
+
 		// do nothing
 	}
 
 	bool Scanner::ReaderRowIntervals::moveNext( ) {
-		int st;
-
 		if( rowIntervalDone ) {
 			rowIntervalDone = false;
 			if( it == scanSpec.row_intervals.end() ) {
@@ -1318,7 +1304,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 			cellCount = 0;
 			cellPerFamilyCount = 0;
 
-			Util::stmt_finalize( db, &stmtQuery );
+			READER_DELETE_OS
+
 			std::string predicate;
 			if( !scanContext->predicate.empty() ) {
 				predicate = " AND (" + scanContext->predicate + ")";
@@ -1326,41 +1313,40 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 			std::string select;
 			if( strcmp(it->start, it->end) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s'%s' AND r <%s'%s')%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM %s WHERE (r>%s:r1<raw[512]> AND r<%s:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
-																	 , tableId
+																	 , tableId.c_str()
 																	 , it->start_inclusive ? "=" : ""
-																	 , escape(it->start).c_str()
 																	 , it->end_inclusive ? "=" : ""
-																	 , escape(it->end).c_str()
 																	 , predicate.c_str()
 																	 );
+
+				os = newOdbcStream( 16, select, db );
+				*os << varbinary(it->start)
+				    << varbinary(it->end);
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]>%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
-																	 , tableId
-																	 , escape((*it).start).c_str()
+																	 , tableId.c_str()
 																	 , predicate.c_str()
 																	 );
+
+				os = newOdbcStream( 16, select, db );
+				*os << varbinary(it->start);
 			}
-			st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
-			HT4C_SQLITE_VERIFY( st, db, 0 )
 		}
 
-		st = sqlite3_step( stmtQuery );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		if( st == SQLITE_DONE ) {
+		if( os->eof() ) {
 			it++;
 			rowIntervalDone = true;
 			return moveNext();
 		}
 
-		return st == SQLITE_ROW;
+		return true;
 	}
 
-	Scanner::ReaderCellIntervals::ReaderCellIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	Scanner::ReaderCellIntervals::ReaderCellIntervals( odbc::otl_connect* db, const std::string& tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
 	: Reader( db, tableId, schema, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.cell_intervals.begin() )
@@ -1375,12 +1361,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 	}
 
 	void Scanner::ReaderCellIntervals::stmtPrepare( ) {
+		READER_DELETE_OS
+
 		// do nothing
 	}
 
 	bool Scanner::ReaderCellIntervals::moveNext( ) {
-		int st;
-
 		if( cellIntervalDone ) {
 			cellIntervalDone = false;
 			if( it == scanSpec.cell_intervals.end() ) {
@@ -1399,7 +1385,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			Hypertable::ScanSpec::parse_column( it->start_column, family, startColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
 			const Hypertable::Schema::ColumnFamily* cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
+				HT4C_ODBC_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
 			}
 			startColumnFamilyCode = cf->id;
 			startColumnQualifier = hasQualifier && !isRegexp ? startColumnQualifierBuf.c_str() : 0;
@@ -1407,12 +1393,13 @@ namespace ht4c { namespace SQLite { namespace Db {
 			Hypertable::ScanSpec::parse_column( it->end_column, family, endColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
 			cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
-				HT4C_SQLITE_THROW(Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
+				HT4C_ODBC_THROW(Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
 			}
 			endColumnFamilyCode = cf->id;
 			endColumnQualifier = hasQualifier && !isRegexp ? endColumnQualifierBuf.c_str() : 0;
 
-			Util::stmt_finalize( db, &stmtQuery );
+			READER_DELETE_OS
+
 			std::string predicate;
 			if( !scanContext->predicate.empty() ) {
 				predicate = " AND (" + scanContext->predicate + ")";
@@ -1420,47 +1407,48 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 			std::string select;
 			if( strcmp(it->start_row, it->end_row) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM %s WHERE (r>=:r1<raw[512]> AND r<=:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
-																	 , tableId
-																	 , escape(it->start_row).c_str()
-																	 , escape(it->end_row).c_str()
+																	 , tableId.c_str()
 																	 , predicate.c_str()
 																	 );
+
+				os = newOdbcStream( 16, select, db );
+				*os << varbinary(it->start_row)
+				    << varbinary(it->end_row);
 			}
 			else if( startColumnFamilyCode != endColumnFamilyCode ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf>=%d AND cf<=%d%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]> AND cf>=:cf1<int> AND cf<=:cf2<int>%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
-																	 , tableId
-																	 , escape((*it).start_row).c_str()
-																	 , startColumnFamilyCode
-																	 , endColumnFamilyCode
+																	 , tableId.c_str()
 																	 , predicate.c_str()
 																	 );
+
+				os = newOdbcStream( 16, select, db );
+				*os << varbinary(it->start_row)
+						<< static_cast<int>(startColumnFamilyCode)
+						<< static_cast<int>(endColumnFamilyCode);
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf=%d%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int>%s ORDER BY r, cf, cq, ts;"
 																	 , scanContext->columns.c_str()
-																	 , tableId
-																	 , escape((*it).start_row).c_str()
-																	 , startColumnFamilyCode
+																	 , tableId.c_str()
 																	 , predicate.c_str()
 																	 );
+
+				os = newOdbcStream( 16, select, db );
+				*os << varbinary(it->start_row)
+						<< static_cast<int>(startColumnFamilyCode);
 			}
-			st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
-			HT4C_SQLITE_VERIFY( st, db, 0 )
 		}
 
-		st = sqlite3_step( stmtQuery );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
-
-		if( st == SQLITE_DONE ) {
+		if( os->eof() ) {
 			it++;
 			cellIntervalDone = true;
 			return moveNext();
 		}
 
-		return st == SQLITE_ROW;
+		return true;
 	}
 
 	bool Scanner::ReaderCellIntervals::filterRow( const char* row ) {
@@ -1497,6 +1485,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		return 0;
 	}
+
+#undef READER_DELETE_OS
 
 	ScannerAsync::ScannerAsync( Db::TablePtr _table )
 	: table( _table )

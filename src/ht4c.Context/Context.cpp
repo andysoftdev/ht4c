@@ -207,6 +207,17 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+				file_desc().add_options()
+					(Common::Config::OdbcConnectionString, str(), "ODBC connection string\n")
+					(Common::Config::OdbcIndexColumn, boo()->default_value(false), "Enables ODBC column index (default:false)\n")
+					(Common::Config::OdbcIndexColumnFamily, boo()->default_value(false), "Enables ODBC column family index (default:false)\n")
+					(Common::Config::OdbcIndexColumnQualifier, boo()->default_value(false), "Enables ODBC column qualifier index (default:false)\n")
+					(Common::Config::OdbcIndexTimestamp, boo()->default_value(false), "Enables ODBC timestamp index (default:false)\n");
+
+#endif
+
 				JoinedPolicyList::init_options();
 			}
 
@@ -279,6 +290,13 @@ namespace ht4c {
 
 				else if( providerName == Common::Config::ProviderSQLite ) {
 					set_file_uri( Common::Config::SQLiteFilename );
+				}
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+				else if( providerName == Common::Config::ProviderOdbc ) {
 				}
 
 #endif
@@ -475,6 +493,13 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+				case Common::CK_ODBC:
+					return getOdbcEnv()->createClient( );
+
+#endif
+
 			}
 			return 0;
 		}
@@ -566,6 +591,12 @@ namespace ht4c {
 			}
 			sqliteEnv = 0;
 		}
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+		sqliteEnv = 0;
 
 #endif
 
@@ -704,6 +735,28 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
+		if( !odbcEnv ) {
+			ScopedRecLock lock( envMutex );
+			std::string connectionString = properties->get_str( Common::Config::OdbcConnectionString );
+
+			Odbc::OdbcEnvConfig config;
+			config.indexColumn = properties->get_bool( Common::Config::OdbcIndexColumn );
+			config.indexColumnFamily = properties->get_bool( Common::Config::OdbcIndexColumnFamily );
+			config.indexColumnQualifier = properties->get_bool( Common::Config::OdbcIndexColumnQualifier );
+			config.indexTimestamp = properties->get_bool( Common::Config::OdbcIndexTimestamp );
+
+			HT_INFO_OUT << "Creating odbc environment " << connectionString << HT_END;
+			odbcEnv = Odbc::OdbcFactory::create( connectionString, config );
+		}
+
+		return odbcEnv;
+	}
+
+#endif
+
 	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
 	: contextKind( _contextKind )
 	, properties( _properties )
@@ -813,9 +866,9 @@ namespace ht4c {
 			replace_all_recursive( _commandLine, "; ", ";" );
 			replace_all_recursive( _commandLine, ";;", ";" );
 			boost::trim_if( _commandLine, boost::is_any_of(";") );
-			boost::replace_all( _commandLine, ";", " --" );
+			boost::replace_all( _commandLine, ";", ";--" );
 			boost::trim( _commandLine );
-			if( !_commandLine.empty() && _commandLine.front() != '-' ) {
+			if( !_commandLine.empty() && _commandLine.front() != '-' && _commandLine.front() != ';' ) {
 				_commandLine = "--" + _commandLine;
 			}
 			commandLine = _commandLine.c_str();
@@ -849,6 +902,10 @@ namespace ht4c {
 					if( a == '\"' ) {
 						inQM = false;
 					}
+					else if( a == ';' ) {
+						_argv[j++] = a;
+						i += 2; // skip '--'
+					}
 					else {
 						_argv[j++] = a;
 					}
@@ -863,6 +920,7 @@ namespace ht4c {
 						inSpace = false;
 						break;
 					case ' ':
+					case ';':
 					case '\t':
 					case '\n':
 					case '\r':
@@ -925,6 +983,14 @@ namespace ht4c {
 
 		else if( providerName == Common::Config::ProviderSQLite ) {
 			contextKind = Common::CK_SQLite;
+		}
+
+#endif
+
+#ifdef SUPPORT_ODBC
+
+		else if( providerName == Common::Config::ProviderOdbc ) {
+			contextKind = Common::CK_ODBC;
 		}
 
 #endif

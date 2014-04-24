@@ -21,33 +21,28 @@
 
 #pragma once
 
-#include "Common/Compat.h"
-
-#pragma warning( push, 3 )
-
-#include "Common/Properties.h"
-#include "AsyncComm/ConnectionManager.h"
-#include "Hyperspace/Session.h"
-#include "Hypertable/Lib/Client.h"
-
-#include "ThriftBroker/Client.h"
-
-#pragma warning( pop )
-
-#ifdef SUPPORT_HAMSTERDB
-
-#include "ht4c.Hamster/HamsterFactory.h"
-
+#ifdef __cplusplus_cli
+#error compile native
 #endif
 
-#ifdef SUPPORT_SQLITEDB
+#include "ht4c.Common/Exception.h"
 
-#include "ht4c.SQLite/SQLiteFactory.h"
+/// <summary>
+/// Defines the catch clause of ht4c Odbc try/catch blocks.
+/// </summary>
+/// <remarks>
+/// Translates Odbc exceptions into ht4c exceptions.
+/// </remarks>
+#define HT4C_ODBC_RETHROW \
+	catch( odbc::otl_exception& e ) { \
+		std::stringstream ss; \
+		ss << e.msg << " (" << e.stm_text << ")\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')'; \
+		throw ht4c::Common::HypertableException( Hypertable::Error::EXTERNAL, ss.str(), __LINE__, __FUNCTION__, __FILE__ ); \
+	} \
+	HT4C_RETHROW
 
-#endif
-
-#ifdef SUPPORT_ODBC
-
-#include "ht4c.Odbc/OdbcFactory.h"
-
-#endif
+/// <summary>
+/// Throws a hypertable exception.
+/// </summary>
+#define HT4C_ODBC_THROW( error, msg ) \
+	throw Hypertable::Exception( error, msg, __LINE__, __FUNCTION__, __FILE__ );

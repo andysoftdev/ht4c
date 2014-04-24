@@ -66,6 +66,15 @@ namespace ht4c { namespace Common {
 
 #endif
 
+#ifdef SUPPORT_ODBC
+
+	/// <summary>
+	/// Hypertable ODBC API context kind.
+	/// </summary>
+	, CK_ODBC
+
+#endif
+
 		/// <summary>
 		/// Terminator.
 		/// </summary>
