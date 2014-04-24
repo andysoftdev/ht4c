@@ -203,6 +203,9 @@ namespace ht4c { namespace Common {
 	, cellLimit( scanSpec.cell_limit )
 	, cellLimitPerFamily( scanSpec.cell_limit_per_family )
 	{
+	}
+
+	void ScanContext::initialize() {
 		ZeroMemory( familyMask, sizeof(familyMask) );
 		ZeroMemory( columnFamilies, sizeof(columnFamilies) );
 

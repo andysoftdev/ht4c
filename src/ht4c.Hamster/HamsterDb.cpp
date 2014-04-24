@@ -951,6 +951,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 	, cellPerFamilyCount( 0 )
 	, eos( false )
 	{
+		scanContext->initialize();
 	}
 
 	Scanner::Reader::~Reader() {
