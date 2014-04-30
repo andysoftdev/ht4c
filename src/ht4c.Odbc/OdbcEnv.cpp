@@ -25,6 +25,7 @@
 
 #include "stdafx.h"
 #include "OdbcEnv.h"
+#include "OdbcStm.h"
 #include "OdbcFactory.h"
 #include "OdbcClient.h"
 #include "OdbcException.h"
@@ -63,10 +64,7 @@ namespace ht4c { namespace Odbc {
 			try {
 				db = getDb();
 
-				odbc::otl_cursor::direct_exec(
-					*db 
-				 , "CREATE TABLE sys_db (id VARCHAR(37) PRIMARY KEY, k VARBINARY(512) NOT NULL, v VARBINARY(4096), UNIQUE(k));"
-				 , odbc::otl_exception::enabled );
+				odbc::otl_cursor::direct_exec( *db, OdbcStm::sysDbCreate().c_str(), odbc::otl_exception::enabled );
 
 				db->commit();
 
@@ -195,7 +193,7 @@ namespace ht4c { namespace Odbc {
 				pk += boost::uuids::detail::to_char( (*it) & 0x0F );
 		}
 
-		odbc::otl_stream os( 1, "INSERT INTO sys_db VALUES(:id<raw[37]>,:k<raw[512]>,:v<raw_long>);", *db );
+		odbc::otl_stream os( 1, OdbcStm::sysDbInsert().c_str(), *db );
 		os << varbinary(pk)
 			 << varbinary(name, len)
 			 << varbinary(value, size);
@@ -206,12 +204,12 @@ namespace ht4c { namespace Odbc {
 	}
 
 	void OdbcEnv::sysDbUpdateKey( odbc::otl_connect* db, const std::string& id, const char* key, int len ) {
-		odbc::otl_stream os( 1, "UPDATE sys_db SET k=:k<raw[512]> WHERE id=:id<raw[37]>;", *db );
+		odbc::otl_stream os( 1, OdbcStm::sysDbUpdateKey().c_str(), *db );
 		os << varbinary(key, len) << varbinary(id);
 	}
 
 	void OdbcEnv::sysDbUpdateValue( odbc::otl_connect* db, const std::string& id, const void* value, int size ) {
-		odbc::otl_stream os( 1, "UPDATE sys_db SET v=:v<raw_long> WHERE id=:id<raw[37]>;", *db );
+		odbc::otl_stream os( 1, OdbcStm::sysDbUpdateValue().c_str(), *db );
 		os << varbinary(value, size) << varbinary(id);
 	}
 
@@ -220,7 +218,7 @@ namespace ht4c { namespace Odbc {
 
 		varbinary v;
 		if( id ) {
-			odbc::otl_stream os( 1, "SELECT id:#1<raw[37]>, v:#2<raw_long> FROM sys_db WHERE k=:k<raw[512]>;", *db );
+			odbc::otl_stream os( 1, OdbcStm::sysDbReadKeyAndValue().c_str(), *db );
 			os << varbinary(name, len);
 
 			if( os.eof() ) {
@@ -232,7 +230,7 @@ namespace ht4c { namespace Odbc {
 			*id = pk.c_str();
 		}
 		else {
-			odbc::otl_stream os( 1, "SELECT v:#1<raw_long> FROM sys_db WHERE k=:k<raw[512]>;", *db );
+			odbc::otl_stream os( 1, OdbcStm::sysDbReadValue().c_str(), *db );
 			os << varbinary(name, len);
 
 			if( os.eof() ) {
@@ -250,7 +248,7 @@ namespace ht4c { namespace Odbc {
 	}
 
 	bool OdbcEnv::sysDbExists( odbc::otl_connect* db, const char* name, int len, std::string* id ) {
-		odbc::otl_stream os( 1, "SELECT id:#1<raw[37]> FROM sys_db WHERE k=:k<raw[512]>;", *db );
+		odbc::otl_stream os( 1, OdbcStm::sysDbExists().c_str(), *db );
 		os << varbinary(name, len);
 
 		if( os.eof() ) {
@@ -271,7 +269,7 @@ namespace ht4c { namespace Odbc {
 			return false;
 		}
 
-		odbc::otl_stream os( 1, "DELETE FROM sys_db WHERE k=:k<raw[512]>;", *db );
+		odbc::otl_stream os( 1, OdbcStm::sysDbDelete().c_str(), *db );
 		os << varbinary(name, len);
 
 		return true;
@@ -280,24 +278,8 @@ namespace ht4c { namespace Odbc {
 	void OdbcEnv::sysDbCreateTable( odbc::otl_connect* db, const char* name, int len, const void* value, int size, std::string& id ) {
 		sysDbInsert( db, name, len, value, size, &id );
 
-		odbc::otl_cursor::direct_exec(
-			*db
-		 , Hypertable::format(
-				"CREATE TABLE "
-				"%s (r VARBINARY(512) NOT NULL, cf INTEGER NOT NULL, cq VARBINARY(512) NOT NULL, ts BIGINT NOT NULL, v VARBINARY(MAX),"
-				"UNIQUE(r, cf, cq, ts));"
-		 , id.c_str()).c_str()
-		 , odbc::otl_exception::enabled );
-
-		odbc::otl_cursor::direct_exec(
-			*db
-		 , Hypertable::format(
-				"CREATE PROCEDURE I%s (@r VARBINARY(512), @cf int, @cq VARBINARY(512), @ts BIGINT, @v VARBINARY(MAX)) AS "
-				"SET NOCOUNT ON;"
-				"BEGIN TRY INSERT INTO %s (r, cf, cq, ts, v) VALUES(@r,@cf,@cq,@ts,@v); END TRY "
-				"BEGIN CATCH UPDATE %s SET v=@v WHERE r=@r AND cf=@cf AND cq=@cq AND ts=@ts; END CATCH"
-		 , id.c_str(), id.c_str(), id.c_str()).c_str()
-		 , odbc::otl_exception::enabled );
+		OdbcStm stm( id );
+		odbc::otl_cursor::direct_exec( *db, stm.createTable().c_str(), odbc::otl_exception::enabled );
 
 		if( indexColumn ) {
 			odbc::otl_cursor::direct_exec(
@@ -363,9 +345,8 @@ namespace ht4c { namespace Odbc {
 				table->dispose();
 			}
 
-			odbc::otl_cursor::direct_exec(
-				*db
-			 , Hypertable::format("DROP PROCEDURE I%s;DROP TABLE %s;", id.c_str(), id.c_str()).c_str());
+			OdbcStm stm( id );
+			odbc::otl_cursor::direct_exec( *db, stm.deleteTable().c_str() );
 
 			return true;
 		}

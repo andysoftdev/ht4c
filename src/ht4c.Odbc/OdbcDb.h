@@ -128,6 +128,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			void getTableSchema( const std::string& name, bool withIds, std::string& schema );
 			void renameTable( const std::string& name, const std::string& newName );
 			void dropTable( const std::string& name, bool ifExists );
+			bool nameExists( bool& isTable, std::string* rowid = 0 );
 			int toKey( const char*& psz );
 
 		private:
@@ -171,6 +172,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			Db::MutatorPtr createMutator( int32_t flags, int32_t flushInterval );
 			Db::ScannerPtr createScanner( const Hypertable::ScanSpec& scanSpec, uint32_t flags );
 			Hypertable::SchemaPtr getSchema( );
+			bool nameExists( bool& isTable, std::string* rowid = 0 );
 			inline const char* getId( ) const {
 				return id.c_str();
 			}

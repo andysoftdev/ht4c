@@ -25,6 +25,7 @@
 
 #include "stdafx.h"
 #include "OdbcException.h"
+#include "OdbcStm.h"
 
 namespace ht4c { namespace Odbc { namespace Db {
 
@@ -62,7 +63,6 @@ namespace ht4c { namespace Odbc { namespace Db {
 				if( created > 0 || !namespaceExists(ns_tmp) ) {
 					createNamespace( ns_tmp );
 				}
-				free( ns_tmp );
 			}
 			else {
 				char* ptr = strrchr( ns_tmp, '/' );
@@ -76,14 +76,24 @@ namespace ht4c { namespace Odbc { namespace Db {
 			}
 
 			tx.commit();
+
+			free( ns_tmp );
 		}
 		catch( odbc::otl_exception& e ) {
-			std::string name( ns_tmp );
+			std::string ns_name( createIntermediate ? ns_tmp : name );
 			free( ns_tmp );
 
 			//  duplicate key
 			if( e.code == 2627 || strcmp(reinterpret_cast<const char*>(e.sqlstate), "23000") == 0 ) {
-				HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", name.c_str()).c_str() );
+				Db::Namespace ns( this, ns_name );
+				bool isTable;
+				ns.nameExists( isTable );
+				if( isTable ) {
+					HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", ns_name.c_str()).c_str() );
+				}
+				else {
+					HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", ns_name.c_str()).c_str() );
+				}
 			}
 
 			throw;
@@ -112,11 +122,9 @@ namespace ht4c { namespace Odbc { namespace Db {
 			return true;
 		}
 
-		bool exists = false;
 		Db::Namespace ns( this, name );
-		const char* key;
-		int len = ns.toKey( key );
-		return OdbcEnv::sysDbExists( getDb(), key, len );
+		bool isTable;
+		return ns.nameExists(isTable) && !isTable;
 	}
 
 	void Client::dropNamespace( const std::string& name, bool ifExists ) {
@@ -134,10 +142,15 @@ namespace ht4c { namespace Odbc { namespace Db {
 		const char* key;
 		int len = ns.toKey( key );
 
+		std::string tmp( key );
+		if( !tmp.empty() ) {
+			tmp += "/";
+		}
+
 		varbinary k;
 		{
-			odbc::otl_stream os( 64, "SELECT k:#1<raw[512]> FROM sys_db WHERE k>:k<raw[512]> ORDER BY k;", *tx.getDb() );
-			os << varbinary(key, len);
+			odbc::otl_stream os( 64, OdbcStm::sysDbQueryKey().c_str(), *tx.getDb() );
+			os << varbinary( tmp );
 
 			if( !os.eof() ) {
 				os >> k;
@@ -193,8 +206,13 @@ namespace ht4c { namespace Odbc { namespace Db {
 		const char* key;
 		int len = toKey( key );
 
-		odbc::otl_stream os( 64, "SELECT k:#1<raw[512]>, v:#2<raw_long> FROM sys_db WHERE k>:k<raw[512]> ORDER BY k;", *getDb() );
-		os << varbinary(key, len);
+		std::string tmp( key );
+		if( !tmp.empty() ) {
+			tmp += "/";
+		}
+
+		odbc::otl_stream os( 64, OdbcStm::sysDbQueryKeyAndValue().c_str(), *getDb() );
+		os << varbinary( tmp );
 
 		varbinary k, v;
 		getNamespaceListing( os, deep, listing, k, v );
@@ -208,17 +226,25 @@ namespace ht4c { namespace Odbc { namespace Db {
 		Tx tx( getDb() );
 
 		// Table already exists?
-		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
-		if( OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
-			HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+		{
+			Db::Table newTable( this, name );
+			bool isTable;
+			if( newTable.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_ODBC_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", name.c_str()).c_str() );
+				}
+				else {
+					HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+				}
+			}
 		}
 
 		// Namespace exists?
-		len = toKey( key );
-		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
-			HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
+		{
+			bool isTable;
+			if( !nameExists(isTable) || isTable ) {
+				HT4C_ODBC_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
+			}
 		}
 
 		// Validate schema
@@ -242,7 +268,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 		schema->render( finalschema, true );
 
 		Db::Table newTable( this, name, finalschema, "" );
-		len = newTable.toKey( key );
+		const char* key;
+		int len = newTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		newTable.toRecord( buf );
 		std::string id;
@@ -269,13 +296,14 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 		Tx tx( getDb() );
 
-		// Table already exists?
-		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
+		// Table exists?
 		std::string rowid;
-		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len, &rowid) ) {
-			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		{
+			Db::Table alterTable( this, name );
+			bool isTable;
+			if( !alterTable.nameExists(isTable, &rowid) || !isTable ) {
+				HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			}
 		}
 
 		// Validate schema
@@ -292,7 +320,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 		schema->render( finalschema, true );
 
 		Db::Table alterTable( this, name, finalschema, rowid );
-		len = alterTable.toKey( key );
+		const char* key;
+		int len = alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		alterTable.toRecord( buf );
 		OdbcEnv::sysDbUpdateValue( tx.getDb(), alterTable.getId(), buf.base, buf.fill() );
@@ -306,16 +335,15 @@ namespace ht4c { namespace Odbc { namespace Db {
 		}
 
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
-		return OdbcEnv::sysDbExists( getDb(), key, len );
+		bool isTable;
+		return table.nameExists(isTable) && isTable;
 	}
 
 	void Namespace::getTableId( const std::string& name, std::string& id ) {
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
-		if( !OdbcEnv::sysDbExists(getDb(), key, len, &id) ) {
+		bool isTable;
+		std::string rowid;
+		if( !table.nameExists(isTable, &rowid) || !isTable ) {
 			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 	}
@@ -355,23 +383,27 @@ namespace ht4c { namespace Odbc { namespace Db {
 		{
 			// New table already exists?
 			Db::Table table( this, newName );
-			const char* key;
-			int len = table.toKey( key );
-			if( OdbcEnv::sysDbExists(tx.getDb(), key, len) ) {
-				HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+			bool isTable;
+			if( table.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_ODBC_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", newName.c_str()).c_str() );
+				}
+				else {
+					HT4C_ODBC_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+				}
 			}
 		}
 
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
+		bool isTable;
 		std::string rowid;
-		if( !OdbcEnv::sysDbExists(tx.getDb(), key, len, &rowid) ) {
-			HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		if( !table.nameExists(isTable, &rowid) || !isTable ) {
+			HT4C_ODBC_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		Db::Table tableNew( this, newName, table );
-		len = tableNew.toKey( key );
+		const char* key;
+		int len = tableNew.toKey( key );
 		OdbcEnv::sysDbUpdateKey( tx.getDb(), rowid, key, len );
 
 		tx.commit();
@@ -381,6 +413,20 @@ namespace ht4c { namespace Odbc { namespace Db {
 		Tx tx( getDb() );
 		dropTable( tx, name, ifExists );
 		tx.commit();
+	}
+
+	bool Namespace::nameExists( bool& isTable, std::string* rowid ) {
+		const char* key;
+		int len = toKey( key );
+		Hypertable::DynamicBuffer buf;
+		bool exists = env->sysDbRead( getDb(), key, len, buf, rowid );
+		isTable = buf.fill() > 0;
+		return exists;
+	}
+
+	int Namespace::toKey( const char*& psz ) {
+		psz = keyName.c_str();
+		return keyName.size() + 1;
 	}
 
 	bool Namespace::getNamespaceListing( odbc::otl_stream& os, bool deep, std::vector<Db::NamespaceListing>& listing, varbinary& k, varbinary& v ) {
@@ -457,11 +503,6 @@ namespace ht4c { namespace Odbc { namespace Db {
 		}
 	}
 
-	int Namespace::toKey( const char*& psz ) {
-		psz = keyName.c_str();
-		return keyName.size() + 1;
-	}
-
 	Table::Table( NamespacePtr _ns, const std::string& _name )
 	: ns( _ns )
 	, name( _name )
@@ -531,6 +572,15 @@ namespace ht4c { namespace Odbc { namespace Db {
 			schema = Hypertable::Schema::new_instance( schemaSpec, schemaSpec.length() );
 		}
 		return schema;
+	}
+
+	bool Table::nameExists( bool& isTable, std::string* rowid ) {
+		const char* key;
+		int len = toKey( key );
+		Hypertable::DynamicBuffer buf;
+		bool exists = env->sysDbRead( getDb(), key, len, buf, rowid );
+		isTable = buf.fill() > 0;
+		return exists;
 	}
 
 	int Table::toKey( const char*& psz ) {
@@ -606,12 +656,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 			timeOrderAsc[cf->id] = !cf->time_order_desc;
 		}
 
-		os = newOdbcStream(
-			16, 
-			Hypertable::format(
-			"EXECUTE I%s @r=:r<raw[512]>, @cf=:cf<int>, @cq=:cq<raw[512]>, @ts=:ts<bigint>, @v=:v<raw_long>;",
-			table->getId()), 
-			getDb() );
+		OdbcStm stm( table.get() );
+		os = newOdbcStream( 16, stm.insert(), getDb() );
 	}
 
 	Mutator::~Mutator( ) {
@@ -690,11 +736,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 	void Mutator::insert( Hypertable::Key& key, const void* value, uint32_t valueLength ) {
 		if( valueLength > static_cast<uint32_t>(getDb()->get_max_long_size()) ) {
 			if( !os_sm ) {
-				os_sm = newOdbcStream(
-					1, 
-					Hypertable::format("EXECUTE I%s @r=:r<raw[512]>, @cf=:cf<int>, @cq=:cq<raw[512]>, @ts=:ts<bigint>, @v=:v<raw_long>;", table->getId()), 
-					getDb(),
-					true );
+				OdbcStm stm( table.get() );
+				os_sm = newOdbcStream( 1, stm.insert(), getDb(), true );
 			}
 
 			odbc::otl_lob_stream lob;
@@ -766,15 +809,16 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 	void Mutator::del( Hypertable::Key& key ) {
 		int64_t timestamp = timeOrderAsc[key.column_family_code] ? ~key.timestamp : key.timestamp;
+		OdbcStm stm( table.get() );
 
-		#define NEWODBCSTREAM( p, sql )																										\
-			if( !p ) {																																			\
-					p = newOdbcStream( 16, Hypertable::format(sql, table->getId()), getDb() );	\
-				}
+		#define NEWODBCSTREAM( p, m )											\
+			if( !p ) {																			\
+				p = newOdbcStream( 64, stm.##m(), getDb() );	\
+			}
 
 		switch( key.flag ) {
 			case Hypertable::FLAG_DELETE_ROW: {
-				NEWODBCSTREAM( os_del_row, "DELETE FROM %s WHERE r=:r<raw[512]> AND ts>:ts<bigint>" )
+				NEWODBCSTREAM( os_del_row, deleteRow )
 
 				*os_del_row << varbinary(key.row, key.row_len)
 										<< static_cast<OTL_BIGINT>(timestamp);
@@ -783,7 +827,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			}
 
 			case Hypertable::FLAG_DELETE_COLUMN_FAMILY: {
-				NEWODBCSTREAM( os_del_cf, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND ts>:ts<bigint>" )
+				NEWODBCSTREAM( os_del_cf, deleteColumnFamily )
 
 				*os_del_cf << varbinary(key.row, key.row_len)
 									 << static_cast<int>(key.column_family_code)
@@ -793,7 +837,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			}
 
 			case Hypertable::FLAG_DELETE_CELL: {
-				NEWODBCSTREAM( os_del_cell, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND cq=:cq<raw[512]> AND ts>:ts<bigint>" )
+				NEWODBCSTREAM( os_del_cell, deleteCell )
 
 				*os_del_cell << varbinary(key.row, key.row_len)
 										 << static_cast<int>(key.column_family_code)
@@ -804,7 +848,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			}
 
 			case Hypertable::FLAG_DELETE_CELL_VERSION: {
-				NEWODBCSTREAM( os_del_cell_version, "DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND cq=:cq<raw[512]> AND ts=:ts<bigint>" )
+				NEWODBCSTREAM( os_del_cell_version, deleteCellVersion )
 
 				*os_del_cell_version << varbinary(key.row, key.row_len)
 														 << static_cast<int>(key.column_family_code)
@@ -1042,8 +1086,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 			predicate = " WHERE " + scanContext->predicate;
 		}
 
-		std::string select = Hypertable::format( "SELECT %s FROM %s%s ORDER BY r, cf, cq, ts;", scanContext->columns.c_str(), tableId.c_str(), predicate.c_str() );
-		os = newOdbcStream( 16, select, db );
+		OdbcStm stm( tableId );
+		os = newOdbcStream( 16, stm.select(scanContext->columns, predicate), db );
 	}
 
 	bool Scanner::Reader::moveNext( ) {
@@ -1087,10 +1131,8 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 		// cutoff time
 		if( key.timestamp < cfi.cutoffTime ) {
-			odbc::otl_stream os( 
-					1,
-					Hypertable::format("DELETE FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int> AND ts>:ts<bigint>", tableId.c_str()).c_str(), 
-					*db );
+			OdbcStm stm( tableId );
+			odbc::otl_stream os( 1, stm.deleteCutoffTime().c_str(), *db );
 
 				os << varbinary(key.row, key.row_len)
 					 << static_cast<int>(key.column_family_code)
@@ -1255,26 +1297,14 @@ namespace ht4c { namespace Odbc { namespace Db {
 			predicate = " AND (" + scanContext->predicate + ")";
 		}
 
-		std::string select;
+		OdbcStm stm( tableId );
 		if( strcmp(*scanContext->rowset.begin(),*scanContext->rowset.rbegin()) ) {
-			select = Hypertable::format( "SELECT %s FROM %s WHERE (r>=:r1<raw[512]> AND r<=:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
-																	, scanContext->columns.c_str()
-																	, tableId.c_str()
-																	, predicate.c_str()
-																	);
-
-			os = newOdbcStream( 16, select, db );
+			os = newOdbcStream( 16, stm.selectRowInterval(scanContext->columns, predicate), db );
 			*os << varbinary(*scanContext->rowset.begin())
 				  << varbinary(*scanContext->rowset.rbegin());
 		}
 		else {
-			select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]>%s ORDER BY r, cf, cq, ts;"
-																	, scanContext->columns.c_str()
-																	, tableId.c_str()
-																	, predicate.c_str()
-																	);
-
-			os = newOdbcStream( 16, select, db );
+			os = newOdbcStream( 16, stm.selectRow(scanContext->columns, predicate), db );
 			*os << varbinary(*scanContext->rowset.begin());
 		}
 	}
@@ -1311,28 +1341,14 @@ namespace ht4c { namespace Odbc { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
-			std::string select;
+			OdbcStm stm( tableId );
 			if( strcmp(it->start, it->end) ) {
-				select = Hypertable::format( "SELECT %s FROM %s WHERE (r>%s:r1<raw[512]> AND r<%s:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId.c_str()
-																	 , it->start_inclusive ? "=" : ""
-																	 , it->end_inclusive ? "=" : ""
-																	 , predicate.c_str()
-																	 );
-
-				os = newOdbcStream( 16, select, db );
+				os = newOdbcStream( 16, stm.selectRowInterval(scanContext->columns, predicate, it->start_inclusive, it->end_inclusive), db );
 				*os << varbinary(it->start)
 				    << varbinary(it->end);
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]>%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId.c_str()
-																	 , predicate.c_str()
-																	 );
-
-				os = newOdbcStream( 16, select, db );
+				os = newOdbcStream( 16, stm.selectRow(scanContext->columns, predicate), db );
 				*os << varbinary(it->start);
 			}
 		}
@@ -1405,38 +1421,20 @@ namespace ht4c { namespace Odbc { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
-			std::string select;
+			OdbcStm stm( tableId );
 			if( strcmp(it->start_row, it->end_row) ) {
-				select = Hypertable::format( "SELECT %s FROM %s WHERE (r>=:r1<raw[512]> AND r<=:r2<raw[512]>)%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId.c_str()
-																	 , predicate.c_str()
-																	 );
-
-				os = newOdbcStream( 16, select, db );
+				os = newOdbcStream( 16, stm.selectRowInterval(scanContext->columns, predicate), db );
 				*os << varbinary(it->start_row)
 				    << varbinary(it->end_row);
 			}
 			else if( startColumnFamilyCode != endColumnFamilyCode ) {
-				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]> AND cf>=:cf1<int> AND cf<=:cf2<int>%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId.c_str()
-																	 , predicate.c_str()
-																	 );
-
-				os = newOdbcStream( 16, select, db );
+				os = newOdbcStream( 16, stm.selectRowColumnFamilyInterval(scanContext->columns, predicate), db );
 				*os << varbinary(it->start_row)
 						<< static_cast<int>(startColumnFamilyCode)
 						<< static_cast<int>(endColumnFamilyCode);
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM %s WHERE r=:r<raw[512]> AND cf=:cf<int>%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId.c_str()
-																	 , predicate.c_str()
-																	 );
-
-				os = newOdbcStream( 16, select, db );
+				os = newOdbcStream( 16, stm.selectRowColumnFamily(scanContext->columns, predicate), db );
 				*os << varbinary(it->start_row)
 						<< static_cast<int>(startColumnFamilyCode);
 			}
