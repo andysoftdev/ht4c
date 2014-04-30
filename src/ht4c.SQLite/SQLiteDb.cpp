@@ -78,7 +78,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 				if( created > 0 || !namespaceExists(ns_tmp) ) {
 					createNamespace( ns_tmp );
 				}
-				free( ns_tmp );
 			}
 			else {
 				char* ptr = strrchr( ns_tmp, '/' );
@@ -92,13 +91,23 @@ namespace ht4c { namespace SQLite { namespace Db {
 			}
 
 			tx.commit();
+
+			free( ns_tmp );
 		}
 		catch( error& e ) {
-			std::string name( ns_tmp );
+			std::string ns_name( createIntermediate ? ns_tmp : name );
 			free( ns_tmp );
 
 			if( e.get_errno() == SQLITE_CONSTRAINT ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", name.c_str()).c_str() );
+				Db::Namespace ns( this, ns_name );
+				bool isTable;
+				ns.nameExists( isTable );
+				if( isTable ) {
+					HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", ns_name.c_str()).c_str() );
+				}
+				else {
+					HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", ns_name.c_str()).c_str() );
+				}
 			}
 
 			throw;
@@ -127,11 +136,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 			return true;
 		}
 
-		bool exists = false;
 		Db::Namespace ns( this, name );
-		const char* key;
-		int len = ns.toKey( key );
-		return env->sysDbExists( key, len );
+		bool isTable;
+		return ns.nameExists(isTable) && !isTable;
 	}
 
 	void Client::dropNamespace( const std::string& name, bool ifExists ) {
@@ -267,17 +274,25 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Util::Tx tx( env );
 
 		// Table already exists?
-		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
-		if( env->sysDbExists(key, len) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+		{
+			Db::Table newTable( this, name );
+			bool isTable;
+			if( newTable.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_SQLITE_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", name.c_str()).c_str() );
+				}
+				else {
+					HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+				}
+			}
 		}
 
 		// Namespace exists?
-		len = toKey( key );
-		if( !env->sysDbExists(key, len) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
+		{
+			bool isTable;
+			if( !nameExists(isTable) || isTable ) {
+				HT4C_SQLITE_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
+			}
 		}
 
 		// Validate schema
@@ -301,7 +316,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		schema->render( finalschema, true );
 
 		Db::Table newTable( this, name, finalschema, 0 );
-		len = newTable.toKey( key );
+		const char* key;
+		int len = newTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		newTable.toRecord( buf );
 		int64_t id;
@@ -328,13 +344,14 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		Util::Tx tx( env );
 
-		// Table already exists?
-		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
+		// Table exists?
 		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		{
+			Db::Table alterTable( this, name );
+			bool isTable;
+			if( !alterTable.nameExists(isTable, &rowid) || !isTable ) {
+				HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			}
 		}
 
 		// Validate schema
@@ -351,7 +368,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		schema->render( finalschema, true );
 
 		Db::Table alterTable( this, name, finalschema, rowid );
-		len = alterTable.toKey( key );
+		const char* key;
+		int len = len = alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		alterTable.toRecord( buf );
 		env->sysDbUpdateValue( alterTable.getId(), buf.base, buf.fill() );
@@ -365,18 +383,16 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
-		return env->sysDbExists( key, len );
+		bool isTable;
+		return table.nameExists(isTable) && isTable;
 	}
 
 	void Namespace::getTableId( const std::string& name, std::string& id ) {
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
+		bool isTable;
 		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		if( !table.nameExists(isTable, &rowid) || !isTable ) {
+			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 		id = Hypertable::format( "%lld", rowid );
 	}
@@ -389,7 +405,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		int len = table.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		if( !env->sysDbRead(key, len, buf) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		table.fromRecord( buf );
@@ -416,23 +432,27 @@ namespace ht4c { namespace SQLite { namespace Db {
 		{
 			// New table already exists?
 			Db::Table table( this, newName );
-			const char* key;
-			int len = table.toKey( key );
-			if( env->sysDbExists(key, len) ) {
-				HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+			bool isTable;
+			if( table.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_SQLITE_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", newName.c_str()).c_str() );
+				}
+				else {
+					HT4C_SQLITE_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+				}
 			}
 		}
 
 		Db::Table table( this, name );
-		const char* key;
-		int len = table.toKey( key );
+		bool isTable;
 		int64_t rowid;
-		if( !env->sysDbExists(key, len, &rowid) ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		if( !table.nameExists(isTable, &rowid) || !isTable ) {
+			HT4C_SQLITE_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		Db::Table tableNew( this, newName, table );
-		len = tableNew.toKey( key );
+		const char* key;
+		int len = tableNew.toKey( key );
 		env->sysDbUpdateKey( rowid, key, len );
 
 		tx.commit();
@@ -442,6 +462,20 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Util::Tx tx( env );
 		dropTable( tx, name, ifExists );
 		tx.commit();
+	}
+
+	bool Namespace::nameExists( bool& isTable, int64_t* rowid ) {
+		const char* key;
+		int len = toKey( key );
+		Hypertable::DynamicBuffer buf;
+		bool exists = env->sysDbRead( key, len, buf, rowid );
+		isTable = buf.fill() > 0;
+		return exists;
+	}
+
+	int Namespace::toKey( const char*& psz ) {
+		psz = keyName.c_str();
+		return keyName.size() + 1;
 	}
 
 	void Namespace::drop( Util::Tx& tx, const std::string& nsName, const std::vector<Db::NamespaceListing>& listing, bool ifExists, bool dropTables ) {
@@ -472,11 +506,6 @@ namespace ht4c { namespace SQLite { namespace Db {
 				HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 			}
 		}
-	}
-
-	int Namespace::toKey( const char*& psz ) {
-		psz = keyName.c_str();
-		return keyName.size() + 1;
 	}
 
 	Table::Table( NamespacePtr _ns, const std::string& _name )
@@ -548,6 +577,15 @@ namespace ht4c { namespace SQLite { namespace Db {
 			schema = Hypertable::Schema::new_instance( schemaSpec, schemaSpec.length() );
 		}
 		return schema;
+	}
+
+	bool Table::nameExists( bool& isTable, int64_t* rowid ) {
+		const char* key;
+		int len = toKey( key );
+		Hypertable::DynamicBuffer buf;
+		bool exists = env->sysDbRead( key, len, buf, rowid );
+		isTable = buf.fill() > 0;
+		return exists;
 	}
 
 	int Table::toKey( const char*& psz ) {

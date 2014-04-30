@@ -93,7 +93,6 @@ namespace ht4c { namespace Hamster { namespace Db {
 				if( created > 0 || !namespaceExists(ns_tmp) ) {
 					createNamespace( ns_tmp );
 				}
-				free( ns_tmp );
 			}
 			else {
 				char* ptr = strrchr( ns_tmp, '/' );
@@ -105,13 +104,23 @@ namespace ht4c { namespace Hamster { namespace Db {
 				}
 				createNamespace( name );
 			}
+
+			free( ns_tmp );
 		}
 		catch( hamsterdb::error& e ) {
-			std::string name( ns_tmp );
+			std::string ns_name( createIntermediate ? ns_tmp : name );
 			free( ns_tmp );
 
 			if( e.get_errno() == HAM_DUPLICATE_KEY ) {
-				HT4C_HAMSTER_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", name.c_str()).c_str() );
+				Db::Namespace ns( this, ns_name );
+				bool isTable;
+				ns.nameExists( isTable );
+				if( isTable ) {
+					HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", ns_name.c_str()).c_str() );
+				}
+				else {
+					HT4C_HAMSTER_THROW( Hypertable::Error::NAMESPACE_EXISTS, Hypertable::format("Namespace '%s' already exists", ns_name.c_str()).c_str() );
+				}
 			}
 
 			throw;
@@ -148,19 +157,9 @@ namespace ht4c { namespace Hamster { namespace Db {
 			return true;
 		}
 
-		try {
-			Db::Namespace ns( this, name );
-			hamsterdb::key key;
-			ns.toKey( key );
-			sysdb->find( &key );
-		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
-			}
-			return false;
-		}
-		return true;
+		Db::Namespace ns( this, name );
+		bool isTable;
+		return ns.nameExists(isTable) && !isTable;
 	}
 
 	void Client::dropNamespace( const std::string& name, bool ifExists ) {
@@ -292,33 +291,26 @@ namespace ht4c { namespace Hamster { namespace Db {
 			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 
-		try {
-			// Table already exists?
-			Db::Table table( this, name );
-			hamsterdb::key key;
-			table.toKey( key );
-			sysdb->find( &key );
-
-			HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
-		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
+		// Table already exists?
+		{
+			Db::Table newTable( this, name );
+			bool isTable;
+			if( newTable.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_HAMSTER_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", name.c_str()).c_str() );
+				}
+				else {
+					HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", name.c_str()).c_str() );
+				}
 			}
 		}
 
-		try {
-			// Namespace exists?
-			hamsterdb::key key;
-			toKey( key );
-			sysdb->find( &key );
-		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
+		// Namespace exists?
+		{
+			bool isTable;
+			if( !nameExists(isTable) || isTable ) {
+				HT4C_HAMSTER_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
 			}
-
-			HT4C_HAMSTER_THROW( Hypertable::Error::NAMESPACE_DOES_NOT_EXIST, Hypertable::format("Namespace '%s' does not exist", getName()).c_str() );
 		}
 
 		// Validate schema
@@ -362,19 +354,14 @@ namespace ht4c { namespace Hamster { namespace Db {
 			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty table name" );
 		}
 
-		Db::Table table( this, name );
-		try {
-			// Table exists?
-			hamsterdb::key key;
-			table.toKey( key );
-			table.fromRecord( sysdb->find(&key) );
-		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
+		// Table exists?
+		uint16_t id;
+		{
+			Db::Table alterTable( this, name );
+			bool isTable;
+			if( !alterTable.nameExists(isTable, &id) || !isTable ) {
+				HT4C_HAMSTER_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 			}
-
-			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		// Validate schema
@@ -390,7 +377,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 		std::string finalschema;
 		schema->render( finalschema, true );
 
-		Db::Table alterTable( this, name, finalschema, table.getId(), 0 );
+		Db::Table alterTable( this, name, finalschema, id, 0 );
 		hamsterdb::key key;
 		alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
@@ -421,20 +408,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 	void Namespace::getTableId( const std::string& name, std::string& id ) {
 		Db::Table table( this, name );
-		try {
-			// Table exists?
-			hamsterdb::key key;
-			table.toKey( key );
-			table.fromRecord( sysdb->find(&key) );
-			id = Hypertable::format( "%d", table.getId() );
+		bool isTable;
+		uint16_t _id;
+		if( !table.nameExists(isTable, &_id) || !isTable ) {
+			HT4C_HAMSTER_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
-			}
-
-			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
-		}
+		id = Hypertable::format( "%d", _id );
 	}
 
 	void Namespace::getTableSchema( const std::string& name, bool withIds, std::string& _schema ) {
@@ -471,18 +450,17 @@ namespace ht4c { namespace Hamster { namespace Db {
 			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_BAD_PATHNAME, "Empty new table name" );
 		}
 
-		try {
+		{
 			// New table already exists?
 			Db::Table table( this, newName );
-			hamsterdb::key key;
-			table.toKey( key );
-			sysdb->find( &key );
-
-			HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
-		}
-		catch( hamsterdb::error& e ) {
-			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
-				throw;
+			bool isTable;
+			if( table.nameExists(isTable) ) {
+				if( isTable ) {
+					HT4C_HAMSTER_THROW( Hypertable::Error::MASTER_TABLE_EXISTS, Hypertable::format("Table '%s' already exists", newName.c_str()).c_str() );
+				}
+				else {
+					HT4C_HAMSTER_THROW( Hypertable::Error::NAME_ALREADY_IN_USE, Hypertable::format("Name '%s' already in use", newName.c_str()).c_str() );
+				}
 			}
 		}
 
@@ -499,7 +477,12 @@ namespace ht4c { namespace Hamster { namespace Db {
 				throw;
 			}
 
-			HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			HT4C_HAMSTER_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+		}
+
+		// Is table?
+		if( record.get_size() == 0 ) {
+			HT4C_HAMSTER_THROW( Hypertable::Error::TABLE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 
 		sysdb->erase( &key );
@@ -532,6 +515,25 @@ namespace ht4c { namespace Hamster { namespace Db {
 				HT4C_HAMSTER_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 			}
 		}
+	}
+
+	bool Namespace::nameExists( bool& isTable, uint16_t* id ) {
+		try {
+			hamsterdb::key key;
+			toKey( key );
+			hamsterdb::record record = sysdb->find( &key );
+			isTable = record.get_size() > 0;
+			if( isTable && id ) {
+				*id = *((const uint16_t*)record.get_data());
+			}
+			return true;
+		}
+		catch( hamsterdb::error& e ) {
+			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
+				throw;
+			}
+		}
+		return false;
 	}
 
 	void Namespace::toKey( hamsterdb::key& key ) {
@@ -605,6 +607,25 @@ namespace ht4c { namespace Hamster { namespace Db {
 			schema = Hypertable::Schema::new_instance( schemaSpec, schemaSpec.length() );
 		}
 		return schema;
+	}
+
+	bool Table::nameExists( bool& isTable, uint16_t* id ) {
+		try {
+			hamsterdb::key key;
+			toKey( key );
+			hamsterdb::record record = getEnv()->getSysDb()->find( &key );
+			isTable = record.get_size() > 0;
+			if( isTable && id ) {
+				*id = *((const uint16_t*)record.get_data());
+			}
+			return true;
+		}
+		catch( hamsterdb::error& e ) {
+			if( e.get_errno() != HAM_KEY_NOT_FOUND ) {
+				throw;
+			}
+		}
+		return false;
 	}
 
 	void Table::toKey( hamsterdb::key& key ) {
