@@ -33,6 +33,103 @@
 
 namespace ht4c { namespace Thrift {
 
+	namespace {
+
+		bool convert_column_family_options(const Hypertable::ColumnFamilyOptions &hoptions, ThriftGen::ColumnFamilyOptions &toptions) {
+			bool ret = false;
+			if (hoptions.is_set_max_versions()) {
+				toptions.__set_max_versions(hoptions.get_max_versions());
+				ret = true;
+			}
+			if (hoptions.is_set_ttl()) {
+				toptions.__set_ttl(hoptions.get_ttl());
+				ret = true;
+			}
+			if (hoptions.is_set_time_order_desc()) {
+				toptions.__set_time_order_desc(hoptions.get_time_order_desc());
+				ret = true;
+			}
+			if (hoptions.is_set_counter()) {
+				toptions.__set_counter(hoptions.get_counter());
+				ret = true;
+			}
+			return ret;
+		}
+
+		bool convert_access_group_options(const Hypertable::AccessGroupOptions &hoptions, ThriftGen::AccessGroupOptions &toptions) {
+			bool ret = false;
+			if (hoptions.is_set_in_memory()) {
+				toptions.__set_in_memory(hoptions.get_in_memory());
+				ret = true;
+			}
+			if (hoptions.is_set_replication()) {
+				toptions.__set_replication(hoptions.get_replication());
+				ret = true;
+			}
+			if (hoptions.is_set_blocksize()) {
+				toptions.__set_blocksize(hoptions.get_blocksize());
+				ret = true;
+			}
+			if (hoptions.is_set_compressor()) {
+				toptions.__set_compressor(hoptions.get_compressor());
+				ret = true;
+			}
+			if (hoptions.is_set_bloom_filter()) {
+				toptions.__set_bloom_filter(hoptions.get_bloom_filter());
+				ret = true;
+			}
+			return ret;
+		}
+
+		void convert_schema(const Hypertable::SchemaPtr &hschema, ThriftGen::Schema &tschema) {
+			if (hschema->get_generation())
+				tschema.__set_generation(hschema->get_generation());
+
+			tschema.__set_version(hschema->get_version());
+
+			if (hschema->get_group_commit_interval())
+				tschema.__set_group_commit_interval(hschema->get_group_commit_interval());
+
+			for (auto ag_spec : hschema->get_access_groups()) {
+				ThriftGen::AccessGroupSpec tag;
+				tag.name = ag_spec->get_name();
+				tag.__set_generation(ag_spec->get_generation());
+				if (convert_access_group_options(ag_spec->options(), tag.options))
+					tag.__isset.options = true;
+				if (convert_column_family_options(ag_spec->defaults(), tag.defaults))
+					tag.__isset.defaults = true;
+				tschema.access_groups[ag_spec->get_name()] = tag;
+				tschema.__isset.access_groups = true;
+			}
+
+			for (auto cf_spec : hschema->get_column_families()) {
+				ThriftGen::ColumnFamilySpec tcf;
+				tcf.name = cf_spec->get_name();
+				tcf.access_group = cf_spec->get_access_group();
+				tcf.deleted = cf_spec->get_deleted();
+				if (cf_spec->get_generation())
+					tcf.__set_generation(cf_spec->get_generation());
+				if (cf_spec->get_id())
+					tcf.__set_id(cf_spec->get_id());
+				tcf.value_index = cf_spec->get_value_index();
+				tcf.qualifier_index = cf_spec->get_qualifier_index();
+				if (convert_column_family_options(cf_spec->options(), tcf.options))
+					tcf.__isset.options = true;
+				tschema.column_families[cf_spec->get_name()] = tcf;
+				tschema.__isset.column_families = true;
+			}
+
+			if (convert_access_group_options(hschema->access_group_defaults(),
+				tschema.access_group_defaults))
+				tschema.__isset.access_group_defaults = true;
+
+			if (convert_column_family_options(hschema->column_family_defaults(),
+				tschema.column_family_defaults))
+				tschema.__isset.column_family_defaults = true;
+
+		}
+	}
+
 	Common::Namespace* ThriftNamespace::create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Namespace& ns, const std::string& name ) {
 		HT4C_TRY {
 			return new ThriftNamespace( client, ns, name );
@@ -55,11 +152,16 @@ namespace ht4c { namespace Thrift {
 		return name;
 	}
 
-	void ThriftNamespace::createTable( const char* name, const char* schema ) {
+	void ThriftNamespace::createTable( const char* name, const char* _schema ) {
 		HT4C_TRY {
 			Common::Namespace::validateTableName( name );
+
+			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( _schema );
+			ThriftGen::Schema ts;
+			convert_schema( schema, ts );
+
 			ThriftClientLock sync( client.get() );
-			client->table_create( ns, name, schema );
+			client->table_create( ns, name, ts );
 		}
 		HT4C_THRIFT_RETHROW
 	}
@@ -70,15 +172,29 @@ namespace ht4c { namespace Thrift {
 			std::string schemaLike;
 			ThriftClientLock sync( client.get() );
 			client->table_get_schema_str_with_ids( schemaLike, ns, like );
-			client->table_create( ns, name, schemaLike );
+
+			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike );
+			ThriftGen::Schema ts;
+			convert_schema( schema, ts );
+
+			client->table_create( ns, name, ts );
 		}
 		HT4C_THRIFT_RETHROW
 	}
 
-	void ThriftNamespace::alterTable( const char* name, const char* schema ) {
+	void ThriftNamespace::alterTable( const char* name, const char* _schema ) {
 		HT4C_TRY {
 			ThriftClientLock sync( client.get() );
-			client->table_alter( ns, name, schema );
+
+			ThriftGen::Schema schema;
+			client->get_schema( schema, ns, name );
+			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
+			newSchema->set_generation( schema.generation );
+
+			ThriftGen::Schema ts;
+			convert_schema( newSchema, ts );
+
+			client->table_alter( ns, name, ts );
 		}
 		HT4C_THRIFT_RETHROW
 	}

@@ -295,11 +295,11 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 					virtual bool moveNext( hamsterdb::key& k );
 					virtual bool filterRow( hamsterdb::key& k, const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
+					virtual const Hypertable::ColumnFamilySpec* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						eos = true;
 					}
-					bool getCell( Hypertable::DynamicBuffer& buf, const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell );
+					bool getCell( Hypertable::DynamicBuffer& buf, const Hypertable::Key& key, const Hypertable::ColumnFamilySpec& cf, Hypertable::Cell& cell );
 
 					hamsterdb::cursor* cursor;
 					ScanContext* scanContext;
@@ -371,7 +371,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 
 					virtual bool moveNext( hamsterdb::key& k );
 					virtual bool filterRow( hamsterdb::key& k, const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
+					virtual const Hypertable::ColumnFamilySpec* filterCell( hamsterdb::key& k, const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						it++;
 						cellIntervalDone = true;

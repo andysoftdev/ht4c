@@ -57,7 +57,6 @@ namespace ht4c { namespace Common {
 		filterByPrefixQualifier = other.filterByPrefixQualifier;
 
 		columnPredicates = other.columnPredicates;
-		searchBufColumnPredicates = other.searchBufColumnPredicates;
 	}
 
 	CellFilterInfo& CellFilterInfo::operator = ( const CellFilterInfo& other ) {
@@ -81,7 +80,6 @@ namespace ht4c { namespace Common {
 		filterByPrefixQualifier = other.filterByPrefixQualifier;
 
 		columnPredicates = other.columnPredicates;
-		searchBufColumnPredicates = other.searchBufColumnPredicates;
 
 		return *this;
 	}
@@ -91,6 +89,13 @@ namespace ht4c { namespace Common {
 			delete re;
 		}
 		regexpQualifiers.clear();
+
+		for each( re2::RE2* re in regexpValueColumnPredicates ) {
+			if( re ) {
+				delete re;
+			}
+		}
+		regexpValueColumnPredicates.clear();
 	}
 
 	bool CellFilterInfo::qualifierMatches( const char* qualifier, size_t qualifierLength ) {
@@ -121,7 +126,7 @@ namespace ht4c { namespace Common {
 		return false;
 	}
 
-	void CellFilterInfo::addQualifier(const char* qualifier, bool isRegexp, bool isPrefix) {
+	void CellFilterInfo::addQualifier( const std::string& qualifier, bool isRegexp, bool isPrefix) {
 		if( isRegexp ) {
 			re2::RE2* regexp = new re2::RE2( qualifier );
 			if( !regexp->ok() ) {
@@ -153,32 +158,23 @@ namespace ht4c { namespace Common {
 			if( cp.value && value ) {
 				switch (cp.operation) {
 					case Hypertable::ColumnPredicate::EXACT_MATCH:
-							if( cp.value_len == value_len && memcmp(cp.value, value, cp.value_len) == 0 ) {
-								return true;
-							}
-							break;
+						if( cp.value_len == value_len && memcmp(cp.value, value, cp.value_len) == 0 ) {
+							return true;
+						}
+						break;
 					case Hypertable::ColumnPredicate::PREFIX_MATCH:
-							if( cp.value_len <= value_len && memcmp(cp.value, value, cp.value_len) == 0 ) {
-								return true;
-							}
-							break;
-					case Hypertable::ColumnPredicate::CONTAINS:
-							if( cp.value_len <= value_len ) {
-								while( searchBufColumnPredicates.size() < columnPredicates.size() ) {
-									searchBufColumnPredicates.push_back( search_buf_t() );
-								}
-								search_buf_t& buf = searchBufColumnPredicates[ncp];
-								if( Common::memfind( static_cast<const uint8_t*>(value)
-																	 , value_len
-																	 , reinterpret_cast<const uint8_t*>(cp.value)
-																	 , cp.value_len
-																	 , buf.shift
-																	 ,&buf.repeat) != 0 ) {
-									return true;
-								}
-							}
-							break;
-						default:
+						if( cp.value_len <= value_len && memcmp(cp.value, value, cp.value_len) == 0 ) {
+							return true;
+						}
+						break;
+					case Hypertable::ColumnPredicate::REGEX_MATCH: {
+						std::string str( reinterpret_cast<const char*>(value), value_len );
+						if( RE2::PartialMatch(str, *regexpValueColumnPredicates[ncp]) ) {
+							return true;
+						}
+						break;
+					}
+					default:
 							break;
 				}
 			}
@@ -188,6 +184,18 @@ namespace ht4c { namespace Common {
 			++ncp;
 		}
 		return false;
+	}
+
+	void CellFilterInfo::addColumnPredicate( const Hypertable::ColumnPredicate& columnPredicate ) {
+		columnPredicates.push_back( columnPredicate );
+
+		if( columnPredicate.operation == Hypertable::ColumnPredicate::REGEX_MATCH ) {
+			std::string pattern( reinterpret_cast<const char*>(columnPredicate.value), columnPredicate.value_len );
+			regexpValueColumnPredicates.push_back( new re2::RE2(pattern) );
+		}
+		else {
+			regexpValueColumnPredicates.push_back( 0 );
+		}
 	}
 
 	ScanContext::ScanContext( const Hypertable::ScanSpec& _scanSpec, Hypertable::SchemaPtr _schema )
@@ -212,47 +220,56 @@ namespace ht4c { namespace Common {
 		boost::xtime xtnow;
 		boost::xtime_get( &xtnow, boost::TIME_UTC_ );
 		int64_t now = ((int64_t)xtnow.sec * 1000000000LL) + (int64_t)xtnow.nsec;
-		uint32_t maxVersions = scanSpec.max_versions;
+		int32_t maxVersions = scanSpec.max_versions;
 
 		if( scanSpec.columns.size() > 0 ) {
-			std::string family, qualifier;
+			std::string family;
+			const char* qualifierCstr;
+			size_t qualifierLength;
 			bool hasQualifier, isRegexp, isPrefix;
 
 			for each( const char* cfstr in scanSpec.columns ) {
-				Hypertable::ScanSpec::parse_column( cfstr, family, qualifier, &hasQualifier, &isRegexp, &isPrefix );
-				Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( family.c_str() );
+				std::string qualifier;
+
+				Hypertable::ScanSpec::parse_column( cfstr, family, &qualifierCstr, &qualifierLength, &hasQualifier, &isRegexp, &isPrefix );
+				Hypertable::ColumnFamilySpec* cf = schema->get_column_family( family.c_str() );
 
 				if( cf == 0 ) {
 					HT4C_THROW( Hypertable::Error::RANGESERVER_INVALID_COLUMNFAMILY, Hypertable::format("Invalid column family '%s'", cfstr).c_str() );
 				}
-				if( cf->id == 0 ) {
-					HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", cf->name.c_str()).c_str() );
+				uint8_t id = cf->get_id();
+				if( id == 0 ) {
+					HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", cf->get_name().c_str()).c_str() );
 				}
-				if( cf->counter ) {
+				if( cf->get_option_counter() ) {
 					HT4C_THROW( Hypertable::Error::BAD_SCAN_SPEC, "Counters are not yet supported" );
 				}
 
-				columnFamilies[cf->id] = cf;
-				familyMask[cf->id] = true;
+				columnFamilies[id] = cf;
+				familyMask[id] = true;
+
+				CellFilterInfo& cfi = familyInfo[id];
+
 				if( hasQualifier ) {
-					familyInfo[cf->id].addQualifier( qualifier.c_str(), isRegexp, isPrefix );
+					qualifier = std::string( qualifierCstr, qualifierLength );
+					cfi.addQualifier( qualifier, isRegexp, isPrefix );
 				}
-				if( cf->ttl == 0 ) {
-					familyInfo[cf->id].cutoffTime = Hypertable::TIMESTAMP_MIN;
+				if( cf->get_option_ttl() == 0 ) {
+					cfi.cutoffTime = Hypertable::TIMESTAMP_MIN;
 				}
 				else {
-					familyInfo[cf->id].cutoffTime = now - ((int64_t)cf->ttl * 1000000000LL);
+					cfi.cutoffTime = now - ((int64_t)cf->get_option_ttl() * 1000000000LL);
 				}
 
 				if( maxVersions == 0 ) {
-					familyInfo[cf->id].maxVersions = cf->max_versions;
+					cfi.maxVersions = cf->get_option_max_versions();
 				}
 				else {
-					if( cf->max_versions == 0 ) {
-						familyInfo[cf->id].maxVersions = maxVersions;
+					if( cf->get_option_max_versions() == 0 ) {
+						cfi.maxVersions = maxVersions;
 					}
 					else {
-						familyInfo[cf->id].maxVersions = maxVersions < cf->max_versions ?  maxVersions : cf->max_versions;
+						cfi.maxVersions = maxVersions < cf->get_option_max_versions() ?  maxVersions : cf->get_option_max_versions();
 					}
 				}
 
@@ -260,40 +277,44 @@ namespace ht4c { namespace Common {
 			}
 		}
 		else {
-			Hypertable::Schema::AccessGroups& aglist = schema->get_access_groups();
+			Hypertable::AccessGroupSpecs& aglist = schema->get_access_groups();
 
 			// ROW_DELETE records have 0 column family, so this allows them to pass through
 			familyMask[0] = true;
-			for( Hypertable::Schema::AccessGroups::iterator ag = aglist.begin(); ag != aglist.end(); ++ag ) {
-				for( Hypertable::Schema::ColumnFamilies::iterator cf = (*ag)->columns.begin(); cf != (*ag)->columns.end(); ++cf ) {
-					if( (*cf)->id == 0 ) {
-						HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", (*cf)->name.c_str()).c_str() );
+			for( Hypertable::AccessGroupSpecs::iterator ag = aglist.begin(); ag != aglist.end(); ++ag ) {
+				for( Hypertable::ColumnFamilySpecs::iterator cf = (*ag)->columns().begin(); cf != (*ag)->columns().end(); ++cf ) {
+					uint8_t id =  (*cf)->get_id();
+					if( id == 0 ) {
+						HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", (*cf)->get_name().c_str()).c_str() );
 					}
-					if( (*cf)->deleted ) {
-						familyMask[(*cf)->id] = false;
+					if( (*cf)->get_deleted() ) {
+						familyMask[id] = false;
 						continue;
 					}
-					if( (*cf)->counter ) {
+					if( (*cf)->get_option_counter() ) {
 						HT4C_THROW( Hypertable::Error::BAD_SCAN_SPEC, "Counters are not yet supported" );
 					}
-					columnFamilies[(*cf)->id] = *cf;
-					familyMask[(*cf)->id] = true;
-					if( (*cf)->ttl == 0 ) {
-						familyInfo[(*cf)->id].cutoffTime = Hypertable::TIMESTAMP_MIN;
+					columnFamilies[id] = *cf;
+					familyMask[id] = true;
+
+					CellFilterInfo& cfi = familyInfo[id];
+
+					if( (*cf)->get_option_ttl() == 0 ) {
+						cfi.cutoffTime = Hypertable::TIMESTAMP_MIN;
 					}
 					else {
-						familyInfo[(*cf)->id].cutoffTime = now- ((int64_t)(*cf)->ttl * 1000000000LL);
+						cfi.cutoffTime = now- ((int64_t)(*cf)->get_option_ttl() * 1000000000LL);
 					}
 
 					if( maxVersions == 0 ) {
-						familyInfo[(*cf)->id].maxVersions = (*cf)->max_versions;
+						cfi.maxVersions = (*cf)->get_option_max_versions();
 					}
 					else {
-						if( (*cf)->max_versions == 0 ) {
-							familyInfo[(*cf)->id].maxVersions = maxVersions;
+						if( (*cf)->get_option_max_versions() == 0 ) {
+							cfi.maxVersions = maxVersions;
 						}
 						else {
-							familyInfo[(*cf)->id].maxVersions = (maxVersions < (*cf)->max_versions) ? maxVersions : (*cf)->max_versions;
+							cfi.maxVersions = (maxVersions < (*cf)->get_option_max_versions()) ? maxVersions : (*cf)->get_option_max_versions();
 						}
 					}
 				}
@@ -313,19 +334,31 @@ namespace ht4c { namespace Common {
 
 		for each( const Hypertable::ColumnPredicate& cp in scanSpec.column_predicates ) {
 			if( cp.column_family && *cp.column_family ) {
-				Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( cp.column_family );
+				Hypertable::ColumnFamilySpec* cf = schema->get_column_family( cp.column_family );
 
 				if( cf == 0 ) {
 					HT4C_THROW( Hypertable::Error::RANGESERVER_INVALID_COLUMNFAMILY, Hypertable::format("Invalid column family '%s'", cp.column_family).c_str() );
 				}
-				if( cf->id == 0 ) {
-					HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", cf->name.c_str()).c_str() );
+				uint8_t id =  cf->get_id();
+				if( id == 0 ) {
+					HT4C_THROW( Hypertable::Error::RANGESERVER_SCHEMA_INVALID_CFID, Hypertable::format("Bad id for column family '%s'", cf->get_name().c_str()).c_str() );
 				}
-				if( cf->counter ) {
+				if( cf->get_option_counter() ) {
 					HT4C_THROW( Hypertable::Error::BAD_SCAN_SPEC, "Counters are not supported" );
 				}
 
-				familyInfo[cf->id].addColumnPredicate( cp );
+				CellFilterInfo& cfi = familyInfo[id];
+
+				if( cp.operation & Hypertable::ColumnPredicate::VALUE_MATCH ) {
+					cfi.addColumnPredicate( cp );
+				}
+				else if( cp.operation & Hypertable::ColumnPredicate::QUALIFIER_MATCH ) {
+					std::string qualifier( reinterpret_cast<const char*>(cp.value), cp.value_len );
+					cfi.addQualifier( 
+						  qualifier
+						, (cp.operation & Hypertable::ColumnPredicate::QUALIFIER_REGEX_MATCH) > 0
+						, (cp.operation & Hypertable::ColumnPredicate::QUALIFIER_PREFIX_MATCH) > 0 );
+				}
 			}
 		}
 

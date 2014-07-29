@@ -296,24 +296,17 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 
 		// Validate schema
-		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance(_schema, _schema.length());
-		if( !schema->is_valid() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
-		}
+		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( _schema );
+		schema->update_generation( get_ts64() );
 
-		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
-		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
-			if( cf->counter ) {
+		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
+			if( cf->get_option_counter() ) {
 				HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
 			}
 		}
 
-		if( schema->need_id_assignment() ) {
-			schema->assign_ids();
-		}
-
-		std::string finalschema;
-		schema->render( finalschema, true );
+		std::string finalschema = schema->render_xml( true );
 
 		Db::Table newTable( this, name, finalschema, 0 );
 		const char* key;
@@ -355,17 +348,17 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 
 		// Validate schema
-		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance(_schema, _schema.length());
-		if( !schema->is_valid() ) {
-			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Invalid table schema '%s'", _schema.c_str()).c_str() );
+		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( _schema );
+		schema->update_generation( get_ts64() );
+
+		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
+			if( cf->get_option_counter() ) {
+				HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Counters are currently not supported '%s'", _schema.c_str()).c_str() );
+			}
 		}
 
-		if( schema->need_id_assignment() ) {
-			schema->assign_ids();
-		}
-
-		std::string finalschema;
-		schema->render( finalschema, true );
+		std::string finalschema = schema->render_xml( true );
 
 		Db::Table alterTable( this, name, finalschema, rowid );
 		const char* key;
@@ -415,7 +408,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 		else {
 			Hypertable::SchemaPtr schema = table.getSchema();
-			schema->render( _schema, false );
+			_schema = schema->render_xml( false );
 		}
 	}
 
@@ -574,7 +567,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 	Hypertable::SchemaPtr Table::getSchema() {
 		if( !schema ) {
-			schema = Hypertable::Schema::new_instance( schemaSpec, schemaSpec.length() );
+			schema = Hypertable::Schema::new_instance( schemaSpec );
 		}
 		return schema;
 	}
@@ -653,9 +646,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, stmtDeleteCellVersion( 0 )
 	{
 		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
-		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
-		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
-			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
+			timeOrderAsc[cf->get_id()] = !cf->get_option_time_order_desc();
 		}
 
 		int st = sqlite3_prepare_v2( db, Hypertable::format("INSERT OR REPLACE INTO t%lld (r, cf, cq, ts, v) VALUES(?, ?, ?, ?, ?);", table->getId()).c_str(), -1, &stmtInsert, 0 );
@@ -764,11 +757,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 				HT4C_SQLITE_THROW( Hypertable::Error::BAD_KEY, "Column family not specified" );
 			}
 
-			Hypertable::Schema::ColumnFamily* cf = schema->get_column_family( columnFamily );
+			Hypertable::ColumnFamilySpec* cf = schema->get_column_family( columnFamily );
 			if( !cf ) {
 				HT4C_SQLITE_THROW( Hypertable::Error::BAD_KEY, Hypertable::format("Bad column family '%s'", columnFamily).c_str() );
 			}
-			fullKey.column_family_code = (uint8_t)cf->id;
+			fullKey.column_family_code = static_cast<uint8_t>( cf->get_id() );
 		}
 		else {
 			fullKey.column_family_code = 0;
@@ -954,9 +947,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		bool hasTimeOrderAsc = false;
 		bool hasTimeOrderDesc = false;
-		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
-		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
-			if( !cf->time_order_desc ) {
+		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
+			if( !cf->get_option_time_order_desc() ) {
 				hasTimeOrderAsc = true;
 			}
 			else {
@@ -1009,15 +1002,15 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 	}
 
-	void Scanner::ScanContext::initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) {
+	void Scanner::ScanContext::initialColumn( Hypertable::ColumnFamilySpec* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) {
 		if( !hasQualifier || isRegexp ) {
-			cfPredicate += Hypertable::format( "%s'%d'", cfPredicate.empty() ? "" : ",", cf->id );
+			cfPredicate += Hypertable::format( "%s'%d'", cfPredicate.empty() ? "" : ",", cf->get_id() );
 		}
 		else if (isPrefix) {
-			qPredicate += Hypertable::format( "%s(cf=%d AND cq>=%s)", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq>=%s)", qPredicate.empty() ? "" : " OR ", cf->get_id(), escape(qualifier).c_str() );
 		}
 		else {
-			qPredicate += Hypertable::format( "%s(cf=%d AND cq='%s')", qPredicate.empty() ? "" : " OR ", cf->id, escape(qualifier).c_str() );
+			qPredicate += Hypertable::format( "%s(cf=%d AND cq='%s')", qPredicate.empty() ? "" : " OR ", cf->get_id(), escape(qualifier).c_str() );
 		}
 	}
 
@@ -1038,9 +1031,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 	{
 		scanContext->initialize();
 		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
-		const Hypertable::Schema::ColumnFamilies& families = schema->get_column_families();
-		for each( const Hypertable::Schema::ColumnFamily* cf in families ) {
-			timeOrderAsc[cf->id] = !cf->time_order_desc;
+		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
+			timeOrderAsc[cf->get_id()] = !cf->get_option_time_order_desc();
 		}
 
 		int st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", tableId).c_str(), -1, &stmtDeleteCf, 0 );
@@ -1066,7 +1059,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				key.column_qualifier = reinterpret_cast<const char*>( sqlite3_column_text(stmtQuery, 2) );
 				key.column_qualifier_len = sqlite3_column_bytes( stmtQuery, 2 );
 				key.timestamp = timeOrderAsc[key.column_family_code] ? ~sqlite3_column_int64( stmtQuery, 3 ) : sqlite3_column_int64( stmtQuery, 3 );
-				const Hypertable::Schema::ColumnFamily* cf = filterCell( key );
+				const Hypertable::ColumnFamilySpec* cf = filterCell( key );
 				if( cf ) {
 					if( getCell(key, *cf, cell) ) {
 						return true;
@@ -1125,7 +1118,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return true;
 	}
 
-	const Hypertable::Schema::ColumnFamily* Scanner::Reader::filterCell( const Hypertable::Key& key ) {
+	const Hypertable::ColumnFamilySpec* Scanner::Reader::filterCell( const Hypertable::Key& key ) {
 		if( !scanContext->familyMask[key.column_family_code] ) {
 			return 0;
 		}
@@ -1218,7 +1211,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return scanContext->columnFamilies[key.column_family_code];
 	}
 
-	bool Scanner::Reader::getCell( const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell ) {
+	bool Scanner::Reader::getCell( const Hypertable::Key& key, const Hypertable::ColumnFamilySpec& cf, Hypertable::Cell& cell ) {
 		if( !scanContext->valueRegexp ) {
 			if( !checkCellLimits(key) ) {
 				return false;
@@ -1228,7 +1221,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		CellFilterInfo& cfi = scanContext->familyInfo[key.column_family_code];
 
 		cell.row_key = key.row;
-		cell.column_family = cf.name.c_str();
+		cell.column_family = cf.get_name().c_str();
 		cell.column_qualifier = key.column_qualifier;
 		cell.timestamp = key.timestamp;
 		cell.revision = key.revision;
@@ -1430,24 +1423,32 @@ namespace ht4c { namespace SQLite { namespace Db {
 			cellPerFamilyCount = 0;
 
 			std::string family;
+			const char* qualifier;
+			size_t qualifierLength;
 			bool hasQualifier, isRegexp, isPrefix;
 
 			cmpStart = it->start_inclusive ? 0 : 1;
 			cmpEnd = it->end_inclusive ? 0 : -1;
-			Hypertable::ScanSpec::parse_column( it->start_column, family, startColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
-			const Hypertable::Schema::ColumnFamily* cf = scanContext->schema->get_column_family( family.c_str() );
+			Hypertable::ScanSpec::parse_column( it->start_column, family, &qualifier, &qualifierLength, &hasQualifier, &isRegexp, &isPrefix );
+			if( hasQualifier && qualifier && *qualifier ) {
+				startColumnQualifierBuf = qualifier;
+			}
+			const Hypertable::ColumnFamilySpec* cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
 				HT4C_SQLITE_THROW( Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
 			}
-			startColumnFamilyCode = cf->id;
+			startColumnFamilyCode = cf->get_id();
 			startColumnQualifier = hasQualifier && !isRegexp ? startColumnQualifierBuf.c_str() : 0;
 
-			Hypertable::ScanSpec::parse_column( it->end_column, family, endColumnQualifierBuf, &hasQualifier, &isRegexp, &isPrefix );
+			Hypertable::ScanSpec::parse_column( it->end_column, family, &qualifier, &qualifierLength, &hasQualifier, &isRegexp, &isPrefix );
+			if( hasQualifier && qualifier && *qualifier ) {
+				endColumnQualifierBuf = qualifier;
+			}
 			cf = scanContext->schema->get_column_family( family.c_str() );
 			if( !cf ) {
 				HT4C_SQLITE_THROW(Hypertable::Error::BAD_SCAN_SPEC, Hypertable::format("Column family '%s' does not exists", family.c_str()).c_str() );
 			}
-			endColumnFamilyCode = cf->id;
+			endColumnFamilyCode = cf->get_id();
 			endColumnQualifier = hasQualifier && !isRegexp ? endColumnQualifierBuf.c_str() : 0;
 
 			Util::stmt_finalize( db, &stmtQuery );
@@ -1514,7 +1515,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return false;
 	}
 
-	const Hypertable::Schema::ColumnFamily* Scanner::ReaderCellIntervals::filterCell( const Hypertable::Key& key ) {
+	const Hypertable::ColumnFamilySpec* Scanner::ReaderCellIntervals::filterCell( const Hypertable::Key& key ) {
 		int cmpStartColumnFamilyCode;
 		int cmpEndColumnFamilyCode = 1;
 		int cmpEndColumnQualifier = 1;

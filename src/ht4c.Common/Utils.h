@@ -105,7 +105,7 @@ namespace ht4c { namespace Common {
 		return 0;
 	}
 
-	#ifdef HYPERTABLE_KEYSPEC_H
+	#if defined(HYPERTABLE_KEYSPEC_H) && defined(HYPERTABLE_SCANSPEC_H) && defined(HYPERTABLE_CELLPREDICATE_H)
 
 	/// <summary>
 	/// Returns the adjusted keyspec flag, according to the specified column family/qualifier.
@@ -159,7 +159,7 @@ namespace ht4c { namespace Common {
 			virtual ~CellFilterInfo( );
 
 			bool qualifierMatches( const char* qualifier, size_t qualifierLength );
-			void addQualifier( const char* qualifier, bool isRegexp, bool isPrefix );
+			void addQualifier( const std::string& qualifier, bool isRegexp, bool isPrefix );
 			inline bool hasQualifierFilter() const {
 				return filterByExactQualifier || filterByRegexpQualifier || filterByPrefixQualifier;
 			}
@@ -171,9 +171,7 @@ namespace ht4c { namespace Common {
 			}
 
 			bool columnPredicateMatches( const void* value, uint32_t value_len );
-			inline void addColumnPredicate( const Hypertable::ColumnPredicate& columnPredicate ) {
-				columnPredicates.push_back( columnPredicate );
-			}
+			void addColumnPredicate( const Hypertable::ColumnPredicate& columnPredicate );
 			inline bool hasColumnPredicateFilter( ) const {
 				return columnPredicates.size() > 0;
 			}
@@ -195,16 +193,7 @@ namespace ht4c { namespace Common {
 			QualifierSet exactQualifiersSet;
 			std::set<std::string> prefixQualifiers;
 			std::vector<Hypertable::ColumnPredicate> columnPredicates;
-			struct search_buf_t {
-				size_t shift[256];
-				bool repeat;
-
-				search_buf_t( )
-					: repeat( false )
-				{
-				}
-			};
-			std::vector<search_buf_t> searchBufColumnPredicates;
+			std::vector<re2::RE2*> regexpValueColumnPredicates;
 			bool filterByExactQualifier;
 			bool filterByRegexpQualifier;
 			bool filterByPrefixQualifier;
@@ -280,7 +269,7 @@ namespace ht4c { namespace Common {
 			const Hypertable::ScanSpec& scanSpec;
 			std::pair<int64_t, int64_t> timeInterval;
 			bool familyMask[ScanContext::MAX_CF];
-			const Hypertable::Schema::ColumnFamily* columnFamilies[MAX_CF];
+			const Hypertable::ColumnFamilySpec* columnFamilies[MAX_CF];
 			CellFilterInfo familyInfo[ScanContext::MAX_CF];
 			re2::RE2* rowRegexp;
 			re2::RE2* valueRegexp;
@@ -295,7 +284,7 @@ namespace ht4c { namespace Common {
 
 		protected:
 
-		 virtual void initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) { }
+		 virtual void initialColumn( Hypertable::ColumnFamilySpec* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier ) { }
 	};
 
 	#endif

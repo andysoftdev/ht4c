@@ -67,17 +67,21 @@ namespace ht4c { namespace Hyper {
 		HT4C_TRY {
 			Common::Namespace::validateTableName( name );
 			Hypertable::String schemaLike = ns->get_schema_str( like, true );
-			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike.c_str(), schemaLike.size() );
+			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike );
+			schema->update_generation( get_ts64() );
 			schemaLike.clear();
-			schema->render( schemaLike );
+			schemaLike = schema->render_xml( true );
 			ns->create_table( name, schemaLike );
 		}
 		HT4C_RETHROW
 	}
 
-	void HyperNamespace::alterTable( const char* name, const char* schema ) {
+	void HyperNamespace::alterTable( const char* name, const char* _schema ) {
 		HT4C_TRY {
-			ns->alter_table( name, schema );
+			Hypertable::SchemaPtr schema = ns->get_schema( name );
+			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
+			newSchema->set_generation( schema->get_generation() );
+			ns->alter_table( name, newSchema );
 		}
 		HT4C_RETHROW
 	}

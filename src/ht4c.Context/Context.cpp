@@ -39,7 +39,7 @@
 #pragma warning( push, 3 )
 
 #include "Common/Init.h"
-#include "DfsBroker/Lib/Config.h"
+#include "FsBroker/Lib/Config.h"
 #include "Hyperspace/Config.h"
 #include "Hypertable/Lib/Config.h"
 #include "ThriftBroker/Config.h"
@@ -118,10 +118,10 @@ namespace ht4c {
 		const char* silent														= "silent";
 		const char* leaseInterval											= "Hyperspace.Lease.Interval";
 		const char* gracePeriod												= "Hyperspace.GracePeriod";
-		const char* sessionReconnect									= "Hyperspace.Session.Reconnect"; // after lost connect the reconnection will be initialted after Hyperspace.GracePeriod (default 1min)
+		const char* sessionReconnect									= "Hyperspace.Session.Reconnect"; // after lost connection the reconnection will be initiated after Hyperspace.GracePeriod (default 1min)
 
-		const uint16_t defaultHyperspacePort					= 38040;
-		const uint16_t defaultThriftBrokerPort				= 38080;
+		const uint16_t defaultHyperspacePort					= 15861;
+		const uint16_t defaultThriftBrokerPort				= 15867;
 
 		const int32_t defaultConnectionTimeoutMsec		= 30000;
 		const int32_t defaultLeaseIntervalMsec				= 1000000;
@@ -150,7 +150,7 @@ namespace ht4c {
 		}
 
 		typedef Meta::list<
-			DfsClientPolicy
+			FsClientPolicy
 		, HyperspaceClientPolicy
 		, MasterClientPolicy
 		, RangeServerClientPolicy
@@ -268,12 +268,12 @@ namespace ht4c {
 
 				std::string providerName = properties->get_str( Common::Config::ProviderName );
 				if( providerName == Common::Config::ProviderHyper ) {
-					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(hyperspace) ) {
+					if( !properties->defaulted(Common::Config::Uri) || !properties->has(hyperspace) || properties->defaulted(hyperspace) ) {
 						properties->set( hyperspace, get_nettcp_uri(hyperspacePort, defaultHyperspacePort) );
 					}
 				}
 				else if( providerName == Common::Config::ProviderThrift ) {
-					if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(thriftBroker) ) {
+					if( !properties->defaulted(Common::Config::Uri) || !properties->has(thriftBroker) || properties->defaulted(thriftBroker) ) {
 						properties->set( thriftBroker, get_nettcp_uri(thriftBrokerPort, defaultThriftBrokerPort) );
 					}
 				}

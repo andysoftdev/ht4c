@@ -339,7 +339,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 			protected:
 
-				virtual void initialColumn( Hypertable::Schema::ColumnFamily* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier );
+				virtual void initialColumn( Hypertable::ColumnFamilySpec* cf, bool hasQualifier, bool isRegexp, bool isPrefix, const std::string& qualifier );
 			};
 
 			class Reader {
@@ -356,11 +356,11 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 					virtual bool moveNext( );
 					virtual bool filterRow( const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( const Hypertable::Key& key );
+					virtual const Hypertable::ColumnFamilySpec* filterCell( const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						eos = true;
 					}
-					bool getCell( const Hypertable::Key& key, const Hypertable::Schema::ColumnFamily& cf, Hypertable::Cell& cell );
+					bool getCell( const Hypertable::Key& key, const Hypertable::ColumnFamilySpec& cf, Hypertable::Cell& cell );
 
 					odbc::otl_connect* db;
 					odbc::otl_stream* os;
@@ -435,7 +435,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 
 					virtual bool moveNext( );
 					virtual bool filterRow( const char* row );
-					virtual const Hypertable::Schema::ColumnFamily* filterCell( const Hypertable::Key& key );
+					virtual const Hypertable::ColumnFamilySpec* filterCell( const Hypertable::Key& key );
 					virtual void limitReached( ) {
 						it++;
 						cellIntervalDone = true;

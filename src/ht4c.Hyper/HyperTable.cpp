@@ -97,7 +97,7 @@ namespace ht4c { namespace Hyper {
 	std::string HyperTable::getSchema( bool withIds ) {
 		HT4C_TRY {
 			Hypertable::String str;
-			table->schema()->render( str, withIds );
+			str = table->schema()->render_xml( withIds );
 			return str;
 		}
 		HT4C_RETHROW
