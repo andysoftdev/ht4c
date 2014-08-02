@@ -205,6 +205,9 @@ namespace ht4c { namespace Thrift {
 		tss.scan_and_filter_rows = hss.scan_and_filter_rows;
 		tss.__isset.scan_and_filter_rows = true;
 
+		tss.and_column_predicates = hss.and_column_predicates;
+		tss.__isset.and_column_predicates = true;
+
 		if( hss.column_predicates.size() ) {
 			tss.column_predicates.reserve( hss.row_intervals.size() );
 			tss.__isset.column_predicates = true;
@@ -216,6 +219,10 @@ namespace ht4c { namespace Thrift {
 				tcp.__isset.column_family = cp.column_family != 0;
 				if( cp.column_family ) {
 					tcp.column_family = cp.column_family;
+				}
+				tcp.__isset.column_qualifier = cp.column_qualifier != 0;
+				if( cp.column_qualifier ) {
+					tcp.column_qualifier = std::string(cp.column_qualifier, cp.column_qualifier_len);
 				}
 				tcp.operation = (Hypertable::ThriftGen::ColumnPredicateOperation::type)cp.operation;
 				tcp.__isset.value = cp.value != 0;
