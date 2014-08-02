@@ -353,7 +353,7 @@ namespace ht4c { namespace Common {
 					cfi.addColumnPredicate( cp );
 				}
 				else if( cp.operation & Hypertable::ColumnPredicate::QUALIFIER_MATCH ) {
-					std::string qualifier( reinterpret_cast<const char*>(cp.value), cp.value_len );
+					std::string qualifier( reinterpret_cast<const char*>(cp.column_qualifier), cp.column_qualifier_len );
 					cfi.addQualifier( 
 						  qualifier
 						, (cp.operation & Hypertable::ColumnPredicate::QUALIFIER_REGEX_MATCH) > 0

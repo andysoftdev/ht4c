@@ -226,7 +226,7 @@ namespace ht4c { namespace Common {
 			ScanSpec& operator = ( const ScanSpec& ) { return *this; }
 
 			#ifndef __cplusplus_cli
-	
+
 			Hypertable::ScanSpecBuilder scanSpecBuilder;
 
 			#endif
