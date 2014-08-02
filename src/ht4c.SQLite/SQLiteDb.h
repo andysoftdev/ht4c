@@ -170,6 +170,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			void toRecord( Hypertable::DynamicBuffer& buf );
 			void fromRecord( Hypertable::DynamicBuffer& buf );
 			void open( );
+			void refresh( );
 			void dispose( );
 
 		private:

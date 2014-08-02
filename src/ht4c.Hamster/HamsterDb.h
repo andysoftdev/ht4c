@@ -160,6 +160,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			void toRecord( Hypertable::DynamicBuffer& buf, hamsterdb::record& record );
 			void fromRecord( hamsterdb::record& record );
 			void open( );
+			void refresh( );
 			void dispose( );
 
 		private:

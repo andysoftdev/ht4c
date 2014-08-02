@@ -72,6 +72,8 @@ namespace ht4c { namespace SQLite {
 
 			void sysDbCreateTable( const char* name, int len, const void* value, int size, int64_t& id );
 			bool sysDbOpenTable( Db::Table* table, int64_t& id );
+			bool sysDbRefreshTable( Db::Table* table );
+			void sysDbRefreshTable( int64_t id );
 			void sysDbDisposeTable( int64_t id );
 			bool sysDbDeleteTable( const char* name, int len );
 

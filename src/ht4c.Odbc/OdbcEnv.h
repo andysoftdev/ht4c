@@ -74,6 +74,8 @@ namespace ht4c { namespace Odbc {
 
 			void sysDbCreateTable( odbc::otl_connect* db, const char* name, int len, const void* value, int size, std::string& id );
 			bool sysDbOpenTable( odbc::otl_connect* db, Db::Table* table, std::string& id );
+			static bool sysDbRefreshTable( odbc::otl_connect* db, Db::Table* table );
+			void sysDbRefreshTable( const std::string& id );
 			void sysDbDisposeTable( const std::string& id );
 			bool sysDbDeleteTable( odbc::otl_connect* db, const char* name, int len );
 

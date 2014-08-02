@@ -195,6 +195,7 @@ namespace ht4c { namespace Thrift {
 			convert_schema( newSchema, ts );
 
 			client->table_alter( ns, name, ts );
+			client->refresh_table( ns, name );
 		}
 		HT4C_THRIFT_RETHROW
 	}

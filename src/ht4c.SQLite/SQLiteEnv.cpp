@@ -335,6 +335,26 @@ namespace ht4c { namespace SQLite {
 		return false;
 	}
 
+	bool SQLiteEnv::sysDbRefreshTable( Db::Table* table ) {
+		const char* key;
+		int len = table->toKey( key );
+		Hypertable::DynamicBuffer buf;
+		if( sysDbRead(key, len, buf, 0) ) {
+			table->fromRecord( buf );
+			return true;
+		}
+		return false;
+	}
+
+	void SQLiteEnv::sysDbRefreshTable( int64_t id ) {
+		tables_t::const_iterator it = tables.find( id );
+		if( it != tables.end() ) {
+			for each( Db::Table* table in (*it).second ) {
+				table->refresh();
+			}
+		}
+	}
+
 	void SQLiteEnv::sysDbDisposeTable( int64_t id ) {
 		tables.erase( id );
 	}

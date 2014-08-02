@@ -82,6 +82,7 @@ namespace ht4c { namespace Hyper {
 			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
 			newSchema->set_generation( schema->get_generation() );
 			ns->alter_table( name, newSchema );
+			ns->refresh_table( name );
 		}
 		HT4C_RETHROW
 	}

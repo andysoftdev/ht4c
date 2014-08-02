@@ -362,10 +362,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		Db::Table alterTable( this, name, finalschema, rowid );
 		const char* key;
-		int len = len = alterTable.toKey( key );
+		int len = alterTable.toKey( key );
 		Hypertable::DynamicBuffer buf;
 		alterTable.toRecord( buf );
 		env->sysDbUpdateValue( alterTable.getId(), buf.base, buf.fill() );
+
+		env->sysDbRefreshTable( alterTable.getId() );
 
 		tx.commit();
 	}
@@ -613,6 +615,16 @@ namespace ht4c { namespace SQLite { namespace Db {
 			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
 		}
 		db = env->getDb();
+	}
+
+	void Table::refresh( ) {
+		if( db ) {
+			schema = 0;
+
+			if( !env->sysDbRefreshTable(this) ) {
+				HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			}
+		}
 	}
 
 	void Table::dispose( ) {

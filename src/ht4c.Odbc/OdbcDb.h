@@ -180,6 +180,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			void toRecord( Hypertable::DynamicBuffer& buf );
 			void fromRecord( Hypertable::DynamicBuffer& buf );
 			void open( );
+			void refresh( );
 			void dispose( );
 
 		private:

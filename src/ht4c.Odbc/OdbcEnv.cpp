@@ -323,6 +323,26 @@ namespace ht4c { namespace Odbc {
 		return false;
 	}
 
+	bool OdbcEnv::sysDbRefreshTable( odbc::otl_connect* db, Db::Table* table ) {
+		const char* key;
+		int len = table->toKey( key );
+		Hypertable::DynamicBuffer buf;
+		if( sysDbRead(db, key, len, buf, 0) ) {
+			table->fromRecord( buf );
+			return true;
+		}
+		return false;
+	}
+
+	void OdbcEnv::sysDbRefreshTable( const std::string& id ) {
+		tables_t::const_iterator it = tables.find( id );
+		if( it != tables.end() ) {
+			for each( Db::Table* table in (*it).second ) {
+				table->refresh();
+			}
+		}
+	}
+
 	void OdbcEnv::sysDbDisposeTable( const std::string& id ) {
 		OdbcEnvLock lock( this );
 		tables.erase( id );

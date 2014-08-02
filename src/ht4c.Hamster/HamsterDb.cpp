@@ -377,6 +377,8 @@ namespace ht4c { namespace Hamster { namespace Db {
 		hamsterdb::record record;
 		alterTable.toRecord( buf, record );
 		sysdb->insert( &key, &record, HAM_OVERWRITE );
+
+		getEnv()->refreshTable( id );
 	}
 
 	bool Namespace::tableExists( const std::string& name ) {
@@ -658,6 +660,16 @@ namespace ht4c { namespace Hamster { namespace Db {
 		toKey( key );
 		fromRecord( getEnv()->getSysDb()->find(&key) );
 		db = getEnv()->openTable( id, this );
+	}
+
+	void Table::refresh( ) {
+		if( db ) {
+			schema = 0;
+
+			hamsterdb::key key;
+			toKey( key );
+			fromRecord( getEnv()->getSysDb()->find(&key) );
+		}
 	}
 
 	void Table::dispose( ) {

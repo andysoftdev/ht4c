@@ -188,6 +188,15 @@ namespace ht4c { namespace Hamster {
 		}
 	}
 
+	void HamsterEnv::refreshTable( uint16_t id ) {
+		tables_t::iterator it = tables.find( id );
+		if( it != tables.end() ) {
+			for each( Db::Table* table in (*it).second.ref ) {
+				table->refresh();
+			}
+		}
+	}
+
 	void HamsterEnv::eraseTable( uint16_t id ) {
 		tables_t::iterator it = tables.find( id );
 		if( it != tables.end() ) {

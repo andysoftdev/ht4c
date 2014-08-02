@@ -72,6 +72,7 @@ namespace ht4c { namespace Hamster {
 			uint16_t createTable( );
 			hamsterdb::db* openTable( uint16_t id, Db::Table* table );
 			void disposeTable( uint16_t id, Db::Table* table );
+			void refreshTable( uint16_t id );
 			void eraseTable( uint16_t id );
 
 			class Lock {

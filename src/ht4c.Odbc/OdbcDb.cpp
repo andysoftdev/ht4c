@@ -318,6 +318,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 		Hypertable::DynamicBuffer buf;
 		alterTable.toRecord( buf );
 		OdbcEnv::sysDbUpdateValue( tx.getDb(), alterTable.getId(), buf.base, buf.fill() );
+		env->sysDbRefreshTable( alterTable.getId() );
 
 		tx.commit();
 	}
@@ -610,6 +611,16 @@ namespace ht4c { namespace Odbc { namespace Db {
 		}
 
 		opened = true;
+	}
+
+	void Table::refresh( ) {
+		if( opened ) {
+			schema = 0;
+
+			if( !OdbcEnv::sysDbRefreshTable(getDb(), this) ) {
+				HT4C_ODBC_THROW( Hypertable::Error::HYPERSPACE_FILE_NOT_FOUND, Hypertable::format("Table '%s' does not exist", name.c_str()).c_str() );
+			}
+		}
 	}
 
 	void Table::dispose( ) {
