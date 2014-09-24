@@ -105,7 +105,7 @@ namespace ht4c { namespace Common {
 		return 0;
 	}
 
-	#if defined(HYPERTABLE_KEYSPEC_H) && defined(HYPERTABLE_SCANSPEC_H) && defined(HYPERTABLE_CELLPREDICATE_H)
+	#if defined(HYPERTABLE_KEYSPEC_H) && defined(Hypertable_Lib_ScanSpec_h) && defined(HYPERTABLE_CELLPREDICATE_H)
 
 	/// <summary>
 	/// Returns the adjusted keyspec flag, according to the specified column family/qualifier.
