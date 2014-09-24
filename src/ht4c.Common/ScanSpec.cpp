@@ -29,6 +29,14 @@
 
 namespace ht4c { namespace Common {
 
+	namespace {
+
+		const char* ToString(const char* str ) {
+			return str ? str : "";
+		}
+
+	}
+
 	ScanSpec::ScanSpec( )
 	: scanSpecBuilder( )
 	{
@@ -140,14 +148,14 @@ namespace ht4c { namespace Common {
 	}
 
 	void ScanSpec::addRowInterval( const char* startRow, bool includeStartRow, const char* endRow, bool includeEndRow ) {
-		scanSpecBuilder.add_row_interval( startRow, includeStartRow, endRow, includeEndRow );
+		scanSpecBuilder.add_row_interval( ToString(startRow), includeStartRow, ToString(endRow), includeEndRow );
 	}
 
 	void ScanSpec::addCellInterval( const char* startRow, const char* startColumn, bool includeStartRow, const char* endRow, const char* endColumn, bool includeEndRow ) {
 		if(  startColumn && *startColumn
 			&& endColumn && *endColumn ) {
 
-			scanSpecBuilder.add_cell_interval( startRow, startColumn, includeStartRow, endRow, endColumn, includeEndRow );
+			scanSpecBuilder.add_cell_interval( ToString(startRow), startColumn, includeStartRow, ToString(endRow), endColumn, includeEndRow );
 		}
 	}
 
