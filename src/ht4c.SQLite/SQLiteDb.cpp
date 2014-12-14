@@ -348,7 +348,16 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 
 		// Validate schema
+		std::string _existingSchema;
+		getTableSchema( name, true, _existingSchema );
+		Hypertable::SchemaPtr existingSchema = Hypertable::Schema::new_instance( _existingSchema );
 		Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( _schema );
+		for each( const ColumnFamilySpec* existingcf in existingSchema->get_column_families() ) {
+			ColumnFamilySpec* cf = schema->get_column_family( existingcf->get_name() );
+			if( cf ) {
+				cf->set_id( existingcf->get_id() );
+			}
+		}
 		schema->update_generation( get_ts64() );
 
 		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();

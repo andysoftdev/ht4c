@@ -80,7 +80,15 @@ namespace ht4c { namespace Hyper {
 		HT4C_TRY {
 			Hypertable::SchemaPtr schema = ns->get_schema( name );
 			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
+
 			newSchema->set_generation( schema->get_generation() );
+			for each( const ColumnFamilySpec* cf in schema->get_column_families() ) {
+				ColumnFamilySpec* newCf = newSchema->get_column_family( cf->get_name() );
+				if( newCf ) {
+					newCf->set_id( cf->get_id() );
+				}
+			}
+
 			ns->alter_table( name, newSchema, false );
 			ns->refresh_table( name );
 		}
