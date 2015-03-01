@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -51,7 +51,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="tableScanner">Thrift scanner</param>
 			/// <returns>New ThriftTableScanner instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::TableScanner* create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner );
+			static Common::TableScanner* create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner );
 
 			/// <summary>
 			/// Destroys the ThriftTableScanner instance.
@@ -66,13 +66,13 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftTableScanner( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner );
+			ThriftTableScanner( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner );
 
 			ThriftTableScanner( ) { }
 			ThriftTableScanner( const ThriftTableScanner& ) { }
 			ThriftTableScanner& operator = ( const ThriftTableScanner& ) { return *this; }
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::Scanner tableScanner;
 			Hypertable::SerializedCellsReader* reader;
 			bool eos;

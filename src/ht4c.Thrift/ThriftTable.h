@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -55,7 +55,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="name">Table name</param>
 			/// <returns>New ThriftTable instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::Table* create( Hypertable::Thrift::ClientPtr client, const ThriftNamespace* ns, const std::string& name );
+			static Common::Table* create( Hypertable::Thrift::ThriftClientPtr client, const ThriftNamespace* ns, const std::string& name );
 
 			/// <summary>
 			/// Destroys the ThriftTable instance.
@@ -79,14 +79,14 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftTable( Hypertable::Thrift::ClientPtr client, const ThriftNamespace* ns, const std::string& name );
+			ThriftTable( Hypertable::Thrift::ThriftClientPtr client, const ThriftNamespace* ns, const std::string& name );
 			void ThriftTable::convertScanSpec( Common::ScanSpec& scanSpec, Hypertable::ThriftGen::ScanSpec& tss );
 
 			ThriftTable( ) { }
 			ThriftTable( const ThriftTable& ) { }
 			ThriftTable& operator = ( const ThriftTable& ) { return *this; }
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::Namespace ns;
 			std::string name;
 			std::string fullname;

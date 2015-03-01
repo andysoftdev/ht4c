@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -626,7 +626,7 @@ namespace ht4c {
 	ConnectionManagerPtr Context::getConnectionManager( ) {
 		HT4C_TRY {
 			if( !connMgr ) {
-				connMgr = new ConnectionManager( getComm() );
+				connMgr = std::make_shared<ConnectionManager>( getComm() );
 			}
 			return connMgr;
 		}
@@ -659,7 +659,7 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
-	Hypertable::Thrift::ClientPtr Context::getThriftClient( ) {
+	Hypertable::Thrift::ThriftClientPtr Context::getThriftClient( ) {
 		HT4C_TRY {
 			if( !thriftClient ) {
 				std::string host = properties->get_str( thriftBrokerHost );

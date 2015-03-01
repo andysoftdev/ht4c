@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -52,7 +52,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="name">Namespace name</param>
 			/// <returns>New ThriftNamespace instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Namespace* create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Namespace& ns, const std::string& name );
+			static Namespace* create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Namespace& ns, const std::string& name );
 
 			/// <summary>
 			/// Destroys the ThriftNamespace instance.
@@ -86,7 +86,7 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftNamespace( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Namespace& ns, const std::string& name );
+			ThriftNamespace( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Namespace& ns, const std::string& name );
 
 			ThriftNamespace( ) { }
 			ThriftNamespace( const ThriftNamespace& ) { }
@@ -94,7 +94,7 @@ namespace ht4c { namespace Thrift {
 
 			void getListing( bool deep, const std::string& nsName, const std::vector<Hypertable::ThriftGen::NamespaceListing>& listing, ht4c::Common::NamespaceListing& nsListing );
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::Namespace ns;
 			std::string name;
 	};

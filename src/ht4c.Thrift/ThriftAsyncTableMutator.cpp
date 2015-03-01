@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -31,7 +31,7 @@
 
 namespace ht4c { namespace Thrift {
 
-	Common::AsyncTableMutator* ThriftAsyncTableMutator::create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::MutatorAsync& tableMutator ) {
+	Common::AsyncTableMutator* ThriftAsyncTableMutator::create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::MutatorAsync& tableMutator ) {
 		HT4C_TRY {
 			return new ThriftAsyncTableMutator( client, tableMutator );
 		}
@@ -114,7 +114,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_THRIFT_RETHROW
 	}
 
-	ThriftAsyncTableMutator::ThriftAsyncTableMutator( Hypertable::Thrift::ClientPtr _client, const Hypertable::ThriftGen::MutatorAsync& _tableMutator )
+	ThriftAsyncTableMutator::ThriftAsyncTableMutator( Hypertable::Thrift::ThriftClientPtr _client, const Hypertable::ThriftGen::MutatorAsync& _tableMutator )
 	: client( )
 	, tableMutator( _tableMutator )
 	, needFlush( false )

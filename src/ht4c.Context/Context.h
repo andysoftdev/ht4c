@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -118,7 +118,7 @@ namespace ht4c {
 			/// </summary>
 			/// <returns>Thrift client</returns>
 			/// <remarks>Pure native method.</remarks>
-			Hypertable::Thrift::ClientPtr getThriftClient( );
+			Hypertable::Thrift::ThriftClientPtr getThriftClient( );
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -193,7 +193,7 @@ namespace ht4c {
 			Hypertable::PropertiesPtr properties;
 			Hypertable::ConnectionManagerPtr connMgr;
 			Hyperspace::SessionPtr session;
-			Hypertable::Thrift::ClientPtr thriftClient;
+			Hypertable::Thrift::ThriftClientPtr thriftClient;
 			sessionStateSinks_t sessionStateSinks;
 			SessionCallback* sessionCallback;
 

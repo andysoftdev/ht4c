@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -47,7 +47,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="timeout_ms">Send/receive time out [ms]</param>
 			/// <returns>New ThriftClient instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Hypertable::Thrift::ThriftClient* create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms );
+			static Hypertable::Thrift::ThriftClientPtr create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms );
 	};
 
 } }

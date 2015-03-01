@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -31,9 +31,9 @@
 
 namespace ht4c { namespace Thrift {
 
-	Hypertable::Thrift::ThriftClient* ThriftFactory::create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms ) {
+	Hypertable::Thrift::ThriftClientPtr ThriftFactory::create( const std::string &host, int port, int connectionTimeout_ms, int timeout_ms ) {
 		HT4C_TRY {
-			return new Hypertable::Thrift::ThriftClient( host, port, connectionTimeout_ms, timeout_ms );
+			return std::make_shared<Hypertable::Thrift::ThriftClient>( host, port, connectionTimeout_ms, timeout_ms );
 		}
 		HT4C_THRIFT_RETHROW
 	}

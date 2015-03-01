@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -61,7 +61,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="client">Thrift client</param>
 			/// <returns>Thrift future</returns>
 			/// <remarks>Pure native method.</remarks>
-			Hypertable::ThriftGen::Future get( Hypertable::Thrift::ClientPtr client );
+			Hypertable::ThriftGen::Future get( Hypertable::Thrift::ThriftClientPtr client );
 
 			#endif
 
@@ -95,7 +95,7 @@ namespace ht4c { namespace Thrift {
 				queryFutureResultTimeoutMs = 500
 			};
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::Future future;
 			size_t capacity;
 			mutable bool cancelled;

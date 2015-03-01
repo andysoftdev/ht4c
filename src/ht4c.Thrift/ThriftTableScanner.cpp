@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -29,7 +29,7 @@
 
 namespace ht4c { namespace Thrift {
 
-	Common::TableScanner* ThriftTableScanner::create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner ) {
+	Common::TableScanner* ThriftTableScanner::create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Scanner& tableScanner ) {
 		HT4C_TRY {
 			return new ThriftTableScanner( client, tableScanner );
 		}
@@ -74,7 +74,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_THRIFT_RETHROW
 	}
 
-	ThriftTableScanner::ThriftTableScanner( Hypertable::Thrift::ClientPtr _client, const Hypertable::ThriftGen::Scanner& _tableScanner )
+	ThriftTableScanner::ThriftTableScanner( Hypertable::Thrift::ThriftClientPtr _client, const Hypertable::ThriftGen::Scanner& _tableScanner )
 	: client( )
 	, tableScanner( _tableScanner )
 	, reader( 0 )

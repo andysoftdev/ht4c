@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -49,7 +49,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="tableScanner">Thrift scanner</param>
 			/// <returns>New ThriftAsyncTableScanner instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::AsyncTableScanner* create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::ScannerAsync& tableScanner );
+			static Common::AsyncTableScanner* create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::ScannerAsync& tableScanner );
 
 			/// <summary>
 			/// Returns the scanner identifier for the specified asynchronous scanner.
@@ -71,13 +71,13 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftAsyncTableScanner( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::ScannerAsync& tableScanner );
+			ThriftAsyncTableScanner( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::ScannerAsync& tableScanner );
 
 			ThriftAsyncTableScanner( ) { }
 			ThriftAsyncTableScanner( const ThriftAsyncTableScanner& ) { }
 			ThriftAsyncTableScanner& operator = ( const ThriftAsyncTableScanner& ) { return *this; }
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::ScannerAsync tableScanner;
 	};
 

@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -38,7 +38,7 @@
 
 namespace ht4c { namespace Thrift {
 
-	Common::Table* ThriftTable::create( Hypertable::Thrift::ClientPtr client, const ThriftNamespace* ns, const std::string& name ) {
+	Common::Table* ThriftTable::create( Hypertable::Thrift::ThriftClientPtr client, const ThriftNamespace* ns, const std::string& name ) {
 		HT4C_TRY {
 			return new ThriftTable( client, ns, name );
 		}
@@ -128,7 +128,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_THRIFT_RETHROW
 	}
 
-	ThriftTable::ThriftTable( Hypertable::Thrift::ClientPtr _client, const ThriftNamespace* _ns, const std::string& _name )
+	ThriftTable::ThriftTable( Hypertable::Thrift::ThriftClientPtr _client, const ThriftNamespace* _ns, const std::string& _name )
 	: client( )
 	, ns( _ns->get() )
 	, name( _name )

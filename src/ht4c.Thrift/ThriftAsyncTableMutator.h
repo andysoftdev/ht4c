@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -47,7 +47,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="tableMutator">Thrift mutator</param>
 			/// <returns>New ThriftAsyncTableMutator instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::AsyncTableMutator* create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::MutatorAsync& tableMutator );
+			static Common::AsyncTableMutator* create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::MutatorAsync& tableMutator );
 
 			/// <summary>
 			/// Returns the mutator identifier for the specified asynchronous mutator.
@@ -74,13 +74,13 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftAsyncTableMutator( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
+			ThriftAsyncTableMutator( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
 			
 			ThriftAsyncTableMutator( ) { }
 			ThriftAsyncTableMutator( const ThriftAsyncTableMutator& ) { }
 			ThriftAsyncTableMutator& operator = ( const ThriftAsyncTableMutator& ) { return *this; }
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::MutatorAsync tableMutator;
 			bool needFlush;
 	};

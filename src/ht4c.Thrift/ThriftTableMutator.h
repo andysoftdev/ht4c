@@ -1,5 +1,5 @@
 /** -*- C++ -*-
- * Copyright (C) 2010-2014 Thalmann Software & Consulting, http://www.softdev.ch
+ * Copyright (C) 2010-2015 Thalmann Software & Consulting, http://www.softdev.ch
  *
  * This file is part of ht4c.
  *
@@ -47,7 +47,7 @@ namespace ht4c { namespace Thrift {
 			/// <param name="tableMutator">Thrift mutator</param>
 			/// <returns>New ThriftTableMutator instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::TableMutator* create( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
+			static Common::TableMutator* create( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
 
 			/// <summary>
 			/// Destroys the ThriftTableMutator instance.
@@ -66,13 +66,13 @@ namespace ht4c { namespace Thrift {
 
 		private:
 
-			ThriftTableMutator( Hypertable::Thrift::ClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
+			ThriftTableMutator( Hypertable::Thrift::ThriftClientPtr client, const Hypertable::ThriftGen::Mutator& tableMutator );
 			
 			ThriftTableMutator( ) { }
 			ThriftTableMutator( const ThriftTableMutator& ) { }
 			ThriftTableMutator& operator = ( const ThriftTableMutator& ) { return *this; }
 
-			Hypertable::Thrift::ClientPtr client;
+			Hypertable::Thrift::ThriftClientPtr client;
 			Hypertable::ThriftGen::Mutator tableMutator;
 			bool needFlush;
 	};
