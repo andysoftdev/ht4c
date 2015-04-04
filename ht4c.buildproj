@@ -3,7 +3,7 @@
 
 	<!-- Master files to make -->
 	<PropertyGroup>
-		<Version>0.9.8.6</Version>
+		<Version>0.9.8.7</Version>
 
 	<!-- Check for MSBuildCommunityTasks -->
 	<PropertyGroup>
