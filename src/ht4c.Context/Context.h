@@ -107,6 +107,13 @@ namespace ht4c {
 			Hyperspace::SessionPtr getHyperspaceSession( );
 
 			/// <summary>
+			/// Returns the application queue.
+			/// </summary>
+			/// <returns>Application queue</returns>
+			/// <remarks>Pure native method.</remarks>
+			Hypertable::ApplicationQueueInterfacePtr getApplicationQueue( );
+
+			/// <summary>
 			/// Returns the communication manager.
 			/// </summary>
 			/// <returns>Communication manager</returns>
@@ -192,6 +199,7 @@ namespace ht4c {
 			Common::ContextKind contextKind;
 			Hypertable::PropertiesPtr properties;
 			Hypertable::ConnectionManagerPtr connMgr;
+			Hypertable::ApplicationQueueInterfacePtr appQueue;
 			Hyperspace::SessionPtr session;
 			Hypertable::Thrift::ThriftClientPtr thriftClient;
 			sessionStateSinks_t sessionStateSinks;

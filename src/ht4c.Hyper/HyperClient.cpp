@@ -33,9 +33,13 @@
 
 namespace ht4c { namespace Hyper {
 
-	Common::Client* HyperClient::create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties ) {
+	Common::Client* HyperClient::create( 
+		Hypertable::ConnectionManagerPtr connMngr,
+		Hyperspace::SessionPtr session,
+		Hypertable::ApplicationQueueInterfacePtr appQueue,
+		Hypertable::PropertiesPtr properties ) {
 		HT4C_TRY {
-			return new HyperClient( connMngr, session, properties );
+			return new HyperClient( connMngr, session, appQueue, properties );
 		}
 		HT4C_RETHROW
 	}
@@ -102,8 +106,12 @@ namespace ht4c { namespace Hyper {
 		}
 		HT4C_RETHROW
 	}
-	
-	HyperClient::HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties )
+
+	HyperClient::HyperClient( 
+		Hypertable::ConnectionManagerPtr connMngr,
+		Hyperspace::SessionPtr session,
+		Hypertable::ApplicationQueueInterfacePtr appQueue,
+		Hypertable::PropertiesPtr properties )
 	: client( )
 	{
 		HT4C_TRY {
@@ -111,7 +119,7 @@ namespace ht4c { namespace Hyper {
 			if( properties && properties->has(Common::Config::ConnectionTimeoutAlias) ) {
 				connectionTimeoutMsec = properties->get_i32( Common::Config::ConnectionTimeoutAlias );
 			}
-			client = new Hypertable::Client( Hypertable::String(), connMngr, session, properties, connectionTimeoutMsec );
+			client = new Hypertable::Client( Hypertable::String(), connMngr, session, appQueue, properties, connectionTimeoutMsec );
 		}
 		HT4C_RETHROW
 	}

@@ -54,10 +54,15 @@ namespace ht4c { namespace Hyper {
 			/// </summary>
 			/// <param name="connMngr">Connection manager</param>
 			/// <param name="session">Hyperspace session</param>
+			/// <param name="appQueue">Application queue</param>
 			/// <param name="properties">Configuraton properties</param>
 			/// <returns>New HyperClient instance</returns>
 			/// <remarks>To free the created instance, use the delete operator.</remarks>
-			static Common::Client* create( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties );
+			static Common::Client* create( 
+				Hypertable::ConnectionManagerPtr connMngr,
+				Hyperspace::SessionPtr session,
+				Hypertable::ApplicationQueueInterfacePtr appQueue,
+				Hypertable::PropertiesPtr properties );
 
 			/// <summary>
 			/// Destroys the HyperClient instance.
@@ -75,7 +80,11 @@ namespace ht4c { namespace Hyper {
 
 		private:
 
-			HyperClient( Hypertable::ConnectionManagerPtr connMngr, Hyperspace::SessionPtr session, Hypertable::PropertiesPtr properties );
+			HyperClient( 
+				Hypertable::ConnectionManagerPtr connMngr, 
+				Hyperspace::SessionPtr session, 
+				Hypertable::ApplicationQueueInterfacePtr appQueue,
+				Hypertable::PropertiesPtr properties );
 
 			Hypertable::Namespace* getNamespace( Common::Namespace* ns );
 			void drop( Hypertable::NamespacePtr ns, const std::vector<Hypertable::NamespaceListing>& listing, bool ifExists, bool dropTables );

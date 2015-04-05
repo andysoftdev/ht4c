@@ -475,7 +475,11 @@ namespace ht4c {
 			ScopedRecLock lock( envMutex );
 			switch( contextKind ) {
 				case Common::CK_Hyper:
-					return ht4c::Hyper::HyperClient::create( getConnectionManager(), getHyperspaceSession(), properties );
+					return ht4c::Hyper::HyperClient::create( 
+						getConnectionManager(), 
+						getHyperspaceSession(), 
+						getApplicationQueue(),
+						properties );
 				case Common::CK_Thrift:
 					return ht4c::Thrift::ThriftClient::create( getThriftClient() );
 
@@ -620,6 +624,7 @@ namespace ht4c {
 			unregisterSession( session );
 		}
 		session = 0;
+		appQueue = 0;
 		properties = 0;
 	}
 
@@ -648,6 +653,17 @@ namespace ht4c {
 				registerSession( session, getConnectionManager() );
 			}
 			return session;
+		}
+		HT4C_RETHROW
+	}
+
+	Hypertable::ApplicationQueueInterfacePtr Context::getApplicationQueue( ) {
+		HT4C_TRY {
+			if( !appQueue ) {
+				int workers = properties->get_i32("Hypertable.Client.Workers");
+				appQueue = std::make_shared<ApplicationQueue>( workers );
+			}
+			return appQueue;
 		}
 		HT4C_RETHROW
 	}

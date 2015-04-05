@@ -26,6 +26,7 @@
 #pragma warning( push, 3 )
 
 #include "Common/Properties.h"
+#include "AsyncComm/ApplicationQueue.h"
 #include "AsyncComm/ConnectionManager.h"
 #include "Hyperspace/Session.h"
 #include "Hypertable/Lib/Client.h"
