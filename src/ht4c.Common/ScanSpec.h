@@ -119,6 +119,12 @@ namespace ht4c { namespace Common {
 			void scanAndFilter( bool scanAndFilter );
 
 			/// <summary>
+			/// AND together all the column predicates, if not set then the OR logic will be used.
+			/// </summary>
+			/// <param name="columnPredicateAnd">Use AND or OR logic for column predicates</param>
+			void columnPredicateAnd( bool columnPredicateAnd );
+
+			/// <summary>
 			/// Sets the start time of time interval for the scan. Cells with timestamp newer or equal will be returned.
 			/// </summary>
 			/// <param name="start">Start time of time interval</param>

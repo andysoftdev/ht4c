@@ -89,6 +89,10 @@ namespace ht4c { namespace Common {
 		scanSpecBuilder.set_scan_and_filter_rows( scanAndFilter );
 	}
 
+	void ScanSpec::columnPredicateAnd( bool columnPredicateAnd ) {
+		scanSpecBuilder.set_and_column_predicates( columnPredicateAnd );
+	}
+
 	void ScanSpec::startTimestamp( uint64_t start ) {
 		scanSpecBuilder.set_start_time( start );
 	}
