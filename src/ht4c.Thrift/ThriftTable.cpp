@@ -209,7 +209,7 @@ namespace ht4c { namespace Thrift {
 		tss.__isset.and_column_predicates = true;
 
 		if( hss.column_predicates.size() ) {
-			tss.column_predicates.reserve( hss.row_intervals.size() );
+			tss.column_predicates.reserve( hss.column_predicates.size() );
 			tss.__isset.column_predicates = true;
 
 			Hypertable::ThriftGen::ColumnPredicate tcp;
