@@ -61,6 +61,11 @@ namespace ht4c { namespace Common {
 		/// Notify session state transition.
 		/// </summary>
 	, CF_NotifySessionStateChanged
+
+		/// <summary>
+		/// Counter columns.
+		/// </summary>
+	, CF_CounterColumn
 	};
 
 } }

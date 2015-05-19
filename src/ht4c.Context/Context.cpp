@@ -528,6 +528,7 @@ namespace ht4c {
 		case Common::CF_AsyncTableMutator:
 		case Common::CF_PeriodicFlushTableMutator:
 		case Common::CF_AsyncTableScanner:
+		case Common::CF_CounterColumn:
 			return contextKind == Common::CK_Hyper || contextKind == Common::CK_Thrift;
 		case Common::CF_NotifySessionStateChanged:
 			return contextKind == Common::CK_Hyper;
