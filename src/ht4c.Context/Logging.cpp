@@ -54,11 +54,8 @@ namespace {
 			void setLogfile( const char* filename ) {
 				close();
 				if( filename && *filename ) {
-					file = fopen( filename, "w+tc" );
-					if( file ) {
-						Hypertable::Logger::get()->set_file( file );
-						fn = filename;
-					}
+					Hypertable::Logger::get()->set_file( filename );
+					fn = filename;
 				}
 			}
 
@@ -77,10 +74,7 @@ namespace {
 			}
 
 			void close( ) {
-				if( file ) {
-					Hypertable::Logger::get()->close();
-					file = 0;
-				}
+				Hypertable::Logger::get()->close();
 				fn.clear();
 			}
 
@@ -89,7 +83,6 @@ namespace {
 			typedef std::set<ht4c::LoggingSink*> sinks_t;
 
 			LogAppender( )
-				: file( 0 )
 			{
 			}
 
@@ -105,7 +98,6 @@ namespace {
 
 			static LogAppender logAppender;
 			std::string fn;
-			FILE* file;
 			sinks_t loggingSinks;
 	};
 
