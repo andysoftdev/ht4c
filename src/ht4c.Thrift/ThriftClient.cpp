@@ -132,7 +132,7 @@ namespace ht4c { namespace Thrift {
 		}
 		HT4C_THRIFT_RETHROW
 	}
-	
+
 	ThriftClient::ThriftClient( Hypertable::Thrift::ThriftClientPtr _client )
 	: client( _client )
 	{

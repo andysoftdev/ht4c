@@ -123,6 +123,17 @@ namespace ht4c { namespace Hyper {
 			fcb->wait_for_completion();
 		}
 		fcb = 0;
+
+		for each( int64_t asyncScannerId in asyncTableScanners ) {
+			delete reinterpret_cast<Hypertable::TableScannerAsync*>(asyncScannerId);
+		}
+	}
+
+	void HyperAsyncResult::attachAsyncScanner( int64_t asyncScannerId ) {
+		if( asyncScannerId ) {
+			std::lock_guard<std::recursive_mutex> lock( mutex );
+			asyncTableScanners.insert( asyncScannerId );
+		}
 	}
 
 	void HyperAsyncResult::join( ) {

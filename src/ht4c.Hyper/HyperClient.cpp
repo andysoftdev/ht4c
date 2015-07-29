@@ -119,7 +119,7 @@ namespace ht4c { namespace Hyper {
 			if( properties && properties->has(Common::Config::ConnectionTimeoutAlias) ) {
 				connectionTimeoutMsec = properties->get_i32( Common::Config::ConnectionTimeoutAlias );
 			}
-			client = new Hypertable::Client( Hypertable::String(), connMngr, session, appQueue, properties, connectionTimeoutMsec );
+			client = std::make_shared<Hypertable::Client>( Hypertable::String(), connMngr, session, appQueue, properties, connectionTimeoutMsec );
 		}
 		HT4C_RETHROW
 	}

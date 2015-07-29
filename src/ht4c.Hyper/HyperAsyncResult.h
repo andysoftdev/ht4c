@@ -77,7 +77,7 @@ namespace ht4c { namespace Hyper {
 
 			#pragma region Common::AsyncResult methods
 
-			virtual void attachAsyncScanner( int64_t asyncScannerId ) { }
+			virtual void attachAsyncScanner( int64_t asyncScannerId );
 			virtual void attachAsyncMutator( int64_t asyncMutatorId ) { }
 			virtual void join( );
 			virtual void cancel( );
@@ -96,6 +96,11 @@ namespace ht4c { namespace Hyper {
 			#ifndef __cplusplus_cli
 
 			Hypertable::FutureCallbackPtr fcb;
+
+			mutable std::recursive_mutex mutex;
+
+			typedef std::set<int64_t> set_t;
+			set_t asyncTableScanners;
 
 			#endif
 

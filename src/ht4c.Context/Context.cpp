@@ -399,7 +399,7 @@ namespace ht4c {
 
 	}
 
-	Hypertable::RecMutex Context::envMutex;
+	Hypertable::recursive_mutex Context::envMutex;
 	Context::sessions_t Context::sessions;
 
 #ifdef SUPPORT_HAMSTERDB
@@ -425,9 +425,8 @@ namespace ht4c {
 
 	void Context::shutdown( ) {
 		HT4C_TRY {
-			size_t remainingSessions;
 			{
-				ScopedRecLock lock( envMutex );
+				std::lock_guard<std::recursive_mutex> lock( envMutex );
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -441,14 +440,13 @@ namespace ht4c {
 
 #endif
 
-				remainingSessions = sessions.size();
+				sessions.clear();
 			}
 
-			if( !remainingSessions ) {
-				Comm::destroy();
-				Config::cleanup();
-			}
+			Comm::destroy();
+			Config::cleanup();
 			Logging::shutdown();
+			delete Logger::get();
 		}
 		HT4C_RETHROW
 	}
@@ -472,7 +470,7 @@ namespace ht4c {
 
 	Common::Client* Context::createClient( ) {
 		HT4C_TRY {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			switch( contextKind ) {
 				case Common::CK_Hyper:
 					return ht4c::Hyper::HyperClient::create( 
@@ -542,7 +540,7 @@ namespace ht4c {
 		if(  SessionStateSink 
 			&& contextKind == Common::CK_Hyper ) {
 
-			ScopedLock lock( ctxMutex );
+			std::lock_guard<std::mutex> lock( ctxMutex );
 
 			if( !sessionCallback ) {
 				sessionCallback = new SessionCallback( this );
@@ -558,7 +556,7 @@ namespace ht4c {
 
 	void Context::removeSessionStateSink( Common::SessionStateSink* SessionStateSink ) {
 		if( SessionStateSink ) {
-			ScopedLock lock( ctxMutex );
+			std::lock_guard<std::mutex> lock( ctxMutex );
 			sessionStateSinks.erase( SessionStateSink );
 		}
 	}
@@ -568,7 +566,7 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 		if( hamsterEnv ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			for( hamster_envs_t::iterator it = hamsterEnvs.begin(); it != hamsterEnvs.end(); ++it ) {
 				if( (*it).second.first == hamsterEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -585,7 +583,7 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 		if( sqliteEnv ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			for( sqlite_envs_t::iterator it = sqliteEnvs.begin(); it != sqliteEnvs.end(); ++it ) {
 				if( (*it).second.first == sqliteEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -606,7 +604,7 @@ namespace ht4c {
 #endif
 
 		{
-			ScopedLock lock( ctxMutex );
+			std::lock_guard<std::mutex> lock( ctxMutex );
 
 			if( sessionCallback ) {
 				if( session ) {
@@ -645,7 +643,7 @@ namespace ht4c {
 				session = findSession( properties, connMgr );
 				if( !session ) {
 					HT_INFO_OUT << "Creating hyperspace session " << properties->get_str(hyperspace) << HT_END;
-					session = new Hyperspace::Session( getComm(), properties );
+					session = std::make_shared<Hyperspace::Session>( getComm(), properties );
 
 					if( sessionCallback ) {
 						session->add_callback( sessionCallback );
@@ -695,7 +693,7 @@ namespace ht4c {
 
 	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
 		if( !hamsterEnv ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::HamsterFilename );
 			hamster_envs_t::iterator it = hamsterEnvs.find( filename );
 			if( it == hamsterEnvs.end() ) {
@@ -724,7 +722,7 @@ namespace ht4c {
 
 	SQLite::SQLiteEnvPtr Context::getSQLiteEnv( ) {
 		if( !sqliteEnv ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::SQLiteFilename );
 			sqlite_envs_t::iterator it = sqliteEnvs.find( filename );
 			if( it == sqliteEnvs.end() ) {
@@ -756,7 +754,7 @@ namespace ht4c {
 
 Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 		if( !odbcEnv ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string connectionString = properties->get_str( Common::Config::OdbcConnectionString );
 
 			Odbc::OdbcEnvConfig config;
@@ -785,7 +783,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 		sessionStateSinks_t _sessionStateSinks;
 
 		{
-			ScopedLock lock( ctxMutex );
+			std::lock_guard<std::mutex> lock( ctxMutex );
 			_sessionStateSinks = sessionStateSinks;
 		}
 
@@ -796,7 +794,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	Hyperspace::SessionPtr Context::findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr ) {
 		connMgr = 0;
-		ScopedRecLock lock( envMutex );
+		std::lock_guard<std::recursive_mutex> lock( envMutex );
 		if( ReactorRunner::handler_map && sessions.size() ) {
 			Hypertable::Strings hosts = properties->get_strs( hyperspaceHost );
 			if( hosts.size() && hosts.front().size() ) {
@@ -814,7 +812,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	void Context::registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr ) {
 		if( session ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::pair<sessions_t::iterator, bool> r = sessions.insert( sessions_t::value_type(session, std::make_pair(connMgr, 1)) );
 			if( !r.second ) {
 				++(*r.first).second.second;
@@ -824,7 +822,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	void Context::unregisterSession( Hyperspace::SessionPtr session ) {
 		if( session ) {
-			ScopedRecLock lock( envMutex );
+			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			sessions_t::iterator it = sessions.find( session );
 			if( it != sessions.end() ) {
 				if( --(*it).second.second == 0 ) {
@@ -836,7 +834,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 	}
 
 	Hypertable::PropertiesPtr Context::initializeProperties( int argc, char *argv[], const Common::Properties& initialProperties, const char* loggingLevel ) {
-		ScopedRecLock lock( Config::rec_mutex );
+		std::lock_guard<std::recursive_mutex> lock( Config::rec_mutex );
 		PropertiesPtr existingProperties = Config::properties;
 		Config::cleanup();
 		Policies::initialProperties = Context::convertProperties( initialProperties );
@@ -852,7 +850,7 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 	}
 
 	Hypertable::PropertiesPtr Context::convertProperties( const Common::Properties& _properties ) {
-		Hypertable::PropertiesPtr properties = new Hypertable::Properties();
+		Hypertable::PropertiesPtr properties = std::make_shared<Hypertable::Properties>();
 		std::vector<std::string> names;
 		_properties.names( names );
 		for each( const std::string& name in names ) {

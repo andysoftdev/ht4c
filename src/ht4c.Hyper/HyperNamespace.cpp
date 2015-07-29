@@ -67,7 +67,7 @@ namespace ht4c { namespace Hyper {
 		HT4C_TRY {
 			Common::Namespace::validateTableName( name );
 			Hypertable::String schemaLike = ns->get_schema_str( like, true );
-			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike );
+			Hypertable::SchemaPtr schema( Hypertable::Schema::new_instance(schemaLike) );
 			schema->update_generation( get_ts64() );
 			schemaLike.clear();
 			schemaLike = schema->render_xml( true );
@@ -79,7 +79,7 @@ namespace ht4c { namespace Hyper {
 	void HyperNamespace::alterTable( const char* name, const char* _schema ) {
 		HT4C_TRY {
 			Hypertable::SchemaPtr schema = ns->get_schema( name );
-			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
+			Hypertable::SchemaPtr newSchema( Hypertable::Schema::new_instance(_schema) );
 
 			newSchema->set_generation( schema->get_generation() );
 			for each( const ColumnFamilySpec* cf in schema->get_column_families() ) {
@@ -148,7 +148,7 @@ namespace ht4c { namespace Hyper {
 	void HyperNamespace::exec( const char* hql ) {
 		HT4C_TRY {
 			if( hql && *hql ) {
-				Hypertable::HqlInterpreterPtr hqlInterpreter = client->create_hql_interpreter( true );
+				Hypertable::HqlInterpreterPtr hqlInterpreter( client->create_hql_interpreter(true) );
 				hqlInterpreter->set_namespace( getName() );
 				hqlInterpreter->execute( hql );
 			}
@@ -160,7 +160,7 @@ namespace ht4c { namespace Hyper {
 		HT4C_TRY {
 			Common::Cells* cells = 0;
 			if( hql && *hql ) {
-				Hypertable::HqlInterpreterPtr hqlInterpreter = client->create_hql_interpreter( true );
+				Hypertable::HqlInterpreterPtr hqlInterpreter( client->create_hql_interpreter(true) );
 				hqlInterpreter->set_namespace( getName() );
 				cells = Common::Cells::create( 512 );
 				std::vector< std::string > results;

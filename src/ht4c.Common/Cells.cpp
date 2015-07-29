@@ -92,7 +92,7 @@ namespace ht4c { namespace Common {
 	}
 
 	void Cells::clear( ) {
-		cellsBuilder = new Hypertable::CellsBuilder( initialCapacity );
+		cellsBuilder = std::make_shared<Hypertable::CellsBuilder>( initialCapacity );
 		cells = &cellsBuilder->get();
 	}
 

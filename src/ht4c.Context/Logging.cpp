@@ -44,7 +44,6 @@ namespace {
 			}
 
 			virtual ~LogAppender( ) {
-				close();
 			}
 
 			const std::string& getLogfile( ) const {
@@ -139,6 +138,8 @@ namespace ht4c {
 			LogAppender::instance().removeAllLogsinks();
 			Logger::get()->remove_sink(&LogAppender::instance());
 			LogAppender::instance().close();
+
+			initialized = false;
 		}
 	}
 

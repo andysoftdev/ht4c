@@ -27,10 +27,6 @@
 
 #include "ht4c.Common/AsyncResult.h"
 
-#ifndef __cplusplus_cli
-#include <boost/thread/condition.hpp>
-#endif
-
 namespace ht4c { namespace Common {
 	class AsyncResultSink;
 } }
@@ -135,8 +131,8 @@ namespace ht4c { namespace Odbc {
 			HANDLE thread;
 			bool abort;
 
-			mutable Hypertable::RecMutex mutex;
-			boost::condition cond;
+			mutable std::recursive_mutex mutex;
+			std::condition_variable_any cond;
 
 			typedef std::set<int64_t> set_t;
 			set_t asyncTableScanners;

@@ -217,9 +217,7 @@ namespace ht4c { namespace Common {
 		ZeroMemory( familyMask, sizeof(familyMask) );
 		ZeroMemory( columnFamilies, sizeof(columnFamilies) );
 
-		boost::xtime xtnow;
-		boost::xtime_get( &xtnow, boost::TIME_UTC_ );
-		int64_t now = ((int64_t)xtnow.sec * 1000000000LL) + (int64_t)xtnow.nsec;
+		int64_t now = Hypertable::get_ts64();
 		int32_t maxVersions = scanSpec.max_versions;
 
 		if( scanSpec.columns.size() > 0 ) {
@@ -303,7 +301,7 @@ namespace ht4c { namespace Common {
 						cfi.cutoffTime = Hypertable::TIMESTAMP_MIN;
 					}
 					else {
-						cfi.cutoffTime = now- ((int64_t)(*cf)->get_option_ttl() * 1000000000LL);
+						cfi.cutoffTime = now - ((int64_t)(*cf)->get_option_ttl() * 1000000000LL);
 					}
 
 					if( maxVersions == 0 ) {

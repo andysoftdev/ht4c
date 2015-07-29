@@ -73,7 +73,7 @@ namespace ht4c { namespace Hyper {
 
 			#pragma region Common::BlockingAsyncResult methods
 
-			virtual void attachAsyncScanner( int64_t asyncScannerId ) { }
+			virtual void attachAsyncScanner( int64_t asyncScannerId );
 			virtual void attachAsyncMutator( int64_t asyncMutatorId ) { }
 			virtual void join( );
 			virtual void cancel( );
@@ -98,6 +98,11 @@ namespace ht4c { namespace Hyper {
 			bool publishResult( Hypertable::ResultPtr& result, Common::AsyncResultSink* asyncResultSink );
 
 			Hypertable::FuturePtr future;
+
+			mutable std::recursive_mutex mutex;
+
+			typedef std::set<int64_t> set_t;
+			set_t asyncTableScanners;
 
 			#endif
 

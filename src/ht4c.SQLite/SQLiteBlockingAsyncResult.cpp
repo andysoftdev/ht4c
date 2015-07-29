@@ -76,7 +76,7 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteBlockingAsyncResult::attachAsyncScanner( int64_t asyncScannerId ) {
 		if( asyncScannerId ) {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			asyncTableScanners.insert( asyncScannerId );
 			cancelled = false;
 		}
@@ -84,7 +84,7 @@ namespace ht4c { namespace SQLite {
 
 	void SQLiteBlockingAsyncResult::attachAsyncMutator( int64_t asyncMutatorId ) {
 		if( asyncMutatorId ) {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			cancelled = false;
 		}
 	}
@@ -105,7 +105,7 @@ namespace ht4c { namespace SQLite {
 					SQLiteEnvLock sync( env.get() );
 					env->future_cancel( future );
 				}
-				Hypertable::ScopedRecLock lock( mutex );
+				std::lock_guard<std::recursive_mutex> lock( mutex );
 				cancelled = true;
 			}
 		}
@@ -121,7 +121,7 @@ namespace ht4c { namespace SQLite {
 					env->async_scanner_cancel( asyncScannerId );
 					env->async_scanner_close( asyncScannerId );
 				}
-				Hypertable::ScopedRecLock lock( mutex );
+				std::lock_guard<std::recursive_mutex> lock( mutex );
 				asyncTableScanners.erase( asyncScannerId );
 			}
 		}
@@ -156,7 +156,7 @@ namespace ht4c { namespace SQLite {
 
 	bool SQLiteBlockingAsyncResult::isCancelled( ) const {
 		/*if( future ) {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			if( cancelled ) {
 				return true;
 			}
@@ -208,7 +208,7 @@ namespace ht4c { namespace SQLite {
 
 					// ignore cancelled scanners
 					if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
-						Hypertable::ScopedRecLock lock( mutex );
+						std::lock_guard<std::recursive_mutex> lock( mutex );
 						if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
 							continue;
 						}

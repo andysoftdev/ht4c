@@ -112,7 +112,7 @@ namespace ht4c { namespace Thrift {
 	ThriftAsyncResult::~ThriftAsyncResult( ) {
 		HT4C_TRY {
 			{
-				Hypertable::ScopedRecLock lock( mutex );
+				std::lock_guard<std::recursive_mutex> lock( mutex );
 				abort = true;
 				cond.notify_all();
 			}
@@ -135,7 +135,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftAsyncResult::attachAsyncScanner( int64_t asyncScannerId ) {
 		if( asyncScannerId ) {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			asyncTableScanners.insert( asyncScannerId );
 			cancelled = false;
 			++outstanding;
@@ -145,7 +145,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftAsyncResult::attachAsyncMutator( int64_t asyncMutatorId ) {
 		if( asyncMutatorId ) {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			cancelled = false;
 			++outstanding;
 			cond.notify_all();
@@ -154,7 +154,7 @@ namespace ht4c { namespace Thrift {
 
 	void ThriftAsyncResult::join( ) {
 		HT4C_TRY {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::unique_lock<std::recursive_mutex> lock( mutex );
 			// wake up the polling thread, required if async mutators have been attached
 			++outstanding;
 			cond.notify_all();
@@ -173,7 +173,7 @@ namespace ht4c { namespace Thrift {
 					ThriftClientLock sync( client.get() );
 					client->future_cancel( future );
 				}
-				Hypertable::ScopedRecLock lock( mutex );
+				std::lock_guard<std::recursive_mutex> lock( mutex );
 				cancelled = true;
 			}
 		}
@@ -183,13 +183,8 @@ namespace ht4c { namespace Thrift {
 	void ThriftAsyncResult::cancelAsyncScanner( int64_t asyncScannerId ) { 
 		HT4C_TRY {
 			if( asyncScannerId ) {
-				{
-					ThriftClientLock sync( client.get() );
-					client->async_scanner_cancel( asyncScannerId );
-					client->async_scanner_close( asyncScannerId );
-				}
-				Hypertable::ScopedRecLock lock( mutex );
-				asyncTableScanners.erase( asyncScannerId );
+				ThriftClientLock sync( client.get() );
+				client->async_scanner_cancel( asyncScannerId );
 			}
 		}
 		HT4C_RETHROW
@@ -207,7 +202,7 @@ namespace ht4c { namespace Thrift {
 
 	bool ThriftAsyncResult::isCompleted( ) const {
 		HT4C_TRY {
-			Hypertable::ScopedRecLock lock( mutex );
+			std::lock_guard<std::recursive_mutex> lock( mutex );
 			return future ? outstanding == 0 : true;
 		}
 		HT4C_THRIFT_RETHROW
@@ -216,7 +211,7 @@ namespace ht4c { namespace Thrift {
 	bool ThriftAsyncResult::isCancelled( ) const {
 		HT4C_TRY {
 			if( future ) {
-				Hypertable::ScopedRecLock lock( mutex );
+				std::lock_guard<std::recursive_mutex> lock( mutex );
 				if( cancelled ) {
 					return true;
 				}
@@ -232,7 +227,7 @@ namespace ht4c { namespace Thrift {
 		while( future && asyncResultSink ) {
 			try {
 				{
-					Hypertable::ScopedRecLock lock( mutex );
+					std::unique_lock<std::recursive_mutex> lock( mutex );
 					while( outstanding == 0 && !abort ) {
 						cond.wait( lock );
 					}
@@ -257,7 +252,7 @@ namespace ht4c { namespace Thrift {
 
 					// ignore cancelled scanners
 					if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
-						Hypertable::ScopedRecLock lock( mutex );
+						std::lock_guard<std::recursive_mutex> lock( mutex );
 						if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
 							continue;
 						}
@@ -266,7 +261,7 @@ namespace ht4c { namespace Thrift {
 				HT4C_THRIFT_RETHROW
 
 				if( !publishResult(result, this, asyncResultSink, false) || result.is_empty ) {
-					Hypertable::ScopedRecLock lock( mutex );
+					std::lock_guard<std::recursive_mutex> lock( mutex );
 					outstanding = std::max( 0, --outstanding );
 					cond.notify_all();
 				}

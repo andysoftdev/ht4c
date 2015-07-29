@@ -99,7 +99,7 @@ namespace ht4c { namespace Thrift {
 			Hypertable::ThriftGen::Future future;
 			size_t capacity;
 			mutable bool cancelled;
-			mutable Hypertable::RecMutex mutex;
+			mutable std::recursive_mutex mutex;
 
 			typedef std::set<int64_t> set_t;
 			set_t asyncTableScanners;

@@ -195,7 +195,7 @@ namespace ht4c {
 			static bool getPropValue( Hypertable::PropertiesPtr properties, const std::string& name, boost::any& value );
 			static Common::ContextKind getContextKind( Hypertable::PropertiesPtr properties );
 
-			Hypertable::Mutex ctxMutex;
+			std::mutex ctxMutex;
 			Common::ContextKind contextKind;
 			Hypertable::PropertiesPtr properties;
 			Hypertable::ConnectionManagerPtr connMgr;
@@ -231,7 +231,7 @@ namespace ht4c {
 
 #endif
 
-			static Hypertable::RecMutex envMutex;
+			static std::recursive_mutex envMutex;
 			static sessions_t sessions;
 
 			#endif

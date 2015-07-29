@@ -156,7 +156,7 @@ namespace ht4c { namespace Thrift {
 		HT4C_TRY {
 			Common::Namespace::validateTableName( name );
 
-			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( _schema );
+			Hypertable::SchemaPtr schema( Hypertable::Schema::new_instance(_schema) );
 			ThriftGen::Schema ts;
 			convert_schema( schema, ts );
 
@@ -173,7 +173,7 @@ namespace ht4c { namespace Thrift {
 			ThriftClientLock sync( client.get() );
 			client->table_get_schema_str_with_ids( schemaLike, ns, like );
 
-			Hypertable::SchemaPtr schema = Hypertable::Schema::new_instance( schemaLike );
+			Hypertable::SchemaPtr schema( Hypertable::Schema::new_instance(schemaLike) );
 			ThriftGen::Schema ts;
 			convert_schema( schema, ts );
 
@@ -188,7 +188,7 @@ namespace ht4c { namespace Thrift {
 
 			ThriftGen::Schema schema;
 			client->get_schema( schema, ns, name );
-			Hypertable::SchemaPtr newSchema = Hypertable::Schema::new_instance( _schema );
+			Hypertable::SchemaPtr newSchema( Hypertable::Schema::new_instance(_schema) );
 			newSchema->set_generation( schema.generation );
 
 			ThriftGen::Schema ts;
@@ -293,7 +293,7 @@ namespace ht4c { namespace Thrift {
 					client->hql_query( result, ns, hql );
 				}
 				cells = Common::Cells::create( result.cells.size() );
-				foreach_ht( const Hypertable::ThriftGen::Cell& cell, result.cells ) {
+				for each( const Hypertable::ThriftGen::Cell& cell in result.cells ) {
 					cells->add( cell.key.row.c_str(), cell.key.column_family.c_str(), cell.key.column_qualifier.c_str(), cell.key.timestamp, cell.value.data(), cell.value.size(), cell.key.flag );
 				}
 			}

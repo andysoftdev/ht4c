@@ -25,6 +25,7 @@
 
 #pragma warning( push, 3 )
 
+#include "Common/ReferenceCount.h"
 #include "Common/Properties.h"
 #include "AsyncComm/ApplicationQueue.h"
 #include "AsyncComm/ConnectionManager.h"
