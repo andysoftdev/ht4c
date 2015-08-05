@@ -131,8 +131,8 @@ namespace ht4c { namespace Hamster {
 			HANDLE thread;
 			bool abort;
 
-			mutable std::recursive_mutex mutex;
-			std::condition_variable_any cond;
+			mutable std::mutex mutex;
+			std::condition_variable cond;
 
 			typedef std::set<int64_t> set_t;
 			set_t asyncTableScanners;

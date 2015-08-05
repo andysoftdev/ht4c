@@ -74,7 +74,7 @@ namespace ht4c { namespace Odbc {
 
 	void OdbcBlockingAsyncResult::attachAsyncScanner( int64_t asyncScannerId ) {
 		if( asyncScannerId ) {
-			std::lock_guard<std::recursive_mutex> lock( mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 			asyncTableScanners.insert( asyncScannerId );
 			cancelled = false;
 		}
@@ -82,7 +82,7 @@ namespace ht4c { namespace Odbc {
 
 	void OdbcBlockingAsyncResult::attachAsyncMutator( int64_t asyncMutatorId ) {
 		if( asyncMutatorId ) {
-			std::lock_guard<std::recursive_mutex> lock( mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 			cancelled = false;
 		}
 	}
@@ -102,7 +102,7 @@ namespace ht4c { namespace Odbc {
 				{
 					env->future_cancel( future );
 				}
-				std::lock_guard<std::recursive_mutex> lock( mutex );
+				std::lock_guard<std::mutex> lock( mutex );
 				cancelled = true;
 			}
 		}
@@ -117,7 +117,7 @@ namespace ht4c { namespace Odbc {
 					env->async_scanner_cancel( asyncScannerId );
 					env->async_scanner_close( asyncScannerId );
 				}
-				std::lock_guard<std::recursive_mutex> lock( mutex );
+				std::lock_guard<std::mutex> lock( mutex );
 				asyncTableScanners.erase( asyncScannerId );
 			}
 		}
@@ -150,7 +150,7 @@ namespace ht4c { namespace Odbc {
 
 	bool OdbcBlockingAsyncResult::isCancelled( ) const {
 		/*if( future ) {
-			std::lock_guard<std::recursive_mutex> lock( mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 			if( cancelled ) {
 				return true;
 			}
@@ -199,7 +199,7 @@ namespace ht4c { namespace Odbc {
 
 					// ignore cancelled scanners
 					if( result.id && result.is_scan && !result.is_error && !result.is_empty ) {
-						std::lock_guard<std::recursive_mutex> lock( mutex );
+						std::lock_guard<std::mutex> lock( mutex );
 						if( asyncTableScanners.find(result.id) == asyncTableScanners.end() ) {
 							continue;
 						}

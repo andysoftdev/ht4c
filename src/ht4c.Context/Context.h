@@ -90,6 +90,10 @@ namespace ht4c {
 
 			#pragma endregion
 
+	private:
+
+		friend class SessionCallback;
+
 			#ifndef __cplusplus_cli
 
 			/// <summary>
@@ -162,10 +166,6 @@ namespace ht4c {
 
 			#endif
 
-		private:
-
-			friend class SessionCallback;
-
 			Context( const Context& ) { }
 			Context& operator = ( const Context& ) { return *this; }
 
@@ -231,7 +231,7 @@ namespace ht4c {
 
 #endif
 
-			static std::recursive_mutex envMutex;
+			static std::mutex envMutex;
 			static sessions_t sessions;
 
 			#endif

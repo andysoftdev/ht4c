@@ -131,7 +131,7 @@ namespace ht4c { namespace Hyper {
 
 	void HyperAsyncResult::attachAsyncScanner( int64_t asyncScannerId ) {
 		if( asyncScannerId ) {
-			std::lock_guard<std::recursive_mutex> lock( mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 			asyncTableScanners.insert( asyncScannerId );
 		}
 	}

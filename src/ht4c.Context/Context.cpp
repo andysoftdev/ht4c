@@ -399,7 +399,7 @@ namespace ht4c {
 
 	}
 
-	Hypertable::recursive_mutex Context::envMutex;
+	std::mutex Context::envMutex;
 	Context::sessions_t Context::sessions;
 
 #ifdef SUPPORT_HAMSTERDB
@@ -426,7 +426,7 @@ namespace ht4c {
 	void Context::shutdown( ) {
 		HT4C_TRY {
 			{
-				std::lock_guard<std::recursive_mutex> lock( envMutex );
+				std::lock_guard<std::mutex> lock( envMutex );
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -470,7 +470,8 @@ namespace ht4c {
 
 	Common::Client* Context::createClient( ) {
 		HT4C_TRY {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
+			std::lock_guard<std::mutex> lock( envMutex );
+
 			switch( contextKind ) {
 				case Common::CK_Hyper:
 					return ht4c::Hyper::HyperClient::create( 
@@ -566,7 +567,8 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 		if( hamsterEnv ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
+			std::lock_guard<std::mutex> lock( envMutex );
+
 			for( hamster_envs_t::iterator it = hamsterEnvs.begin(); it != hamsterEnvs.end(); ++it ) {
 				if( (*it).second.first == hamsterEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -583,7 +585,8 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 		if( sqliteEnv ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
+			std::lock_guard<std::mutex> lock( envMutex );
+
 			for( sqlite_envs_t::iterator it = sqliteEnvs.begin(); it != sqliteEnvs.end(); ++it ) {
 				if( (*it).second.first == sqliteEnv ) {
 					if( --(*it).second.second == 0 ) {
@@ -620,6 +623,7 @@ namespace ht4c {
 
 		thriftClient = 0;
 		if( session ) {
+			std::lock_guard<std::mutex> lock( envMutex );
 			unregisterSession( session );
 		}
 		session = 0;
@@ -693,7 +697,6 @@ namespace ht4c {
 
 	Hamster::HamsterEnvPtr Context::getHamsterEnv( ) {
 		if( !hamsterEnv ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::HamsterFilename );
 			hamster_envs_t::iterator it = hamsterEnvs.find( filename );
 			if( it == hamsterEnvs.end() ) {
@@ -722,7 +725,6 @@ namespace ht4c {
 
 	SQLite::SQLiteEnvPtr Context::getSQLiteEnv( ) {
 		if( !sqliteEnv ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string filename = properties->get_str( Common::Config::SQLiteFilename );
 			sqlite_envs_t::iterator it = sqliteEnvs.find( filename );
 			if( it == sqliteEnvs.end() ) {
@@ -754,7 +756,6 @@ namespace ht4c {
 
 Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 		if( !odbcEnv ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::string connectionString = properties->get_str( Common::Config::OdbcConnectionString );
 
 			Odbc::OdbcEnvConfig config;
@@ -794,7 +795,6 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	Hyperspace::SessionPtr Context::findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr ) {
 		connMgr = 0;
-		std::lock_guard<std::recursive_mutex> lock( envMutex );
 		if( ReactorRunner::handler_map && sessions.size() ) {
 			Hypertable::Strings hosts = properties->get_strs( hyperspaceHost );
 			if( hosts.size() && hosts.front().size() ) {
@@ -812,7 +812,6 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	void Context::registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr ) {
 		if( session ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			std::pair<sessions_t::iterator, bool> r = sessions.insert( sessions_t::value_type(session, std::make_pair(connMgr, 1)) );
 			if( !r.second ) {
 				++(*r.first).second.second;
@@ -822,7 +821,6 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 
 	void Context::unregisterSession( Hyperspace::SessionPtr session ) {
 		if( session ) {
-			std::lock_guard<std::recursive_mutex> lock( envMutex );
 			sessions_t::iterator it = sessions.find( session );
 			if( it != sessions.end() ) {
 				if( --(*it).second.second == 0 ) {

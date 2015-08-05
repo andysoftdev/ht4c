@@ -99,7 +99,7 @@ namespace ht4c { namespace Hyper {
 
 			Hypertable::FuturePtr future;
 
-			mutable std::recursive_mutex mutex;
+			mutable std::mutex mutex;
 
 			typedef std::set<int64_t> set_t;
 			set_t asyncTableScanners;
