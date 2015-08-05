@@ -89,7 +89,7 @@ namespace ht4c { namespace Hyper {
 				}
 				else {
 					for( std::vector<Hypertable::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
-						if( !(*it).is_namespace ) {
+						if( !(*it).is_namespace && (*it).name.size() && (*it).name.front() != '^' ) {
 							ns->drop_table( (*it).name.c_str(), true );
 						}
 					}
@@ -143,7 +143,7 @@ namespace ht4c { namespace Hyper {
 				}
 				client->drop_namespace( (*it).name.c_str(), ns.get(), ifExists );
 			}
-			else if( dropTables ) {
+			else if( dropTables && (*it).name.size() && (*it).name.front() != '^' ) {
 				ns->drop_table( (*it).name.c_str(), true );
 			}
 		}

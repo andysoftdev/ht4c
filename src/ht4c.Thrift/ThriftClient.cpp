@@ -108,7 +108,7 @@ namespace ht4c { namespace Thrift {
 					}
 					else {
 						for( std::vector<Hypertable::ThriftGen::NamespaceListing>::const_iterator it = listing.begin(); it != listing.end(); ++it ) {
-							if( !(*it).is_namespace ) {
+							if( !(*it).is_namespace && (*it).name.size() && (*it).name.front() != '^' ) {
 								client->table_drop( ns, (*it).name, true );
 							}
 						}
@@ -171,7 +171,7 @@ namespace ht4c { namespace Thrift {
 				}
 				client->namespace_drop( nsSubName, ifExists );
 			}
-			else if( dropTables ) {
+			else if( dropTables && (*it).name.size() && (*it).name.front() != '^' ) {
 				client->table_drop( ns, (*it).name, true );
 			}
 		}
