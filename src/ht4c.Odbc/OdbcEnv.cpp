@@ -37,12 +37,12 @@ namespace ht4c { namespace Odbc {
 	namespace {
 
 		static std::set<OdbcEnv*> environments;
-		static std::mutex mtxEnvironments;
+		static boost::mutex mtxEnvironments;
 
 	}
 
 	void on_thread_exit() {
-		std::lock_guard<std::mutex> lock( mtxEnvironments );
+		boost::lock_guard<boost::mutex> lock( mtxEnvironments );
 		for each( OdbcEnv* env in environments ) {
 			env->onThreadExit();
 		}
@@ -69,7 +69,7 @@ namespace ht4c { namespace Odbc {
 				db->commit();
 
 				{
-					std::lock_guard<std::mutex> lock( mtxEnvironments );
+					boost::lock_guard<boost::mutex> lock( mtxEnvironments );
 					environments.insert( this );
 				}
 			}
@@ -85,7 +85,7 @@ namespace ht4c { namespace Odbc {
 
 	OdbcEnv::~OdbcEnv( ) {
 			{
-				std::lock_guard<std::mutex> lock( mtxEnvironments );
+				boost::lock_guard<boost::mutex> lock( mtxEnvironments );
 				environments.erase( this );
 			}
 

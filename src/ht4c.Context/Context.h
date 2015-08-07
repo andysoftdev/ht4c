@@ -231,7 +231,7 @@ namespace ht4c {
 
 #endif
 
-			static std::mutex envMutex;
+			static boost::mutex envMutex;
 			static sessions_t sessions;
 
 			#endif

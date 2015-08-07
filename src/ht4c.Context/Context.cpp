@@ -399,7 +399,7 @@ namespace ht4c {
 
 	}
 
-	std::mutex Context::envMutex;
+	boost::mutex Context::envMutex;
 	Context::sessions_t Context::sessions;
 
 #ifdef SUPPORT_HAMSTERDB
@@ -426,7 +426,7 @@ namespace ht4c {
 	void Context::shutdown( ) {
 		HT4C_TRY {
 			{
-				std::lock_guard<std::mutex> lock( envMutex );
+				boost::lock_guard<boost::mutex> lock( envMutex );
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -470,7 +470,7 @@ namespace ht4c {
 
 	Common::Client* Context::createClient( ) {
 		HT4C_TRY {
-			std::lock_guard<std::mutex> lock( envMutex );
+			boost::lock_guard<boost::mutex> lock( envMutex );
 
 			switch( contextKind ) {
 				case Common::CK_Hyper:
@@ -567,7 +567,7 @@ namespace ht4c {
 #ifdef SUPPORT_HAMSTERDB
 
 		if( hamsterEnv ) {
-			std::lock_guard<std::mutex> lock( envMutex );
+			boost::lock_guard<boost::mutex> lock( envMutex );
 
 			for( hamster_envs_t::iterator it = hamsterEnvs.begin(); it != hamsterEnvs.end(); ++it ) {
 				if( (*it).second.first == hamsterEnv ) {
@@ -585,7 +585,7 @@ namespace ht4c {
 #ifdef SUPPORT_SQLITEDB
 
 		if( sqliteEnv ) {
-			std::lock_guard<std::mutex> lock( envMutex );
+			boost::lock_guard<boost::mutex> lock( envMutex );
 
 			for( sqlite_envs_t::iterator it = sqliteEnvs.begin(); it != sqliteEnvs.end(); ++it ) {
 				if( (*it).second.first == sqliteEnv ) {
@@ -623,7 +623,7 @@ namespace ht4c {
 
 		thriftClient = 0;
 		if( session ) {
-			std::lock_guard<std::mutex> lock( envMutex );
+			boost::lock_guard<boost::mutex> lock( envMutex );
 			unregisterSession( session );
 		}
 		session = 0;
