@@ -97,6 +97,12 @@
     <ClInclude Include="SessionStateSink.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="CW2U8.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CU82W.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

@@ -4,7 +4,6 @@
     <SupportHamsterDb Condition="'$(SupportHamsterDb)' == ''">true</SupportHamsterDb>
     <SupportSQLiteDb Condition="'$(SupportSQLiteDb)' == ''">true</SupportSQLiteDb>
     <SupportOdbc Condition="'$(SupportOdbc)' == ''">true</SupportOdbc>
-
     <SupportHamsterDbDefine Condition="$(SupportHamsterDb) == true">SUPPORT_HAMSTERDB</SupportHamsterDbDefine>
     <SupportSQLiteDbDefine Condition="$(SupportSQLiteDb) == true">SUPPORT_SQLITEDB</SupportSQLiteDbDefine>
     <SupportOdbcDefine Condition="$(SupportOdbc) == true">SUPPORT_ODBC</SupportOdbcDefine>
@@ -205,6 +204,8 @@
     <ClInclude Include="Cells.h" />
     <ClInclude Include="Client.h" />
     <ClInclude Include="Config.h" />
+    <ClInclude Include="CU82W.h" />
+    <ClInclude Include="CW2U8.h" />
     <ClInclude Include="SessionState.h" />
     <ClInclude Include="Context.h" />
     <ClInclude Include="ContextKind.h" />

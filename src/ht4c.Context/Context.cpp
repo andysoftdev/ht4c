@@ -32,6 +32,8 @@
 #include "ht4c.Common/Properties.h"
 #include "ht4c.Common/SessionStateSink.h"
 #include "ht4c.Common/Exception.h"
+#include "ht4c.Common/CU82W.h"
+#include "ht4c.Common/CW2U8.h"
 #include "ht4c.Hyper/HyperClient.h"
 #include "ht4c.Thrift/ThriftFactory.h"
 #include "ht4c.Thrift/ThriftClient.h"
@@ -139,11 +141,19 @@ namespace ht4c {
 		}
 
 		inline bool expand_environment_strings( std::string& str ) {
-			char expanded[2048];
-			if( ExpandEnvironmentStringsA(str.c_str(), expanded, sizeof(expanded)) ) {
-				if( str != expanded ) {
-					str = expanded;
-					return true;
+			std::wstring wstr( ht4c::Common::CU82W(str.c_str()) );
+			int cc = ExpandEnvironmentStringsW( wstr.c_str(), 0, 0 );
+			if( cc ) {
+				wchar_t* wsz = static_cast<wchar_t*>( malloc((cc + 1) * sizeof(wchar_t)) );
+				if( wsz ) {
+					if( ExpandEnvironmentStringsW(wstr.c_str(), wsz, cc) ) {
+						if( wstr != wsz ) {
+							str = ht4c::Common::CW2U8(wsz);
+							free(wsz);
+							return true;
+						}
+					}
+					free(wsz);
 				}
 			}
 			return false;
@@ -385,7 +395,7 @@ namespace ht4c {
 			}
 
 			static void set_file_uri( const char* filenameProperty ) {
-				if( !properties->defaulted(Common::Config::Uri) || properties->defaulted(filenameProperty) ) {
+				if( !properties->defaulted(Common::Config::Uri) || !properties->has(filenameProperty) || properties->defaulted(filenameProperty) ) {
 					std::string filename = get_uri();
 					uri_to_filename( filename );
 					properties->set( filenameProperty, filename );
