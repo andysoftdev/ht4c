@@ -66,7 +66,7 @@ namespace ht4c { namespace SQLite {
 														  "CREATE TABLE IF NOT EXISTS "
 														  "sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
 														, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
-														, std::max(1, config.cacheSizeMB) * -1024
+														, std::max(16, 1024 * config.cacheSizeMB / config.pageSizeKB)
 														, config.synchronous ? "ON" : "OFF").c_str()
 												 , 0, 0, &errmsg );
 
