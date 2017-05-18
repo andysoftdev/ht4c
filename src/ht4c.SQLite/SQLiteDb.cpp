@@ -660,6 +660,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, db( _table->getEnv()->getDb() )
 	, env( _table->getEnv() )
 	, schema( _table->getSchema().get() )
+	, dbReleaseMemory( false ) 
 	, stmtInsert( 0 )
 	, stmtDeleteRow( 0 )
 	, stmtDeleteCf( 0 )
@@ -694,6 +695,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 		Util::stmt_finalize( db, &stmtDeleteCf );
 		Util::stmt_finalize( db, &stmtDeleteCell );
 		Util::stmt_finalize( db, &stmtDeleteCellVersion );
+
+		if( dbReleaseMemory ) {
+			sqlite3_db_release_memory( db );
+		}
 
 		schema = 0;
 		db = 0;
@@ -760,6 +765,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 		st = sqlite3_step( stmtInsert );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
+
+		if( !dbReleaseMemory ) {
+			dbReleaseMemory = valueLength >= HUGE_VALUE_LENGTH;
+		}
 	}
 
 	void Mutator::toKey( Hypertable::Schema* schema

@@ -257,6 +257,10 @@ namespace ht4c { namespace SQLite { namespace Db {
 			SQLiteEnv* env;
 			Hypertable::Schema* schema;
 			enum {
+				HUGE_VALUE_LENGTH = 8 * 1024 * 1024
+			};
+			bool dbReleaseMemory;
+			enum {
 				MAX_CF = 256
 			};
 			bool timeOrderAsc[MAX_CF];
