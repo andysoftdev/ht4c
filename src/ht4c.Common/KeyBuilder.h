@@ -51,6 +51,13 @@ namespace ht4c { namespace Common {
 			KeyBuilder( );
 
 			/// <summary>
+			/// Initializes a new instance of the KeyBuilder class.
+			/// </summary>
+			/// <param name="preffix">The key preffix.</param>
+			/// <remarks>Generates a new GUID</remarks>
+			explicit KeyBuilder( const char preffix[2] );
+
+			/// <summary>
 			/// Initializes a new instance of the KeyBuilder class, using the specified GUID.
 			/// </summary>
 			/// <param name="key">GUID to encode</param>

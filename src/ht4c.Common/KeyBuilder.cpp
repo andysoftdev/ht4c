@@ -40,6 +40,19 @@ namespace ht4c { namespace Common {
 		createKey( buf );
 	}
 
+	KeyBuilder::KeyBuilder( const char preffix[2] ) {
+		createKey( buf );
+
+		if( preffix ) {
+			if( preffix[0] ) {
+				buf[0] = preffix[0];
+				if( preffix[1] ) {
+					buf[1] = preffix[1];
+				}
+			}
+		}
+	}
+
 	KeyBuilder::KeyBuilder( const uint8_t key[sizeGuid] ) {
 		encodeKey( (const uint8_t*)key, buf );
 	}
