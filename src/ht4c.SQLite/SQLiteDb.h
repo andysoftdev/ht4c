@@ -332,7 +332,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					Reader( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					Reader( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 					virtual ~Reader();
 
 					virtual void stmtPrepare( );
@@ -348,6 +348,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 					}
 					bool getCell( const Hypertable::Key& key, const Hypertable::ColumnFamilySpec& cf, Hypertable::Cell& cell );
 
+					SQLiteEnv* env;
 					sqlite3* db;
 					int64_t tableId;
 					sqlite3_stmt* stmtQuery;
@@ -378,7 +379,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderScanAndFilter( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderScanAndFilter( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 			};
@@ -387,7 +388,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderRowIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderRowIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 
@@ -410,7 +411,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderCellIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderCellIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 

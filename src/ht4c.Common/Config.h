@@ -153,6 +153,16 @@ namespace ht4c { namespace Common {
 			static const char* SQLiteSynchronous;
 
 			/// <summary>
+			/// SQLite unique rows.
+			/// </summary>
+			static const char* SQLiteUniqueRows;
+
+			/// <summary>
+			/// SQLite no cell revisions.
+			/// </summary>
+			static const char* SQLiteNoCellRevisions;  
+
+			/// <summary>
 			/// SQLite column index.
 			/// </summary>
 			static const char* SQLiteIndexColumn;

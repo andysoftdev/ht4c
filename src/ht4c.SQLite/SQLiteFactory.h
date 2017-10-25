@@ -38,6 +38,8 @@ namespace ht4c { namespace SQLite {
 		int cacheSizeMB;
 		int pageSizeKB;
 		bool synchronous;
+		bool uniqueRows;
+		bool noCellRevisions;
 		bool indexColumn;
 		bool indexColumnFamily;
 		bool indexColumnQualifier;
@@ -47,6 +49,8 @@ namespace ht4c { namespace SQLite {
 			: cacheSizeMB( 64 )
 			, pageSizeKB( 4 )
 			, synchronous( false )
+			, uniqueRows( false )
+			, noCellRevisions( false )
 			, indexColumn( false )
 			, indexColumnFamily( false )
 			, indexColumnQualifier( false )

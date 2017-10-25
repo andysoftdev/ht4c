@@ -35,6 +35,8 @@ namespace ht4c { namespace SQLite {
 	SQLiteEnv::SQLiteEnv( const std::string &filename, const SQLiteEnvConfig& config )
 	: db( 0 )
 	, tx( false )
+	, uniqueRows( config.uniqueRows )
+	, noCellRevisions( config.noCellRevisions )
 	, indexColumn( config.indexColumn )
 	, indexColumnFamily( config.indexColumnFamily )
 	, indexColumnQualifier( config.indexColumnQualifier )
@@ -52,23 +54,25 @@ namespace ht4c { namespace SQLite {
 		::InitializeCriticalSection( &cs );
 		HT4C_TRY {
 			try {
+				sqlite3_enable_shared_cache( 1 );
 				int st = sqlite3_open( filename.c_str(), &db );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				char* errmsg = 0;
 				st = sqlite3_exec( db
-												 , Hypertable::format(
-														  "PRAGMA page_size=%d;"
-														  "PRAGMA cache_size=%d;"
-														  "PRAGMA journal_mode=TRUNCATE;"
-														  "PRAGMA synchronous=%s;"
-														  "PRAGMA temp_store=MEMORY;"
-														  "CREATE TABLE IF NOT EXISTS "
-														  "sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
-														, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
-														, std::max(16, 1024 * config.cacheSizeMB / config.pageSizeKB)
-														, config.synchronous ? "ON" : "OFF").c_str()
-												 , 0, 0, &errmsg );
+								, Hypertable::format(
+										"PRAGMA page_size=%d;"
+										"PRAGMA cache_size=%d;"
+										"PRAGMA journal_mode=TRUNCATE;"
+										"PRAGMA synchronous=%s;"
+										"PRAGMA temp_store=MEMORY;"
+										"PRAGMA auto_vacuum=INCREMENTAL;"
+										"CREATE TABLE IF NOT EXISTS "
+										"sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
+									, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
+									, std::max(1, 1024 * config.cacheSizeMB / config.pageSizeKB)
+									, config.synchronous ? "ON" : "OFF").c_str()
+								, 0, 0, &errmsg );
 
 				HT4C_SQLITE_VERIFY( st, db, errmsg );
 
@@ -134,7 +138,13 @@ namespace ht4c { namespace SQLite {
 			if( db ) {
 				// deletes the journal
 				char* errmsg = 0;
-				int st = sqlite3_exec( db, "PRAGMA journal_mode=DELETE;BEGIN;COMMIT;", 0, 0, &errmsg );
+				int st = sqlite3_exec( 
+					db, 
+					"PRAGMA incremental_vacuum;"
+					"PRAGMA optimize;"
+					"PRAGMA journal_mode=DELETE;"
+					"BEGIN;COMMIT;"
+					, 0, 0, &errmsg );
 				HT4C_SQLITE_VERIFY( st, db, errmsg );
 
 				st = sqlite3_close( db );
@@ -281,11 +291,14 @@ namespace ht4c { namespace SQLite {
 	void SQLiteEnv::sysDbCreateTable( const char* name, int len, const void* value, int size, int64_t& id ) {
 		sysDbInsert( name, len, value, size, &id );
 
+		const char* rowColumn = uniqueRows ? "r TEXT NOT NULL PRIMARY KEY" : "r TEXT NOT NULL";
+		const char* uniqueConstraint = noCellRevisions ? "UNIQUE(r, cf, cq)" : "UNIQUE(r, cf, cq, ts)";
+
 		char* errmsg = 0;
 		int st = sqlite3_exec( db
 												 , Hypertable::format("CREATE TABLE IF NOT EXISTS "
-																							"t%lld (r TEXT NOT NULL, cf INTEGER NOT NULL, cq TEXT NOT NULL, ts INTEGER NOT NULL, v BLOB,"
-																							"UNIQUE(r, cf, cq, ts));", id).c_str()
+																							"t%lld (%s, cf INTEGER NOT NULL, cq TEXT NOT NULL, ts INTEGER NOT NULL, v BLOB,"
+																							"%s);", id, rowColumn, uniqueConstraint).c_str()
 												 , 0, 0, &errmsg );
 
 		HT4C_SQLITE_VERIFY( st, db, errmsg );

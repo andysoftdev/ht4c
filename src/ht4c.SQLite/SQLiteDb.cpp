@@ -920,7 +920,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	{
 		if( scanSpec.get().row_intervals.empty() ) {
 			if( scanSpec.get().cell_intervals.empty() ) {
-				reader = new Reader( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new Reader( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
 			}
 			else {
 				Hypertable::CellIntervals& cellIntervals = scanSpec.get().cell_intervals;
@@ -932,11 +932,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 						ci->end_row = Hypertable::Key::END_ROW_MARKER;
 					}
 				}
-				reader = new ReaderCellIntervals( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new ReaderCellIntervals( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
 			}
 		}
 		else if (scanSpec.get().scan_and_filter_rows) {
-			reader = new ReaderScanAndFilter( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderScanAndFilter( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
 		}
 		else {
 			Hypertable::RowIntervals& rowIntervals = scanSpec.get().row_intervals;
@@ -949,7 +949,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				}
 			}
 
-			reader = new ReaderRowIntervals( db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderRowIntervals( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
 		}
 
 		reader->stmtPrepare( );
@@ -1044,8 +1044,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 	}
 
-	Scanner::Reader::Reader( sqlite3* _db, int64_t _tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
-	: db( _db )
+	Scanner::Reader::Reader( SQLiteEnv* _env, sqlite3* _db, int64_t _tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	: env( _env )
+	, db( _db )
 	, tableId( _tableId )
 	, stmtQuery( 0 )
 	, scanContext( new ScanContext(scanSpec, schema) )
@@ -1109,7 +1110,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 			predicate = " WHERE " + scanContext->predicate;
 		}
 
-		std::string select = Hypertable::format( "SELECT %s FROM t%lld%s ORDER BY r, cf, cq, ts;", scanContext->columns.c_str(), tableId, predicate.c_str() );
+		const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+		std::string select = Hypertable::format( "SELECT %s FROM t%lld%s %s;", scanContext->columns.c_str(), tableId, predicate.c_str(), orderBy );
 		int st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
 	}
@@ -1320,8 +1322,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return true;
 	}
 
-	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
-	: Reader( db, tableId, schema, scanSpec )
+	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
+	: Reader( env, db, tableId, schema, scanSpec )
 	{
 	}
 
@@ -1332,30 +1334,32 @@ namespace ht4c { namespace SQLite { namespace Db {
 			predicate = " AND (" + scanContext->predicate + ")";
 		}
 
+		const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+
 		std::string select;
 		if( strcmp(*scanContext->rowset.begin(),*scanContext->rowset.rbegin()) ) {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s %s;"
 																	, scanContext->columns.c_str()
 																	, tableId
 																	, escape(*scanContext->rowset.begin()).c_str()
 																	, escape(*scanContext->rowset.rbegin()).c_str()
 																	, predicate.c_str()
-																	);
+																	, orderBy );
 		}
 		else {
-			select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+			select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s %s;"
 																	, scanContext->columns.c_str()
 																	, tableId
 																	, escape(*scanContext->rowset.begin()).c_str()
 																	, predicate.c_str()
-																	);
+																	, orderBy );
 		}
 		int st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 )
 	}
 
-	Scanner::ReaderRowIntervals::ReaderRowIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
-	: Reader( db, tableId, schema, _scanSpec )
+	Scanner::ReaderRowIntervals::ReaderRowIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	: Reader( env, db, tableId, schema, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.row_intervals.begin() )
 	, rowIntervalDone( true )
@@ -1385,25 +1389,47 @@ namespace ht4c { namespace SQLite { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
+			const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+
 			std::string select;
 			if( strcmp(it->start, it->end) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s'%s' AND r <%s'%s')%s ORDER BY r, cf, cq, ts;"
-																	 , scanContext->columns.c_str()
-																	 , tableId
-																	 , it->start_inclusive ? "=" : ""
-																	 , escape(it->start).c_str()
-																	 , it->end_inclusive ? "=" : ""
-																	 , escape(it->end).c_str()
-																	 , predicate.c_str()
-																	 );
+				if( *it->start && *it->end ) {
+					select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s'%s' AND r <%s'%s')%s %s;"
+																		 , scanContext->columns.c_str()
+																		 , tableId
+																		 , it->start_inclusive ? "=" : ""
+																		 , escape(it->start).c_str()
+																		 , it->end_inclusive ? "=" : ""
+																		 , escape(it->end).c_str()
+																		 , predicate.c_str()
+																		 , orderBy );
+				}
+				else if( *it->end ) {
+					select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r <%s'%s')%s %s;"
+						, scanContext->columns.c_str()
+						, tableId
+						, it->end_inclusive ? "=" : ""
+						, escape(it->end).c_str()
+						, predicate.c_str()
+						, orderBy );
+				}
+				else {
+					select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>%s'%s')%s %s;"
+						, scanContext->columns.c_str()
+						, tableId
+						, it->start_inclusive ? "=" : ""
+						, escape(it->start).c_str()
+						, predicate.c_str()
+						, orderBy );
+				}
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s'%s %s;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , escape((*it).start).c_str()
 																	 , predicate.c_str()
-																	 );
+																	 , orderBy );
 			}
 			st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
 			HT4C_SQLITE_VERIFY( st, db, 0 )
@@ -1421,8 +1447,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return st == SQLITE_ROW;
 	}
 
-	Scanner::ReaderCellIntervals::ReaderCellIntervals( sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
-	: Reader( db, tableId, schema, _scanSpec )
+	Scanner::ReaderCellIntervals::ReaderCellIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
+	: Reader( env, db, tableId, schema, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.cell_intervals.begin() )
 	, startColumnQualifier( 0 )
@@ -1487,34 +1513,36 @@ namespace ht4c { namespace SQLite { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
+			const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+
 			std::string select;
 			if( strcmp(it->start_row, it->end_row) ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE (r>='%s' AND r <='%s')%s %s;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , escape(it->start_row).c_str()
 																	 , escape(it->end_row).c_str()
 																	 , predicate.c_str()
-																	 );
+																	 , orderBy );
 			}
 			else if( startColumnFamilyCode != endColumnFamilyCode ) {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf>=%d AND cf<=%d%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf>=%d AND cf<=%d%s %s;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , escape((*it).start_row).c_str()
 																	 , startColumnFamilyCode
 																	 , endColumnFamilyCode
 																	 , predicate.c_str()
-																	 );
+																	 , orderBy );
 			}
 			else {
-				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf=%d%s ORDER BY r, cf, cq, ts;"
+				select = Hypertable::format( "SELECT %s FROM t%lld WHERE r='%s' AND cf=%d%s %s;"
 																	 , scanContext->columns.c_str()
 																	 , tableId
 																	 , escape((*it).start_row).c_str()
 																	 , startColumnFamilyCode
 																	 , predicate.c_str()
-																	 );
+																	 , orderBy );
 			}
 			st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
 			HT4C_SQLITE_VERIFY( st, db, 0 )

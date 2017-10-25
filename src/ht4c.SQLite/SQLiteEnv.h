@@ -59,6 +59,10 @@ namespace ht4c { namespace SQLite {
 				return db;
 			}
 
+			inline bool NoCellRevisions( ) const {
+				return noCellRevisions;
+			}
+
 			void txBegin();
 			void txCommit();
 			void txRollback();
@@ -107,6 +111,8 @@ namespace ht4c { namespace SQLite {
 			sqlite3* db;
 			bool tx;
 
+			bool uniqueRows;
+			bool noCellRevisions;
 			bool indexColumn;
 			bool indexColumnFamily;
 			bool indexColumnQualifier;
