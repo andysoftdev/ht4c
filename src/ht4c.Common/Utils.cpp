@@ -33,7 +33,7 @@
 namespace ht4c { namespace Common {
 
 	CellFilterInfo::CellFilterInfo( )
-	: cutoffTime(0)
+	: cutoffTime(Hypertable::TIMESTAMP_MIN)
 	, maxVersions(0)
 	, filterByExactQualifier(false)
 	, filterByRegexpQualifier(false)
