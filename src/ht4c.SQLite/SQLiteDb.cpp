@@ -517,7 +517,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, name( _name )
 	, id( 0 )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, db( 0 )
+	{
 		init();
 	}
 
@@ -527,7 +528,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, schemaSpec( _schema )
 	, id( _id )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, db( 0 )
+	{
 		init();
 	}
 
@@ -538,7 +540,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, schema( other.schema )
 	, id( other.id )
 	, env( _ns->getEnv() )
-	, db( 0 ) {
+	, db( 0 )
+	{
 		init();
 	}
 
@@ -602,15 +605,37 @@ namespace ht4c { namespace SQLite { namespace Db {
 			HT4C_SQLITE_THROW( Hypertable::Error::MASTER_BAD_SCHEMA, Hypertable::format("Undefined schema for table '%s'", getFullName()).c_str() );
 		}
 
-		size_t schema_len = schemaSpec.size() + 1;
+		std::string options;
+
+		if( uniqueRows ) {
+			options += "{UR}";
+		}
+		if( noCellRevisions ) {
+			options += "{NCR}";
+		}
+
+		size_t buf_len = schemaSpec.size() + 1;
+		if( options.size() ) {
+			buf_len += options.size() + 1;
+		}
+
 		buf.clear();
-		buf.reserve( schema_len );
-		buf.add( schemaSpec.c_str(), schema_len );
+		buf.reserve( buf_len );
+		buf.add( schemaSpec.c_str(), schemaSpec.size() + 1 );
+
+		if( options.size() ) {
+			buf.add( options.c_str(), options.size() + 1 );
+		}
 	}
 
 	void Table::fromRecord( Hypertable::DynamicBuffer& buf ) {
 		if( buf.fill() ) {
 			schemaSpec = (const char*)buf.base;
+			if( buf.fill() > schemaSpec.size() + 1 ) {
+				std::string options = (const char*)(buf.base + schemaSpec.size() + 1);
+				uniqueRows = options.find("{UR}") >= 0;
+				noCellRevisions = options.find("{NCR}") >= 0;
+			}
 		}
 		else {
 			schemaSpec.empty();
@@ -651,6 +676,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 		keyName += ns->getName();
 		keyName += "/";
 		keyName += name;
+
+		uniqueRows = env->UniqueRows();
+		noCellRevisions = env->NoCellRevisions();
 	}
 
 	Mutator::Mutator( Db::TablePtr _table, int32_t _flags, int32_t _flushInterval )
@@ -920,7 +948,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 	{
 		if( scanSpec.get().row_intervals.empty() ) {
 			if( scanSpec.get().cell_intervals.empty() ) {
-				reader = new Reader( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new Reader( _table.get(), db, scanSpec.get() );
 			}
 			else {
 				Hypertable::CellIntervals& cellIntervals = scanSpec.get().cell_intervals;
@@ -932,11 +960,11 @@ namespace ht4c { namespace SQLite { namespace Db {
 						ci->end_row = Hypertable::Key::END_ROW_MARKER;
 					}
 				}
-				reader = new ReaderCellIntervals( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
+				reader = new ReaderCellIntervals( _table.get(), db, scanSpec.get() );
 			}
 		}
 		else if (scanSpec.get().scan_and_filter_rows) {
-			reader = new ReaderScanAndFilter( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderScanAndFilter( _table.get(), db, scanSpec.get() );
 		}
 		else {
 			Hypertable::RowIntervals& rowIntervals = scanSpec.get().row_intervals;
@@ -949,7 +977,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				}
 			}
 
-			reader = new ReaderRowIntervals( _table->getEnv(), db, _table->getId(), _table->getSchema(), scanSpec.get() );
+			reader = new ReaderRowIntervals( _table.get(), db, scanSpec.get() );
 		}
 
 		reader->stmtPrepare( );
@@ -1044,12 +1072,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 		}
 	}
 
-	Scanner::Reader::Reader( SQLiteEnv* _env, sqlite3* _db, int64_t _tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
-	: env( _env )
+	Scanner::Reader::Reader( Db::Table* table, sqlite3* _db, const Hypertable::ScanSpec& scanSpec )
+	: env( table->getEnv() )
 	, db( _db )
-	, tableId( _tableId )
+	, tableId( table->getId() )
 	, stmtQuery( 0 )
-	, scanContext( new ScanContext(scanSpec, schema) )
+	, scanContext( new ScanContext(scanSpec, table->getSchema()) )
 	, currkey( 64 )
 	, prevKey( 64 )
 	, prevColumnFamilyCode( -1 )
@@ -1058,17 +1086,25 @@ namespace ht4c { namespace SQLite { namespace Db {
 	, rowCount( 0 )
 	, cellCount( 0 )
 	, cellPerFamilyCount( 0 )
+	, noCellRevisions( table->NoCellRevisions() )
+	, stmtDeleteCf( 0 )
 	, eos( false )
 	{
+		bool ttl = false;
 		scanContext->initialize();
 		memset( timeOrderAsc, true, sizeof(timeOrderAsc) );
-		const Hypertable::ColumnFamilySpecs& families = schema->get_column_families();
+		const Hypertable::ColumnFamilySpecs& families = scanContext->schema->get_column_families();
 		for each( const Hypertable::ColumnFamilySpec* cf in families ) {
 			timeOrderAsc[cf->get_id()] = !cf->get_option_time_order_desc();
+			if( cf->get_option_ttl() != 0 ) {
+				ttl = true;
+			}
 		}
 
-		int st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", tableId).c_str(), -1, &stmtDeleteCf, 0 );
-		HT4C_SQLITE_VERIFY( st, db, 0 );
+		if( ttl ) {
+			int st = sqlite3_prepare_v2( db, Hypertable::format("DELETE FROM t%lld WHERE r=? AND cf=? AND ts>?;", tableId).c_str(), -1, &stmtDeleteCf, 0 );
+			HT4C_SQLITE_VERIFY( st, db, 0 );
+		}
 	}
 
 	Scanner::Reader::~Reader() {
@@ -1076,7 +1112,9 @@ namespace ht4c { namespace SQLite { namespace Db {
 		scanContext = 0;
 
 		Util::stmt_finalize( db, &stmtQuery );
-		Util::stmt_finalize( db, &stmtDeleteCf );
+		if( stmtDeleteCf ) {
+			Util::stmt_finalize( db, &stmtDeleteCf );
+		}
 		db = 0;
 	}
 
@@ -1110,7 +1148,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			predicate = " WHERE " + scanContext->predicate;
 		}
 
-		const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+		const char* orderBy = noCellRevisions ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
 		std::string select = Hypertable::format( "SELECT %s FROM t%lld%s %s;", scanContext->columns.c_str(), tableId, predicate.c_str(), orderBy );
 		int st = sqlite3_prepare_v2( db, select.c_str(), -1, &stmtQuery, 0 );
 		HT4C_SQLITE_VERIFY( st, db, 0 );
@@ -1322,8 +1360,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return true;
 	}
 
-	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec )
-	: Reader( env, db, tableId, schema, scanSpec )
+	Scanner::ReaderScanAndFilter::ReaderScanAndFilter( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& scanSpec )
+	: Reader( table, db, scanSpec )
 	{
 	}
 
@@ -1334,7 +1372,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			predicate = " AND (" + scanContext->predicate + ")";
 		}
 
-		const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+		const char* orderBy = noCellRevisions ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
 
 		std::string select;
 		if( strcmp(*scanContext->rowset.begin(),*scanContext->rowset.rbegin()) ) {
@@ -1358,8 +1396,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		HT4C_SQLITE_VERIFY( st, db, 0 )
 	}
 
-	Scanner::ReaderRowIntervals::ReaderRowIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
-	: Reader( env, db, tableId, schema, _scanSpec )
+	Scanner::ReaderRowIntervals::ReaderRowIntervals( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& _scanSpec )
+	: Reader( table, db, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.row_intervals.begin() )
 	, rowIntervalDone( true )
@@ -1389,7 +1427,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
-			const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+			const char* orderBy = noCellRevisions ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
 
 			std::string select;
 			if( strcmp(it->start, it->end) ) {
@@ -1447,8 +1485,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 		return st == SQLITE_ROW;
 	}
 
-	Scanner::ReaderCellIntervals::ReaderCellIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& _scanSpec )
-	: Reader( env, db, tableId, schema, _scanSpec )
+	Scanner::ReaderCellIntervals::ReaderCellIntervals( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& _scanSpec )
+	: Reader( table, db, _scanSpec )
 	, scanSpec( _scanSpec )
 	, it( _scanSpec.cell_intervals.begin() )
 	, startColumnQualifier( 0 )
@@ -1513,7 +1551,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				predicate = " AND (" + scanContext->predicate + ")";
 			}
 
-			const char* orderBy = env->NoCellRevisions() ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
+			const char* orderBy = noCellRevisions ? "ORDER BY r, cf, cq" : "ORDER BY r, cf, cq, ts";
 
 			std::string select;
 			if( strcmp(it->start_row, it->end_row) ) {

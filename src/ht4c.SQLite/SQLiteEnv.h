@@ -58,7 +58,9 @@ namespace ht4c { namespace SQLite {
 			inline sqlite3* getDb( ) const {
 				return db;
 			}
-
+			inline bool UniqueRows( ) const {
+				return uniqueRows;
+			}
 			inline bool NoCellRevisions( ) const {
 				return noCellRevisions;
 			}

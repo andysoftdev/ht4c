@@ -145,6 +145,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 			Table( NamespacePtr ns, const std::string& name, const Table& other );
 			virtual ~Table( );
 
+			inline bool UniqueRows() const {
+				return uniqueRows;
+			}
+			inline bool NoCellRevisions() const {
+				return noCellRevisions;
+			}
 			inline SQLiteEnv* getEnv( ) const {
 				return ns->getEnv();
 			}
@@ -185,6 +191,8 @@ namespace ht4c { namespace SQLite { namespace Db {
 			int64_t id;
 			sqlite3* db;
 			SQLiteEnv* env;
+			bool uniqueRows;
+			bool noCellRevisions;
 	};
 
 	class Mutator : public Hypertable::ReferenceCount {
@@ -332,7 +340,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					Reader( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					Reader( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& scanSpec );
 					virtual ~Reader();
 
 					virtual void stmtPrepare( );
@@ -360,6 +368,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 						MAX_CF = 256
 					};
 					bool timeOrderAsc[MAX_CF];
+					bool noCellRevisions;
 
 				private:
 
@@ -379,7 +388,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderScanAndFilter( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderScanAndFilter( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 			};
@@ -388,7 +397,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderRowIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderRowIntervals( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 
@@ -411,7 +420,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 
 				public:
 
-					ReaderCellIntervals( SQLiteEnv* env, sqlite3* db, int64_t tableId, Hypertable::SchemaPtr schema, const Hypertable::ScanSpec& scanSpec );
+					ReaderCellIntervals( Db::Table* table, sqlite3* db, const Hypertable::ScanSpec& scanSpec );
 
 					virtual void stmtPrepare( );
 
