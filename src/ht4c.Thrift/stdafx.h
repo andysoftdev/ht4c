@@ -27,6 +27,7 @@
 
 #include <Common/ReferenceCount.h>
 #include "Common/HRTimer.h"
+#include "Hypertable/Lib/Canonicalize.h"
 #include "Hypertable/Lib/Namespace.h"
 
 #include "ThriftBroker/Client.h"

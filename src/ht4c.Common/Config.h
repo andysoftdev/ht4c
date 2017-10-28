@@ -44,15 +44,23 @@ namespace ht4c { namespace Common {
 			/// </summary>
 			static const char* ProviderNameAlias;
 
+#ifdef SUPPORT_HYPERTABLE
+
 			/// <summary>
 			/// Provider name value - Hyper.
 			/// </summary>
 			static const char* ProviderHyper;
 
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 			/// <summary>
 			/// Provider name value - Thrift.
 			/// </summary>
 			static const char* ProviderThrift;
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 

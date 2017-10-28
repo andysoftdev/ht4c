@@ -117,7 +117,7 @@ namespace ht4c { namespace SQLite {
 			}
 			ns += name;
 		}
-		Hypertable::Namespace::canonicalize( &ns );
+		Canonicalize::trim_namespace_path( &ns );
 		return ns;
 	}
 

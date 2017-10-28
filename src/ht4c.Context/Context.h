@@ -92,9 +92,11 @@ namespace ht4c {
 
 	private:
 
-		friend class SessionCallback;
+			friend class SessionCallback;
 
 			#ifndef __cplusplus_cli
+
+#ifdef SUPPORT_HYPERTABLE
 
 			/// <summary>
 			/// Returns the Hypertable connection manager.
@@ -124,12 +126,18 @@ namespace ht4c {
 			/// <remarks>Pure native method.</remarks>
 			Hyperspace::Comm* getComm( );
 
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 			/// <summary>
 			/// Returns the thrift client.
 			/// </summary>
 			/// <returns>Thrift client</returns>
 			/// <remarks>Pure native method.</remarks>
 			Hypertable::Thrift::ThriftClientPtr getThriftClient( );
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -183,11 +191,15 @@ namespace ht4c {
 
 			Context( Common::ContextKind contextKind, Hypertable::PropertiesPtr properties );
 
+#ifdef SUPPORT_HYPERTABLE
+
 			void fireSessionStateChanged( Common::SessionState oldSessionState, Common::SessionState newSessionState );
 
 			static Hyperspace::SessionPtr findSession( Hypertable::PropertiesPtr properties, Hypertable::ConnectionManagerPtr& connMgr );
 			static void registerSession( Hyperspace::SessionPtr session, Hypertable::ConnectionManagerPtr connMgr );
 			static void unregisterSession( Hyperspace::SessionPtr session );
+
+#endif
 
 			static Hypertable::PropertiesPtr initializeProperties( int argc, char *argv[], const Common::Properties& properties, const char* loggingLevel );
 			static Hypertable::PropertiesPtr convertProperties( const Common::Properties& properties );
@@ -198,12 +210,22 @@ namespace ht4c {
 			std::mutex ctxMutex;
 			Common::ContextKind contextKind;
 			Hypertable::PropertiesPtr properties;
+
+#ifdef SUPPORT_HYPERTABLE
+
 			Hypertable::ConnectionManagerPtr connMgr;
 			Hypertable::ApplicationQueueInterfacePtr appQueue;
 			Hyperspace::SessionPtr session;
-			Hypertable::Thrift::ThriftClientPtr thriftClient;
 			sessionStateSinks_t sessionStateSinks;
 			SessionCallback* sessionCallback;
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
+			Hypertable::Thrift::ThriftClientPtr thriftClient;
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 

@@ -34,17 +34,37 @@
 #include "ht4c.Common/Exception.h"
 #include "ht4c.Common/CU82W.h"
 #include "ht4c.Common/CW2U8.h"
+
+#ifdef SUPPORT_HYPERTABLE
+
 #include "ht4c.Hyper/HyperClient.h"
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 #include "ht4c.Thrift/ThriftFactory.h"
 #include "ht4c.Thrift/ThriftClient.h"
+
+#endif
 
 #pragma warning( push, 3 )
 
 #include "Common/Init.h"
+
+#ifdef SUPPORT_HYPERTABLE
+
 #include "FsBroker/Lib/Config.h"
 #include "Hyperspace/Config.h"
 #include "Hypertable/Lib/Config.h"
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 #include "ThriftBroker/Config.h"
+
+#endif
 
 #pragma warning( pop )
 
@@ -52,6 +72,8 @@ namespace ht4c {
 
 	using namespace Hypertable;
 	using namespace Hypertable::Config;
+
+#ifdef SUPPORT_HYPERTABLE
 
 	class SessionCallback : public Hyperspace::SessionCallback {
 
@@ -103,6 +125,8 @@ namespace ht4c {
 			Context* ctx;
 			Common::SessionState oldSessionState;
 	};
+
+#endif
 
 	namespace {
 
@@ -160,12 +184,32 @@ namespace ht4c {
 		}
 
 		typedef Meta::list<
+
+#ifdef SUPPORT_HYPERTABLE
+
 			FsClientPolicy
 		, HyperspaceClientPolicy
 		, MasterClientPolicy
-		, RangeServerClientPolicy
-		, ThriftClientPolicy
-		, DefaultCommPolicy
+		, RangeServerClientPolicy,
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
+			ThriftClientPolicy,
+
+#endif
+
+#if defined(SUPPORT_HYPERTABLE) || defined(SUPPORT_HYPERTABLE_THRIFT)
+
+			DefaultCommPolicy
+
+#else
+
+			DefaultPolicy
+
+#endif
+
 		> PolicyList;
 
 		typedef Join<PolicyList>::type JoinedPolicyList;
@@ -178,8 +222,32 @@ namespace ht4c {
 			static void init_options( ) {
 				Config::allow_unregistered_options( true );
 
+				const char* defaultProvider = "";
+
+#ifdef SUPPORT_HYPERTABLE
+
+				defaultProvider = Common::Config::ProviderHyper;
+
+#elif SUPPORT_HYPERTABLE_THRIFT
+
+				defaultProvider = Common::Config::ProviderThrift;
+
+#elif SUPPORT_HYPERTABLE_SQLITE
+
+				defaultProvider = Common::Config::ProviderSqlite;
+
+#elif SUPPORT_HYPERTABLE_ODBC
+
+				defaultProvider = Common::Config::ProviderOdbc;
+
+#elif SUPPORT_HYPERTABLE_HAMSTERDB
+
+				defaultProvider = Common::Config::ProviderHamsterDb;
+
+#endif
+
 				cmdline_desc().add_options()
-					(Common::Config::ProviderNameAlias, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
+					(Common::Config::ProviderNameAlias, str()->default_value(defaultProvider), format("Provider name (default: %s)\n", defaultProvider).c_str())
 					(Common::Config::UriAlias, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n")
 					(Common::Config::ConnectionTimeoutAlias, i32()->default_value(defaultConnectionTimeoutMsec), "Connection timeout [ms] (default: 30000)\n");
 
@@ -188,7 +256,7 @@ namespace ht4c {
 				alias( Common::Config::ConnectionTimeoutAlias, Common::Config::ConnectionTimeout );
 
 				file_desc().add_options()
-					(Common::Config::ProviderName, str()->default_value(Common::Config::ProviderHyper), "Provider name (default: Hyper)\n")
+					(Common::Config::ProviderName, str()->default_value(defaultProvider), format("Provider name (default: %s)\n", defaultProvider).c_str())
 					(Common::Config::Uri, str()->default_value(localhost), "Uri hostname[:port] (default: net.tcp://localhost)\n")
 					(Common::Config::ConnectionTimeout, i32()->default_value(defaultConnectionTimeoutMsec), "Connection timeout [ms] (default: 30000)\n");
 
@@ -279,16 +347,29 @@ namespace ht4c {
 				properties->sync_aliases();
 
 				std::string providerName = properties->get_str( Common::Config::ProviderName );
-				if( providerName == Common::Config::ProviderHyper ) {
+
+				if( false ) {
+				}
+
+#ifdef SUPPORT_HYPERTABLE
+
+				else if( providerName == Common::Config::ProviderHyper ) {
 					if( !properties->defaulted(Common::Config::Uri) || !properties->has(hyperspace) || properties->defaulted(hyperspace) ) {
 						properties->set( hyperspace, get_nettcp_uri(hyperspacePort, defaultHyperspacePort) );
 					}
 				}
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 				else if( providerName == Common::Config::ProviderThrift ) {
 					if( !properties->defaulted(Common::Config::Uri) || !properties->has(thriftBroker) || properties->defaulted(thriftBroker) ) {
 						properties->set( thriftBroker, get_nettcp_uri(thriftBrokerPort, defaultThriftBrokerPort) );
 					}
 				}
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -455,7 +536,12 @@ namespace ht4c {
 				sessions.clear();
 			}
 
+#ifdef SUPPORT_HYPERTABLE
+
 			Comm::destroy();
+
+#endif
+
 			Config::cleanup();
 			Logging::shutdown();
 			delete Logger::get();
@@ -485,14 +571,24 @@ namespace ht4c {
 			boost::lock_guard<boost::mutex> lock( envMutex );
 
 			switch( contextKind ) {
+
+#ifdef SUPPORT_HYPERTABLE
+
 				case Common::CK_Hyper:
 					return ht4c::Hyper::HyperClient::create( 
 						getConnectionManager(), 
 						getHyperspaceSession(), 
 						getApplicationQueue(),
 						properties );
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 				case Common::CK_Thrift:
 					return ht4c::Thrift::ThriftClient::create( getThriftClient() );
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -540,17 +636,46 @@ namespace ht4c {
 		case Common::CF_PeriodicFlushTableMutator:
 		case Common::CF_AsyncTableScanner:
 		case Common::CF_CounterColumn:
-			return contextKind == Common::CK_Hyper || contextKind == Common::CK_Thrift;
+
+#ifdef SUPPORT_HYPERTABLE
+
+			if( contextKind == Common::CK_Hyper ) {
+				return true;
+			}
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
+			if( contextKind == Common::CK_Thrift ) {
+				return true;
+			}
+
+#endif
+
+			return false;
 		case Common::CF_NotifySessionStateChanged:
-			return contextKind == Common::CK_Hyper;
+
+#ifdef SUPPORT_HYPERTABLE
+
+			if( contextKind == Common::CK_Hyper ) {
+				return true;
+			}
+
+#endif
+
+			return false;
 		default:
 			break;
 		}
 		return false;
 	}
 
-	void Context::addSessionStateSink( Common::SessionStateSink* SessionStateSink ) {
-		if(  SessionStateSink 
+	void Context::addSessionStateSink( Common::SessionStateSink* sessionStateSink ) {
+
+#ifdef SUPPORT_HYPERTABLE
+
+		if(  sessionStateSink 
 			&& contextKind == Common::CK_Hyper ) {
 
 			std::lock_guard<std::mutex> lock( ctxMutex );
@@ -563,15 +688,24 @@ namespace ht4c {
 				}
 			}
 
-			sessionStateSinks.insert( SessionStateSink );
+			sessionStateSinks.insert( sessionStateSink );
 		}
+
+#endif
+
 	}
 
-	void Context::removeSessionStateSink( Common::SessionStateSink* SessionStateSink ) {
-		if( SessionStateSink ) {
+	void Context::removeSessionStateSink( Common::SessionStateSink* sessionStateSink ) {
+
+#ifdef SUPPORT_HYPERTABLE
+
+		if( sessionStateSink ) {
 			std::lock_guard<std::mutex> lock( ctxMutex );
-			sessionStateSinks.erase( SessionStateSink );
+			sessionStateSinks.erase( sessionStateSink );
 		}
+
+#endif
+
 	}
 
 	Context::~Context( ) {
@@ -618,6 +752,8 @@ namespace ht4c {
 
 #endif
 
+#ifdef SUPPORT_HYPERTABLE
+
 		{
 			std::lock_guard<std::mutex> lock( ctxMutex );
 
@@ -633,15 +769,29 @@ namespace ht4c {
 			sessionStateSinks.clear();
 		}
 
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 		thriftClient = 0;
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE
+
 		if( session ) {
 			boost::lock_guard<boost::mutex> lock( envMutex );
 			unregisterSession( session );
 		}
 		session = 0;
 		appQueue = 0;
+
+#endif
+
 		properties = 0;
 	}
+
+#ifdef SUPPORT_HYPERTABLE
 
 	ConnectionManagerPtr Context::getConnectionManager( ) {
 		HT4C_TRY {
@@ -690,6 +840,10 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 	Hypertable::Thrift::ThriftClientPtr Context::getThriftClient( ) {
 		HT4C_TRY {
 			if( !thriftClient ) {
@@ -704,6 +858,8 @@ namespace ht4c {
 		}
 		HT4C_RETHROW
 	}
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 
@@ -790,9 +946,16 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 	Context::Context( Common::ContextKind _contextKind, Hypertable::PropertiesPtr _properties )
 	: contextKind( _contextKind )
 	, properties( _properties )
+
+#ifdef SUPPORT_HYPERTABLE
+
 	, sessionCallback( 0 )
+
+#endif
 	{
 	}
+
+#ifdef SUPPORT_HYPERTABLE
 
 	void Context::fireSessionStateChanged( Common::SessionState oldSessionState, Common::SessionState newSessionState ) {
 		sessionStateSinks_t _sessionStateSinks;
@@ -844,6 +1007,8 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 			}
 		}
 	}
+
+#endif
 
 	Hypertable::PropertiesPtr Context::initializeProperties( int argc, char *argv[], const Common::Properties& initialProperties, const char* loggingLevel ) {
 		std::lock_guard<std::recursive_mutex> lock( Config::rec_mutex );
@@ -991,12 +1156,25 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 	Common::ContextKind Context::getContextKind( Hypertable::PropertiesPtr properties ) {
 		Common::ContextKind contextKind = Common::CK_Unknown;
 		std::string providerName = properties->get_str( Common::Config::ProviderName );
-		if( providerName == Common::Config::ProviderHyper ) {
+
+		if( false ) {
+		}
+
+#ifdef SUPPORT_HYPERTABLE
+
+		else if( providerName == Common::Config::ProviderHyper ) {
 			contextKind = Common::CK_Hyper;
 		}
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 		else if( providerName == Common::Config::ProviderThrift ) {
 			contextKind = Common::CK_Thrift;
 		}
+
+#endif
 
 #ifdef SUPPORT_HAMSTERDB
 

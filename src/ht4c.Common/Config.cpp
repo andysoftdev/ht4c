@@ -30,8 +30,18 @@ namespace ht4c { namespace Common {
 
 	const char* Config::ProviderName												= "Ht4n.Provider";
 	const char* Config::ProviderNameAlias										= "Provider";
+
+#ifdef SUPPORT_HYPERTABLE
+
 	const char* Config::ProviderHyper												= "Hyper";
+
+#endif
+
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 	const char* Config::ProviderThrift											= "Thrift";
+
+#endif
 
 	const char* Config::Uri																	= "Ht4n.Uri";
 	const char* Config::UriAlias														= "Uri";

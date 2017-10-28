@@ -27,12 +27,23 @@
 
 #include "Common/ReferenceCount.h"
 #include "Common/Properties.h"
+#include "AsyncComm/Config.h"
+
+#ifdef SUPPORT_HYPERTABLE
+
 #include "AsyncComm/ApplicationQueue.h"
 #include "AsyncComm/ConnectionManager.h"
 #include "Hyperspace/Session.h"
+
+#endif
+
 #include "Hypertable/Lib/Client.h"
 
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+
 #include "ThriftBroker/Client.h"
+
+#endif
 
 #pragma warning( pop )
 

@@ -25,6 +25,7 @@
 #include "Common/ReferenceCount.h"
 #include "Common/HRTimer.h"
 #include "Hypertable/Lib/KeySpec.h"
+#include "Hypertable/Lib/Canonicalize.h"
 #include "Hypertable/Lib/Namespace.h"
 #include "re2/re2.h"
 #include "ht4c.Common/Utils.h"

@@ -30,6 +30,7 @@
 #include "AsyncComm/ConnectionManager.h"
 #include "Hyperspace/Session.h"
 #include "Hypertable/Lib/Client.h"
+#include "Hypertable/Lib/Canonicalize.h"
 #include "Hypertable/Lib/Namespace.h"
 #include "Hypertable/Lib/HqlInterpreter.h"
 #include "Hypertable/Lib/ResultCallback.h"

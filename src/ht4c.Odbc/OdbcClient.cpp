@@ -117,7 +117,7 @@ namespace ht4c { namespace Odbc {
 			}
 			ns += name;
 		}
-		Hypertable::Namespace::canonicalize( &ns );
+		Canonicalize::trim_namespace_path( &ns );
 		return ns;
 	}
 
