@@ -37,7 +37,7 @@ namespace ht4c { namespace Odbc {
 		HT4C_ODBC_RETHROW
 	}
 
-	OdbcClient::~OdbcClient( ) {
+	OdbcClient::~OdbcClient( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			client = 0;
 		}

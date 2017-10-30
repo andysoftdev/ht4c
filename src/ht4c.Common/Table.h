@@ -38,6 +38,7 @@ namespace ht4c { namespace Common {
 	class TableScanner;
 	class ScanSpec;
 	class AsyncResult;
+	class HypertableException;
 
 	/// <summary>
 	/// Abstract class represents a Hypertable table.
@@ -49,7 +50,7 @@ namespace ht4c { namespace Common {
 			/// <summary>
 			/// Destroys the Table instance.
 			/// </summary>
-			virtual ~Table( ) { }
+			virtual ~Table( ) throw(HypertableException) { }
 
 			/// <summary>
 			/// Returns the context kind.

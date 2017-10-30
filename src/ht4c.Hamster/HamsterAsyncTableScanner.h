@@ -60,7 +60,7 @@ namespace ht4c { namespace Hamster {
 			/// <summary>
 			/// Destroys the HamsterAsyncTableScanner instance.
 			/// </summary>
-			virtual ~HamsterAsyncTableScanner( );
+			virtual ~HamsterAsyncTableScanner( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::AsyncTableScanner methods
 

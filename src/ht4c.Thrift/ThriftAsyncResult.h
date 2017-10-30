@@ -28,7 +28,10 @@
 #include "ht4c.Common/AsyncResult.h"
 
 namespace ht4c { namespace Common {
+
 	class AsyncResultSink;
+	class HypertableException;
+
 } }
 
 namespace ht4c { namespace Thrift {
@@ -85,7 +88,7 @@ namespace ht4c { namespace Thrift {
 			/// <summary>
 			/// Destroys the ThriftAsyncResult instance.
 			/// </summary>
-			virtual ~ThriftAsyncResult( );
+			virtual ~ThriftAsyncResult( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::AsyncResult methods
 

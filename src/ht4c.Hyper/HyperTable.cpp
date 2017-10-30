@@ -45,7 +45,7 @@ namespace ht4c { namespace Hyper {
 	}
 
 
-	HyperTable::~HyperTable( ) {
+	HyperTable::~HyperTable( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			table = 0;
 		}

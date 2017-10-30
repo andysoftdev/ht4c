@@ -66,7 +66,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperNamespace instance.
 			/// </summary>
-			virtual ~HyperNamespace( );
+			virtual ~HyperNamespace( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::Namespace methods
 

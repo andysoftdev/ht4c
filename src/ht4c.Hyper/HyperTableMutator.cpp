@@ -27,7 +27,6 @@
 #include "HyperTableMutator.h"
 
 #include "ht4c.Common/KeyBuilder.h"
-#include "ht4c.Common/Exception.h"
 
 namespace ht4c { namespace Hyper {
 
@@ -38,7 +37,7 @@ namespace ht4c { namespace Hyper {
 		HT4C_RETHROW
 	}
 
-	HyperTableMutator::~HyperTableMutator( ) {
+	HyperTableMutator::~HyperTableMutator( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			tableMutator = 0;
 		}

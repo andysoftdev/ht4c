@@ -28,6 +28,7 @@
 #include "ht4c.Common/Types.h"
 #include "ht4c.Common/Cells.h"
 #include "ht4c.Common/TableMutator.h"
+#include "ht4c.Common/Exception.h"
 
 namespace ht4c { namespace Hyper {
 
@@ -50,7 +51,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperTableMutator instance.
 			/// </summary>
-			virtual ~HyperTableMutator( );
+			virtual ~HyperTableMutator( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::TableMutator methods
 

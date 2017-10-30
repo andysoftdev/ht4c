@@ -56,15 +56,17 @@ namespace ht4c {
 			static Context* create( const Common::Properties& properties );
 
 			/// <summary>
-			/// Destroys the Context instance.
-			/// </summary>
-			/// <param name="ctx">Context to destroy</param>
-			static void destroy( Context* ctx );
-
-			/// <summary>
 			/// Frees resources used.
 			/// </summary>
 			static void shutdown( );
+
+			/// <summary>
+			/// Returns true if the implementation supports the context kind specified, otherwise false.
+			/// </summary>
+			/// <param name="contextKind">The context kind</param>
+			/// <returns> Returns true if the implementation supports the context kind specified, otherwise false</returns>
+			/// <seealso cref="ht4c::Common::ContextKind"/>
+			static bool hasContext( Common::ContextKind contextKind );
 
 			/// <summary>
 			/// Merges the connection string with all default properties and those from a configuration file.

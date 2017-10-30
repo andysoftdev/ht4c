@@ -83,7 +83,7 @@ namespace ht4c { namespace Odbc {
 		HT4C_ODBC_RETHROW
 	}
 
-	OdbcEnv::~OdbcEnv( ) {
+	OdbcEnv::~OdbcEnv( ) throw(ht4c::Common::HypertableException) {
 			{
 				boost::lock_guard<boost::mutex> lock( mtxEnvironments );
 				environments.erase( this );

@@ -109,7 +109,7 @@ namespace ht4c { namespace Thrift {
 		return true;
 	}
 
-	ThriftAsyncResult::~ThriftAsyncResult( ) {
+	ThriftAsyncResult::~ThriftAsyncResult( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			{
 				std::lock_guard<std::mutex> lock( mutex );

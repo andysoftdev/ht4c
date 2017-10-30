@@ -57,7 +57,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperAsyncTableMutator instance.
 			/// </summary>
-			virtual ~HyperAsyncTableMutator( );
+			virtual ~HyperAsyncTableMutator( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::AsyncTableMutator methods
 

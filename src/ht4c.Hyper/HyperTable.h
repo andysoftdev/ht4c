@@ -56,7 +56,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperTable instance.
 			/// </summary>
-			virtual ~HyperTable( );
+			virtual ~HyperTable( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::Table methods
 

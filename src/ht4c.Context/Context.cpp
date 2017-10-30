@@ -232,17 +232,17 @@ namespace ht4c {
 
 				defaultProvider = Common::Config::ProviderThrift;
 
-#elif SUPPORT_HYPERTABLE_SQLITE
+#elif SUPPORT_SQLITEDB
 
-				defaultProvider = Common::Config::ProviderSqlite;
+				defaultProvider = Common::Config::ProviderSQLite;
 
-#elif SUPPORT_HYPERTABLE_ODBC
+#elif SUPPORT_HAMSTERDB
+
+				defaultProvider = Common::Config::ProviderHamster;
+
+#elif SUPPORT_ODBC
 
 				defaultProvider = Common::Config::ProviderOdbc;
-
-#elif SUPPORT_HYPERTABLE_HAMSTERDB
-
-				defaultProvider = Common::Config::ProviderHamsterDb;
 
 #endif
 
@@ -549,6 +549,50 @@ namespace ht4c {
 		HT4C_RETHROW
 	}
 
+	bool Context::hasContext(Common::ContextKind contextKind) {
+		switch (contextKind) {
+
+		case Common::CK_Hyper:
+#ifdef SUPPORT_HYPERTABLE
+			return true;
+#else
+			return false;
+#endif
+
+		case Common::CK_Thrift:
+#ifdef SUPPORT_HYPERTABLE_THRIFT
+			return true;
+#else
+			return false;
+#endif
+
+		case Common::CK_SQLite:
+#ifdef SUPPORT_SQLITEDB
+			return true;
+#else
+			return false;
+#endif
+
+		case Common::CK_Hamster:
+#ifdef SUPPORT_HAMSTERDB
+			return true;
+#else
+			return false;
+#endif
+
+		case Common::CK_ODBC:
+#ifdef SUPPORT_ODBC
+			return true;
+#else
+			return false;
+#endif
+
+		default:
+			break;
+		}
+		return false;
+	}
+
 	void Context::mergeProperties( const char* connectionString, const char* loggingLevel, Common::Properties& _properties ) {
 		HT4C_TRY {
 			int argc;
@@ -654,6 +698,7 @@ namespace ht4c {
 #endif
 
 			return false;
+
 		case Common::CF_NotifySessionStateChanged:
 
 #ifdef SUPPORT_HYPERTABLE
@@ -1039,7 +1084,11 @@ Odbc::OdbcEnvPtr Context::getOdbcEnv( ) {
 				catch( std::bad_cast& ) {
 					std::stringstream ss;
 					ss << "Invalid property value for '" << name << "'\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')';
-					throw std::bad_cast( ss.str().c_str() );
+#if _MSC_VER < 1900
+						throw std::bad_cast(ss.str().c_str());
+#else
+					throw std::bad_cast::__construct_from_string_literal( ss.str().c_str() );
+#endif
 				}
 			}
 			else {

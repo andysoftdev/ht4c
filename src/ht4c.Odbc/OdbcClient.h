@@ -54,7 +54,7 @@ namespace ht4c { namespace Odbc {
 			/// <summary>
 			/// Destroys the OdbcClient instance.
 			/// </summary>
-			virtual ~OdbcClient( );
+			virtual ~OdbcClient( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::Client methods
 

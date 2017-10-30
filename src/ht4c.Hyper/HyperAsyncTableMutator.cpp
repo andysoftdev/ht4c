@@ -42,7 +42,7 @@ namespace ht4c { namespace Hyper {
 		return reinterpret_cast<int64_t>( tableMutator );
 	}
 
-	HyperAsyncTableMutator::~HyperAsyncTableMutator( ) {
+	HyperAsyncTableMutator::~HyperAsyncTableMutator( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			tableMutator = 0;
 		}

@@ -58,7 +58,7 @@ namespace ht4c { namespace Hamster {
 			/// <summary>
 			/// Destroys the HamsterAsyncTableMutator instance.
 			/// </summary>
-			virtual ~HamsterAsyncTableMutator( );
+			virtual ~HamsterAsyncTableMutator( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::AsyncTableMutator methods
 

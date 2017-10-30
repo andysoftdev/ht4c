@@ -41,7 +41,7 @@ namespace ht4c { namespace Hyper {
 		return reinterpret_cast<int64_t>( tableScanner );
 	}
 
-	HyperAsyncTableScanner::~HyperAsyncTableScanner( ) {
+	HyperAsyncTableScanner::~HyperAsyncTableScanner( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			tableScanner = 0;
 		}

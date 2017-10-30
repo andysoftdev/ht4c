@@ -42,7 +42,7 @@ namespace ht4c { namespace Hamster {
 		return int64_t(tableMutator.get());
 	}
 
-	HamsterAsyncTableMutator::~HamsterAsyncTableMutator( ) {
+	HamsterAsyncTableMutator::~HamsterAsyncTableMutator( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			{
 				HamsterEnvLock sync( tableMutator->getEnv() );

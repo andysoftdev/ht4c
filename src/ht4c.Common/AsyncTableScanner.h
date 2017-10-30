@@ -27,6 +27,8 @@
 
 namespace ht4c { namespace Common {
 
+	class HypertableException;
+
 	/// <summary>
 	/// Abstract class represents a asynchronous table scanner.
 	/// </summary>
@@ -37,7 +39,7 @@ namespace ht4c { namespace Common {
 			/// <summary>
 			/// Destroys the AsyncTableScanner instance.
 			/// </summary>
-			virtual ~AsyncTableScanner( ) { }
+			virtual ~AsyncTableScanner( ) throw(HypertableException) { }
 
 			/// <summary>
 			/// Returns the scanner identifier.

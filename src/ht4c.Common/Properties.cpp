@@ -159,7 +159,11 @@ namespace ht4c { namespace Common {
 
 		std::stringstream ss;
 		ss << "Unsupported property type\n\tat " << __FUNCTION__ << " (" << __FILE__ << ':' << __LINE__ << ')';
-		throw std::bad_cast( ss.str().c_str() );
+#if _MSC_VER < 1900
+		throw std::bad_cast(ss.str().c_str());
+#else
+		throw std::bad_cast::__construct_from_string_literal( ss.str().c_str() );
+#endif
 
 		#undef CONVERT_ANY
 	}

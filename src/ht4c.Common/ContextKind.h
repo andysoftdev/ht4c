@@ -38,50 +38,30 @@ namespace ht4c { namespace Common {
 		/// </summary>
 	  CK_Unknown = 0
 
-#ifdef SUPPORT_HYPERTABLE
-
 		/// <summary>
 		/// Hypertable native protocol context kind.
 		/// </summary>
 	, CK_Hyper
-
-#endif
-
-#ifdef SUPPORT_HYPERTABLE_THRIFT
 
 		/// <summary>
 		/// Hypertable thrift API context kind.
 		/// </summary>
 	, CK_Thrift
 
-#endif
-
-#ifdef SUPPORT_HAMSTERDB
+		/// <summary>
+		/// Hypertable SQLite API context kind.
+		/// </summary>
+	, CK_SQLite
 
 		/// <summary>
 		/// Hypertable hamster API context kind.
 		/// </summary>
 	, CK_Hamster
 
-#endif
-
-#ifdef SUPPORT_SQLITEDB
-
-		/// <summary>
-		/// Hypertable SQLite API context kind.
-		/// </summary>
-	, CK_SQLite
-
-#endif
-
-#ifdef SUPPORT_ODBC
-
 	/// <summary>
 	/// Hypertable ODBC API context kind.
 	/// </summary>
 	, CK_ODBC
-
-#endif
 
 		/// <summary>
 		/// Terminator.

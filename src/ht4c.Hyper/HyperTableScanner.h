@@ -28,6 +28,7 @@
 #include "ht4c.Common/Types.h"
 #include "ht4c.Common/Cell.h"
 #include "ht4c.Common/TableScanner.h"
+#include "ht4c.Common/Exception.h"
 
 
 namespace ht4c { namespace Hyper {
@@ -51,7 +52,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperTableScanner instance.
 			/// </summary>
-			virtual ~HyperTableScanner( );
+			virtual ~HyperTableScanner( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::TableScanner methods
 

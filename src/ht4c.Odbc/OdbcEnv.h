@@ -37,6 +37,7 @@ namespace odbc {
 namespace ht4c { namespace Common {
 
 	class Client;
+	class HypertableException;
 
 } }
 
@@ -58,7 +59,7 @@ namespace ht4c { namespace Odbc {
 	public:
 
 			OdbcEnv( const std::string& connectionString, const OdbcEnvConfig& config );
-			virtual ~OdbcEnv( );
+			virtual ~OdbcEnv( ) throw(ht4c::Common::HypertableException);
 
 			Common::Client* createClient( );
 			odbc::otl_connect* getDb();

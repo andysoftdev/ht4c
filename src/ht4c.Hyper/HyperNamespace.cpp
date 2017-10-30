@@ -41,7 +41,7 @@ namespace ht4c { namespace Hyper {
 		HT4C_RETHROW
 	}
 
-	HyperNamespace::~HyperNamespace( ) {
+	HyperNamespace::~HyperNamespace( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			ns = 0;
 		}

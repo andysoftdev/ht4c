@@ -56,7 +56,7 @@ namespace ht4c { namespace Hyper {
 			/// <summary>
 			/// Destroys the HyperAsyncTableScanner instance.
 			/// </summary>
-			virtual ~HyperAsyncTableScanner( );
+			virtual ~HyperAsyncTableScanner( ) throw(ht4c::Common::HypertableException);
 
 			#pragma region Common::AsyncTableScanner methods
 

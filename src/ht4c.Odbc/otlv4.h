@@ -17466,7 +17466,7 @@ public:
   shell->flush_flag=true;
  }
 
- virtual ~otl_stream()
+ virtual ~otl_stream() throw(otl_exception)
  {
   if(!connected)return;
   try{

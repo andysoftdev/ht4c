@@ -71,6 +71,8 @@ class CellsSerializedNoCopy : public Hypertable::ThriftGen::CellsSerialized
 {
 	public:
 
+#if _MSC_VER < 1900
+
 		inline CellsSerializedNoCopy( char* p, size_t len ) {
 			_Myres = len > _BUF_SIZE ? len : _BUF_SIZE;
 			_Bx._Ptr = p;
@@ -82,4 +84,20 @@ class CellsSerializedNoCopy : public Hypertable::ThriftGen::CellsSerialized
 			_Bx._Ptr = 0;
 			_Mysize = 0;
 		}
+
+#else
+
+		inline CellsSerializedNoCopy(char* p, size_t len) {
+			_Myres() = len > _BUF_SIZE ? len : _BUF_SIZE;
+			_Bx()._Ptr = p;
+			_Mysize() = len;
+		}
+
+		inline ~CellsSerializedNoCopy() {
+			_Myres() = 0;
+			_Bx()._Ptr = 0;
+			_Mysize() = 0;
+		}
+
+#endif
 };

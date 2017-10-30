@@ -30,6 +30,7 @@
 namespace ht4c { namespace Common {
 
 	class Cells;
+	class HypertableException;
 
 	/// <summary>
 	/// Abstract class represents a table mutator.
@@ -41,7 +42,7 @@ namespace ht4c { namespace Common {
 			/// <summary>
 			/// Destroys the TableMutator instance.
 			/// </summary>
-			virtual ~TableMutator( ) { }
+			virtual ~TableMutator( ) throw(HypertableException) { }
 
 			/// <summary>
 			/// Inserts a new cell into the table.

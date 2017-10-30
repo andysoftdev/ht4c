@@ -33,6 +33,7 @@ namespace ht4c { namespace Common {
 	class Client;
 	class Table;
 	class Cells;
+	class HypertableException;
 
 	/// <summary>
 	/// Abstract class represents Hypertable namespace.
@@ -44,7 +45,7 @@ namespace ht4c { namespace Common {
 			/// <summary>
 			/// Destroys the Namespace instance.
 			/// </summary>
-			virtual ~Namespace( ) { }
+			virtual ~Namespace( ) throw(HypertableException) { }
 
 			/// <summary>
 			/// Returns the fully qualified namespace name.

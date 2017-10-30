@@ -40,7 +40,7 @@ namespace ht4c { namespace Hamster {
 		return int64_t(tableScanner.get());
 	}
 
-	HamsterAsyncTableScanner::~HamsterAsyncTableScanner( ) {
+	HamsterAsyncTableScanner::~HamsterAsyncTableScanner( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			tableScanner = 0;
 		}

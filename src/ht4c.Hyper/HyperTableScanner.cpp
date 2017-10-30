@@ -26,8 +26,6 @@
 #include "stdafx.h"
 #include "HyperTableScanner.h"
 
-#include "ht4c.Common/Exception.h"
-
 namespace ht4c { namespace Hyper {
 
 	Common::TableScanner* HyperTableScanner::create( Hypertable::TableScanner* tableScanner ) {
@@ -38,7 +36,7 @@ namespace ht4c { namespace Hyper {
 	}
 
 
-	HyperTableScanner::~HyperTableScanner( ) {
+	HyperTableScanner::~HyperTableScanner( ) throw(ht4c::Common::HypertableException) {
 		HT4C_TRY {
 			tableScanner = 0;
 		}
