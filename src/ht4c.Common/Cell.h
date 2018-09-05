@@ -39,6 +39,11 @@ namespace ht4c { namespace Common {
 		public:
 
 			/// <summary>
+			/// Max cell size.
+			/// </summary>
+			static const uint32_t MaxSize = 1000000000;
+
+			/// <summary>
 			/// Creates a new Cell instance.
 			/// </summary>
 			/// <returns>New Cell instance</returns>

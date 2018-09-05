@@ -70,7 +70,7 @@
 /// <summary>
 /// Throws an Argument exception.
 /// </summary>
-#define HT4C_THROW_ARGUMENT( mesg, arg ) \
+#define HT4C_THROW_ARGUMENT( msg, arg ) \
 	throw ht4c::Common::HypertableArgumentException( msg, arg, __LINE__, __FUNCTION__, __FILE__ );
 
 #endif

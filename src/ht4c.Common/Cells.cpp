@@ -67,6 +67,10 @@ namespace ht4c { namespace Common {
 	}
 
 	void Cells::add( const char* row, const char* columnFamily, const char* columnQualifier, uint64_t timestamp, const void* value, uint32_t valueLength, uint8_t flag ) {
+		if( valueLength > Cell::MaxSize ) {
+			HT4C_THROW_ARGUMENT("cell value exceeds the limit", "valueLength");
+		}
+
 		flag = FLAG( columnFamily, columnQualifier, flag );
 		Cell cell( row
 						 , CF(columnFamily)
