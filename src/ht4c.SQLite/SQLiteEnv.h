@@ -111,6 +111,7 @@ namespace ht4c { namespace SQLite {
 			}
 
 			sqlite3* db;
+			bool readOnly;
 			bool tx;
 
 			bool uniqueRows;
