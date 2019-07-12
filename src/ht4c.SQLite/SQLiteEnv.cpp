@@ -56,7 +56,7 @@ namespace ht4c { namespace SQLite {
 		HT4C_TRY {
 			try {
 				sqlite3_enable_shared_cache( 1 );
-				int st = sqlite3_open( filename.c_str(), &db );
+				int st = sqlite3_open( filename == "memory" ? ":memory:" : filename.c_str(), &db );
 				HT4C_SQLITE_VERIFY( st, db, 0 );
 
 				readOnly = sqlite3_db_readonly(db, "main") == 1;
