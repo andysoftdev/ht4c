@@ -1,0 +1,5 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PlatformToolset Condition="'$(PlatformToolset)'==''">v142</PlatformToolset>
+  </PropertyGroup>
+</Project>

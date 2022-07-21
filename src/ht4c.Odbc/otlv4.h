@@ -61,6 +61,11 @@
 #if !defined(OTL_ANSI_CPP_11_NOEXCEPT)
 #define OTL_ANSI_CPP_11_NOEXCEPT
 #endif
+#elif defined(_MSC_VER) && (_MSC_VER>=1920)
+// VC++ 11 and higher
+#if !defined(OTL_ANSI_CPP_11_NOEXCEPT)
+#define OTL_ANSI_CPP_11_NOEXCEPT noexcept
+#endif
 #elif defined(_MSC_VER) && (_MSC_VER>=1700)
 // VC++ 11 and higher
 #if !defined(OTL_ANSI_CPP_11_NOEXCEPT)
