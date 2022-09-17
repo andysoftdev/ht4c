@@ -607,7 +607,7 @@ namespace ht4c { namespace Odbc { namespace Db {
 			schemaSpec = (const char*)buf.base;
 		}
 		else {
-			schemaSpec.empty();
+			schemaSpec.clear();
 			dispose();
 		}
 	}

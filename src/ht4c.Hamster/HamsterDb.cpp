@@ -657,7 +657,7 @@ namespace ht4c { namespace Hamster { namespace Db {
 			schemaSpec = ((const char*)record.get_data() + sizeof(uint16_t));
 		}
 		else {
-			schemaSpec.empty();
+			schemaSpec.clear();
 			dispose();
 		}
 	}

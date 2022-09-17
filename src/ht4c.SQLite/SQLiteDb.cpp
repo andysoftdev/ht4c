@@ -638,7 +638,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 			}
 		}
 		else {
-			schemaSpec.empty();
+			schemaSpec.clear();
 			dispose();
 		}
 	}
