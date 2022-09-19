@@ -277,6 +277,7 @@ namespace ht4c {
 					(Common::Config::SQLiteFilename, str(), "SQLite db filename\n")
 					(Common::Config::SQLiteCacheSizeMB, i32()->default_value(64), "SQLite db cache size [MB] (default:64)\n")
 					(Common::Config::SQLitePageSizeKB, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
+					(Common::Config::SQLiteWriteAheadLog, boo()->default_value(false), "SQLite WAL (default:false)\n")
 					(Common::Config::SQLiteSynchronous, boo()->default_value(false), "SQLite synchronous (default:false)\n")
 					(Common::Config::SQLiteUniqueRows, boo()->default_value(false), "SQLite unique rows (default:false)\n")
 					(Common::Config::SQLiteNoCellRevisions, boo()->default_value(false), "SQLite no cell revisions (default:false)\n")
@@ -944,6 +945,7 @@ namespace ht4c {
 				SQLite::SQLiteEnvConfig config;
 				config.cacheSizeMB = properties->get_i32( Common::Config::SQLiteCacheSizeMB );
 				config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKB );
+				config.writeAheadLog = properties->get_bool( Common::Config::SQLiteWriteAheadLog );
 				config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronous );
 				config.uniqueRows = properties->get_bool( Common::Config::SQLiteUniqueRows );
 				config.noCellRevisions = properties->get_bool( Common::Config::SQLiteNoCellRevisions );

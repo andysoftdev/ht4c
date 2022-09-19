@@ -37,6 +37,7 @@ namespace ht4c { namespace SQLite {
 	struct SQLiteEnvConfig {
 		int cacheSizeMB;
 		int pageSizeKB;
+		bool writeAheadLog;
 		bool synchronous;
 		bool uniqueRows;
 		bool noCellRevisions;
@@ -48,6 +49,7 @@ namespace ht4c { namespace SQLite {
 		SQLiteEnvConfig( )
 			: cacheSizeMB( 64 )
 			, pageSizeKB( 4 )
+			, writeAheadLog( false )
 			, synchronous( false )
 			, uniqueRows( false )
 			, noCellRevisions( false )

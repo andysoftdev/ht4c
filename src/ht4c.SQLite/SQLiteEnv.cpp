@@ -67,7 +67,7 @@ namespace ht4c { namespace SQLite {
 						, Hypertable::format(
 							"PRAGMA page_size=%d;"
 							"PRAGMA cache_size=%d;"
-							"PRAGMA journal_mode=TRUNCATE;"
+							"PRAGMA journal_mode=%s;"
 							"PRAGMA synchronous=%s;"
 							"PRAGMA temp_store=MEMORY;"
 							"PRAGMA auto_vacuum=INCREMENTAL;"
@@ -75,7 +75,8 @@ namespace ht4c { namespace SQLite {
 							"sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
 							, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
 							, std::max(1, 1024 * config.cacheSizeMB / config.pageSizeKB)
-							, config.synchronous ? "ON" : "OFF").c_str()
+							, config.writeAheadLog ? "WAL" : "TRUNCATE"
+							, config.synchronous ? "NORMAL" : "OFF").c_str()
 						, 0, 0, &errmsg);
 
 						HT4C_SQLITE_VERIFY(st, db, errmsg);

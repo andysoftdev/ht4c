@@ -156,6 +156,11 @@ namespace ht4c { namespace Common {
 			static const char* SQLitePageSizeKB;
 
 			/// <summary>
+			/// SQLite write ahead log (wal).
+			/// </summary>
+			static const char* SQLiteWriteAheadLog;
+
+			/// <summary>
 			/// SQLite synchronous.
 			/// </summary>
 			static const char* SQLiteSynchronous;
