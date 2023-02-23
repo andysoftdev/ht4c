@@ -166,6 +166,14 @@ namespace ht4c { namespace Common {
 			static const char* SQLiteSynchronous;
 
 			/// <summary>
+			/// SQLite auto-vacuum mode.
+			/// </summary>
+			/// <remarks>
+			/// //0=None, 1=FULL, 2=INCREMENTAL
+			/// </remarks>
+			static const char* SQLiteAutoVacuum;
+
+			/// <summary>
 			/// SQLite unique rows.
 			/// </summary>
 			static const char* SQLiteUniqueRows;

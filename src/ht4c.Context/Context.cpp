@@ -279,6 +279,7 @@ namespace ht4c {
 					(Common::Config::SQLitePageSizeKB, i32()->default_value(4), "SQLite db page size [KB] (default:4)\n")
 					(Common::Config::SQLiteWriteAheadLog, boo()->default_value(false), "SQLite WAL (default:false)\n")
 					(Common::Config::SQLiteSynchronous, boo()->default_value(false), "SQLite synchronous (default:false)\n")
+					(Common::Config::SQLiteAutoVacuum, i32()->default_value(0), "SQLite auto-vacuum (default:0)\n")
 					(Common::Config::SQLiteUniqueRows, boo()->default_value(false), "SQLite unique rows (default:false)\n")
 					(Common::Config::SQLiteNoCellRevisions, boo()->default_value(false), "SQLite no cell revisions (default:false)\n")
 					(Common::Config::SQLiteIndexColumn, boo()->default_value(false), "Enables SQLite column index (default:false)\n")
@@ -947,6 +948,7 @@ namespace ht4c {
 				config.pageSizeKB = properties->get_i32( Common::Config::SQLitePageSizeKB );
 				config.writeAheadLog = properties->get_bool( Common::Config::SQLiteWriteAheadLog );
 				config.synchronous = properties->get_bool( Common::Config::SQLiteSynchronous );
+				config.autoVacuum = properties->get_i32( Common::Config::SQLiteAutoVacuum );
 				config.uniqueRows = properties->get_bool( Common::Config::SQLiteUniqueRows );
 				config.noCellRevisions = properties->get_bool( Common::Config::SQLiteNoCellRevisions );
 				config.indexColumn = properties->get_bool( Common::Config::SQLiteIndexColumn );

@@ -114,6 +114,7 @@ namespace ht4c { namespace SQLite {
 			bool readOnly;
 			bool tx;
 
+			int autoVacuum;
 			bool uniqueRows;
 			bool noCellRevisions;
 			bool indexColumn;

@@ -36,6 +36,7 @@ namespace ht4c { namespace SQLite {
 	: db( 0 )
 	, readOnly( false )
 	, tx( false )
+	, autoVacuum( autoVacuum )
 	, uniqueRows( config.uniqueRows )
 	, noCellRevisions( config.noCellRevisions )
 	, indexColumn( config.indexColumn )
@@ -70,13 +71,14 @@ namespace ht4c { namespace SQLite {
 							"PRAGMA journal_mode=%s;"
 							"PRAGMA synchronous=%s;"
 							"PRAGMA temp_store=MEMORY;"
-							"PRAGMA auto_vacuum=INCREMENTAL;"
+							"PRAGMA auto_vacuum=%d;"
 							"CREATE TABLE IF NOT EXISTS "
 							"sys_db (id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v BLOB, UNIQUE(k));"
 							, std::max(1, std::min(config.pageSizeKB, 64)) * 1024
 							, std::max(1, 1024 * config.cacheSizeMB / config.pageSizeKB)
 							, config.writeAheadLog ? "WAL" : "TRUNCATE"
-							, config.synchronous ? "NORMAL" : "OFF").c_str()
+							, config.synchronous ? "NORMAL" : "OFF"
+							, config.autoVacuum).c_str()
 						, 0, 0, &errmsg);
 
 						HT4C_SQLITE_VERIFY(st, db, errmsg);
@@ -146,13 +148,26 @@ namespace ht4c { namespace SQLite {
 				if( !readOnly ) {
 					// deletes the journal
 					char* errmsg = 0;
-					st = sqlite3_exec(
-						db,
-						"PRAGMA incremental_vacuum;"
-						"PRAGMA optimize;"
-						"PRAGMA journal_mode=DELETE;"
-						"BEGIN;COMMIT;"
-						, 0, 0, &errmsg);
+					// incremental vacuum ?
+					if( autoVacuum == 2 ) {
+						// deletes the journal
+						st = sqlite3_exec(
+							db,
+							"PRAGMA incremental_vacuum;"
+							"PRAGMA optimize;"
+							"PRAGMA journal_mode=DELETE;"
+							"BEGIN;COMMIT;"
+							, 0, 0, &errmsg);
+					}
+					else {
+						char* errmsg = 0;
+						st = sqlite3_exec(
+							db,
+							"PRAGMA optimize;"
+							"PRAGMA journal_mode=DELETE;"
+							"BEGIN;COMMIT;"
+							, 0, 0, &errmsg);
+					}
 					HT4C_SQLITE_VERIFY(st, db, errmsg);
 				}
 

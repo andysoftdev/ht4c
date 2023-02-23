@@ -70,6 +70,7 @@ namespace ht4c { namespace Common {
 	const char* Config::SQLitePageSizeKB									= "Ht4n.SQLite.PageSizeKB";
 	const char* Config::SQLiteWriteAheadLog									= "Ht4n.SQLite.WAL";
 	const char* Config::SQLiteSynchronous									= "Ht4n.SQLite.Synchronous";
+	const char* Config::SQLiteAutoVacuum									= "Ht4n.SQLite.AutoVacuum";
 	const char* Config::SQLiteUniqueRows									= "Ht4n.SQLite.UniqueRows";
 	const char* Config::SQLiteNoCellRevisions								= "Ht4n.SQLite.NoCellRevisions";
 	const char* Config::SQLiteIndexColumn									= "Ht4n.SQLite.Index.Column";

@@ -39,6 +39,7 @@ namespace ht4c { namespace SQLite {
 		int pageSizeKB;
 		bool writeAheadLog;
 		bool synchronous;
+		int autoVacuum; //0=None, 1=FULL, 2=INCREMENTAL
 		bool uniqueRows;
 		bool noCellRevisions;
 		bool indexColumn;
@@ -51,6 +52,7 @@ namespace ht4c { namespace SQLite {
 			, pageSizeKB( 4 )
 			, writeAheadLog( false )
 			, synchronous( false )
+			, autoVacuum( 0 )
 			, uniqueRows( false )
 			, noCellRevisions( false )
 			, indexColumn( false )
