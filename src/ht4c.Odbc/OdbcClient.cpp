@@ -100,6 +100,10 @@ namespace ht4c { namespace Odbc {
 		}
 		HT4C_ODBC_RETHROW
 	}
+
+	void OdbcClient::optimize( ) {
+		// not yet implemented, just ignore
+	}
 	
 	OdbcClient::OdbcClient( Db::ClientPtr _client )
 	: client( _client )

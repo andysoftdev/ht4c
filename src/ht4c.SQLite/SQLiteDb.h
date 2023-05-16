@@ -91,6 +91,7 @@ namespace ht4c { namespace SQLite { namespace Db {
 				return namespaceExists( name.c_str() );
 			}
 			void dropNamespace( const std::string& name, bool ifExists );
+			void optimize( );
 
 		private:
 

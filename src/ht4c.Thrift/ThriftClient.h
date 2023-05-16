@@ -60,6 +60,7 @@ namespace ht4c { namespace Thrift {
 			virtual Common::Namespace* openNamespace( const char* name, Common::Namespace* nsBase );
 			virtual void dropNamespace( const char* name, Common::Namespace* nsBase, bool ifExists, bool dropTables, bool deep );
 			virtual bool existsNamespace( const char* name, Common::Namespace* nsBase );
+			virtual void optimize( );
 
 			#pragma endregion
 

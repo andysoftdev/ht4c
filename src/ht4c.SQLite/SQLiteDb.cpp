@@ -147,6 +147,12 @@ namespace ht4c { namespace SQLite { namespace Db {
 		tx.commit();
 	}
 
+	void Client::optimize( ) {
+		char* errmsg = 0;
+		int st = sqlite3_exec( db, "VACUUM", 0, 0, &errmsg );
+		HT4C_SQLITE_VERIFY(st, db, errmsg);
+	}
+
 	void Client::dropNamespace( Util::Tx& /*tx*/, const std::string& name, bool ifExists ) {
 		if( name.empty() ) { // root "/" always exists
 			HT4C_SQLITE_THROW( Hypertable::Error::HYPERSPACE_DIR_NOT_EMPTY, "Cannot drop root namepsace '/'" );

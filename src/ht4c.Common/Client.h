@@ -96,6 +96,11 @@ namespace ht4c { namespace Common {
 			/// </remarks>
 			virtual bool existsNamespace( const char* name, Namespace* nsBase ) = 0;
 
+			/// <summary>
+			/// Defragment, re-index and optimize database.
+			/// </summary>
+			virtual void optimize( ) = 0;
+
 		protected:
 
 			/// <summary>

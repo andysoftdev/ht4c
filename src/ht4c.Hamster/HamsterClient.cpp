@@ -100,7 +100,11 @@ namespace ht4c { namespace Hamster {
 		}
 		HT4C_HAMSTER_RETHROW
 	}
-	
+
+	void HamsterClient::optimize( ) {
+		// not yet implemented, just ignore
+	}
+
 	HamsterClient::HamsterClient( Db::ClientPtr _client )
 	: client( _client )
 	{

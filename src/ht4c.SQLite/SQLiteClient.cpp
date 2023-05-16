@@ -100,6 +100,14 @@ namespace ht4c { namespace SQLite {
 		}
 		HT4C_SQLITE_RETHROW
 	}
+
+	void SQLiteClient::optimize( ) {
+		HT4C_TRY {
+			SQLiteEnvLock sync( client->getEnv() );
+			return client->optimize( );
+		}
+		HT4C_SQLITE_RETHROW
+	}
 	
 	SQLiteClient::SQLiteClient( Db::ClientPtr _client )
 	: client( _client )

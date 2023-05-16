@@ -133,6 +133,10 @@ namespace ht4c { namespace Thrift {
 		HT4C_THRIFT_RETHROW
 	}
 
+	void ThriftClient::optimize( ) {
+		// not yet implemented, just ignore
+	}
+
 	ThriftClient::ThriftClient( Hypertable::Thrift::ThriftClientPtr _client )
 	: client( _client )
 	{

@@ -107,6 +107,10 @@ namespace ht4c { namespace Hyper {
 		HT4C_RETHROW
 	}
 
+	void HyperClient::optimize( ) {
+		// not yet implemented, just ignore
+	}
+
 	HyperClient::HyperClient( 
 		Hypertable::ConnectionManagerPtr connMngr,
 		Hyperspace::SessionPtr session,
