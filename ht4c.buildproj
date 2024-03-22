@@ -24,7 +24,7 @@
 
     <!-- Platform toolset -->
     <PropertyGroup>
-        <PlatformToolset Condition="'$(PlatformToolset)' == ''">v140</PlatformToolset>
+        <PlatformToolset Condition="'$(PlatformToolset)' == ''">v142</PlatformToolset>
     </PropertyGroup>
 
     <!-- Make configuration Debug or Release -->
@@ -37,14 +37,6 @@
 
     <!-- Configuration group -->
     <ItemGroup>
-        <MakeConfiguration Include="." Condition="$(Is32Bit) == true And $(Debug) == true" >
-            <Configuration>Debug</Configuration>
-            <Platform>Win32</Platform>
-        </MakeConfiguration>
-        <MakeConfiguration Include="." Condition="$(Is32Bit) == true And $(Release) == true" >
-            <Configuration>Release</Configuration>
-            <Platform>Win32</Platform>
-        </MakeConfiguration>
         <MakeConfiguration Include="." Condition="$(Is64Bit) == true And $(Debug) == true" >
             <Configuration>Debug</Configuration>
             <Platform>x64</Platform>

@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-   <PropertyGroup>
+  <PropertyGroup>
     <UseMimallocDefine Condition="$(UseMimalloc) == true">_USE_MIMALLOC</UseMimallocDefine>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
@@ -210,6 +210,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <GenerateXMLDocumentationFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</GenerateXMLDocumentationFiles>
+      <GenerateXMLDocumentationFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateXMLDocumentationFiles>
     </ClCompile>
     <ClCompile Include="SQLiteEnv.cpp" />
     <ClCompile Include="SQLiteDb.cpp" />
